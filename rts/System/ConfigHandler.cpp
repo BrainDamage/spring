@@ -224,13 +224,6 @@ void ConfigHandler::SetString(const string name, const string value)
  */
 string ConfigHandler::GetDefaultConfig()
 {
-	string binaryPath = Platform::GetBinaryPath() + "/";
-	std::string portableConfPath = binaryPath + "springsettings.cfg";
-	if (access(portableConfPath.c_str(), 6) != -1)
-	{
-		return portableConfPath;
-	}
-
 	string cfg;
 
 #ifndef _WIN32
