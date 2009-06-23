@@ -8,6 +8,7 @@
 #include <string>
 #include <map>
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/FBO.h"
 
 class CVertexArray;
 struct S3DModel;
@@ -31,7 +32,7 @@ public:
 	void DoDrawUnit(CUnit *unit, bool drawReflection, bool drawRefraction, CUnit *excludeUnit);
 	void DrawUnitLOD(CUnit* unit);
 
-	void DrawCloakedUnits(void);     // cloaked units must be drawn after all others
+	void DrawCloakedUnits(bool submerged, bool noAdvShading = false);     // cloaked units must be drawn after all others
 	void DrawShadowPass(void);
 	void DoDrawUnitShadow(CUnit *unit);
 
@@ -53,17 +54,11 @@ public:
 
 	volatile bool mt_drawReflection;
 	volatile bool mt_drawRefraction;
-  #ifdef DIRECT_CONTROL_ALLOWED
 	CUnit* volatile mt_excludeUnit;
-  #endif
 
 	static void DoDrawUnitMT(void* c, CUnit* unit) {
 		CUnitDrawer* const ud = (CUnitDrawer*) c;
-		#ifdef DIRECT_CONTROL_ALLOWED
 		ud->DoDrawUnit(unit, ud->mt_drawReflection, ud->mt_drawRefraction, ud->mt_excludeUnit);
-		#else
-		ud->DoDrawUnit(unit, ud->mt_drawReflection, ud->mt_drawRefraction, NULL);
-		#endif
 	}
 
 	static void DoDrawUnitShadowMT(void *c,CUnit *unit) {((CUnitDrawer *)c)->DoDrawUnitShadow(unit);}
@@ -100,11 +95,18 @@ public:
 	CVertexArray* va;
 
 	bool advShading;
+	bool advFade;
+	float cloakAlpha;
+	float cloakAlpha1;
+	float cloakAlpha2;
+	float cloakAlpha3;
 
 	float LODScale;
 	float LODScaleShadow;
 	float LODScaleReflection;
 	float LODScaleRefraction;
+
+	FBO unitReflectFBO;
 
 	unsigned int unitVP;             // vertex program
 	unsigned int unitFP;             // fragment program, shadows disabled
@@ -155,9 +157,7 @@ public:
 
 	float3 camNorm;		//used by drawfar
 
-#ifdef DIRECT_CONTROL_ALLOWED
 	CUnit* playerControlledUnit;
-#endif
 	void CreateSpecularFace(unsigned int gltype, int size, float3 baseDir, float3 xdif, float3 ydif, float3 sundir, float exponent,float3 suncolor);
 	void UpdateReflectTex(void);
 	void CreateReflectionFace(unsigned int gltype, float3 camdir);

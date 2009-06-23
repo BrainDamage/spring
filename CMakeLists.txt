@@ -45,11 +45,6 @@ if (SYNCCHECK)
 	ADD_DEFINITIONS(-DSYNCCHECK)
 endif (SYNCCHECK)
 
-SET(DIRECT_CONTROL TRUE CACHE BOOL "Allow controling units in first-person-mode")
-if (DIRECT_CONTROL)
-	ADD_DEFINITIONS(-DDIRECT_CONTROL_ALLOWED)
-endif (DIRECT_CONTROL)
-
 IF (WIN32)
 	SET(NO_AVI FALSE CACHE BOOL "Disable in-game video recording")
 	if (NO_AVI)
@@ -100,7 +95,7 @@ else (SDL_FOUND)
 	message("* AIs")
 endif (SDL_FOUND)
 
-FIND_PACKAGE(Boost 1.35.0 COMPONENTS thread regex program_options REQUIRED)
+FIND_PACKAGE(Boost 1.35.0 COMPONENTS thread regex program_options system REQUIRED)
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 
 FIND_PACKAGE(Devil REQUIRED)

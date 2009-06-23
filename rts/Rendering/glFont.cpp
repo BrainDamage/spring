@@ -367,7 +367,7 @@ GLuint CFontTextureRenderer::CreateTexture()
 
 	//! generate the ogl texture
 	texHeight = curY + curHeight;
-	if (!GLEW_ARB_texture_non_power_of_two)
+	if (!gu->supportNPOTs)
 		texHeight = next_power_of_2(texHeight);
 	GLuint tex;
 	glGenTextures(1, &tex);
@@ -1429,7 +1429,6 @@ void CglFont::Begin(const bool immediate, const bool resetColors)
 		logOutput.Print("FontError: called Begin() multiple times");
 		return;
 	}
-	inBeginEnd = true;
 
 	autoOutlineColor = true;
 
@@ -1437,6 +1436,8 @@ void CglFont::Begin(const bool immediate, const bool resetColors)
 	if (resetColors) {
 		SetColors(); //! reset colors
 	}
+
+	inBeginEnd = true;
 
 	va.Initialize();
 	va2.Initialize();

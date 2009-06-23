@@ -15,8 +15,7 @@
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/RadarHandler.h"
 #include "Sim/Projectiles/Unsynced/SmokeProjectile.h"
-#include "Sim/Units/COB/CobFile.h"
-#include "Sim/Units/COB/CobInstance.h"
+#include "Sim/Units/COB/UnitScript.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Weapons/Weapon.h"
 
@@ -164,7 +163,6 @@ void CAirMoveType::Update(void)
 	}
 
 
-#ifdef DIRECT_CONTROL_ALLOWED
 	if (owner->directControl && !(aircraftState == AIRCRAFT_CRASHING)) {
 		SetState(AIRCRAFT_FLYING);
 		DirectControlStruct* dc = owner->directControl;
@@ -188,12 +186,11 @@ void CAirMoveType::Update(void)
 			goto EndNormalControl; // bad
 		}
 	}
-#endif
 
 
 	if (reservedPad) {
 		CUnit* unit = reservedPad->GetUnit();
-		float3 relPos = unit->cob->GetPiecePos(reservedPad->GetPiece());
+		float3 relPos = unit->script->GetPiecePos(reservedPad->GetPiece());
 		float3 pos = unit->pos + (unit->frontdir * relPos.z) + (unit->updir * relPos.y) + (unit->rightdir * relPos.x);
 
 		if (padStatus == 0) {
@@ -739,11 +736,7 @@ void CAirMoveType::UpdateFlying(float wantedHeight, float engine)
 	}
 
 
-	if (adjustedGoalDir.dot(frontdir) < -0.1f && goalLength < turnRadius
-#ifdef DIRECT_CONTROL_ALLOWED
-		&& (!owner->directControl || owner->directControl->mouse2)
-#endif
-		)
+	if (adjustedGoalDir.dot(frontdir) < -0.1f && goalLength < turnRadius && (!owner->directControl || owner->directControl->mouse2))
 		goalDotRight = -goalDotRight;
 	if (lastColWarning) {
 		goalDotRight -= otherDir.dot(rightdir) * otherThreat;
@@ -904,7 +897,7 @@ void CAirMoveType::UpdateLanding(void)
 			owner->physicalState = CSolidObject::Flying;
 			pos = tp;
 			owner->Deactivate();
-			owner->cob->Call(COBFN_StopMoving);
+			owner->script->StopMoving();
 		} else {
 			goalPos.CheckInBounds();
 			UpdateFlying(wantedHeight, 1);
@@ -1021,7 +1014,6 @@ void CAirMoveType::UpdateAirPhysics(float rudder, float aileron, float elevator,
 
 	float gHeight = ground->GetHeight(pos.x, pos.z);
 
-#ifdef DIRECT_CONTROL_ALLOWED
 	if (owner->directControl) {
 		if ((pos.y - gHeight) > wantedHeight * 1.2f) {
 			engine = std::max(0.0f, std::min(engine, 1 - (pos.y - gHeight - wantedHeight * 1.2f) / wantedHeight));
@@ -1029,7 +1021,6 @@ void CAirMoveType::UpdateAirPhysics(float rudder, float aileron, float elevator,
 		// check next position given current (unadjusted) pos and speed
 		nextPosInBounds = (pos + speed).CheckInBounds();
 	}
-#endif
 
 
 	speed += engineVector * maxAcc * engine;
@@ -1124,7 +1115,7 @@ void CAirMoveType::SetState(AAirMoveType::AircraftState state)
 
 	if (state == AIRCRAFT_FLYING) {
 		owner->Activate();
-		owner->cob->Call(COBFN_StartMoving);
+		owner->script->StartMoving();
 	}
 
 	if (state == AIRCRAFT_LANDED) {

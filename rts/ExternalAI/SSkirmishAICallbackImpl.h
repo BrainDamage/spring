@@ -665,18 +665,22 @@ EXPORT(float            ) skirmishAiCallback_Map_getMinWind(int teamId);
 EXPORT(float            ) skirmishAiCallback_Map_getMaxWind(int teamId);
 EXPORT(float            ) skirmishAiCallback_Map_getTidalStrength(int teamId);
 EXPORT(float            ) skirmishAiCallback_Map_getGravity(int teamId);
-EXPORT(int              ) skirmishAiCallback_Map_0MULTI1SIZE0Point(int teamId);
+EXPORT(int              ) skirmishAiCallback_Map_0MULTI1SIZE0Point(int teamId,
+		bool includeAllies);
 EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Point_getPosition(int teamId,
 		int pointId);
 EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Point_getColor(int teamId,
 		int pointId);
-EXPORT(const char*      ) skirmishAiCallback_Map_Point_getLabel(int teamId, int pointId);
-EXPORT(int              ) skirmishAiCallback_Map_0MULTI1SIZE0Line(int teamId);
-EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Line_getFirstPosition(int teamId,
+EXPORT(const char*      ) skirmishAiCallback_Map_Point_getLabel(int teamId,
+		int pointId);
+EXPORT(int              ) skirmishAiCallback_Map_0MULTI1SIZE0Line(int teamId,
+		bool includeAllies);
+EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Line_getFirstPosition(
+		int teamId, int lineId);
+EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Line_getSecondPosition(
+		int teamId, int lineId);
+EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Line_getColor(int teamId,
 		int lineId);
-EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Line_getSecondPosition(int teamId,
-		int lineId);
-EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_Line_getColor(int teamId, int lineId);
 EXPORT(bool             ) skirmishAiCallback_Map_0REF1UnitDef2unitDefId0isPossibleToBuildAt(int teamId, int unitDefId,
 		struct SAIFloat3 pos, int facing);
 EXPORT(struct SAIFloat3 ) skirmishAiCallback_Map_0REF1UnitDef2unitDefId0findClosestBuildSite(int teamId,
@@ -715,7 +719,6 @@ EXPORT(bool             ) skirmishAiCallback_FeatureDef_isUpright(int teamId, in
 EXPORT(int              ) skirmishAiCallback_FeatureDef_getDrawType(int teamId, int featureDefId);
 EXPORT(const char*      ) skirmishAiCallback_FeatureDef_getModelName(int teamId,
 		int featureDefId);
-EXPORT(int              ) skirmishAiCallback_FeatureDef_getModelType(int teamId, int featureDefId);
 EXPORT(int              ) skirmishAiCallback_FeatureDef_getResurrectable(int teamId,
 		int featureDefId);
 EXPORT(int              ) skirmishAiCallback_FeatureDef_getSmokeTime(int teamId, int featureDefId);

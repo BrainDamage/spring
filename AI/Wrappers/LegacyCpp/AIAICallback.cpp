@@ -708,6 +708,14 @@ const unsigned short* CAIAICallback::GetLosMap() {
 	return losMap;
 }
 
+int CAIAICallback::GetLosMapResolution() {
+
+	int fullSize = GetMapWidth() * GetMapHeight();
+	int losSize = sAICallback->Clb_Map_0ARRAY1SIZE0getLosMap(teamId);
+
+	return fullSize / losSize;
+}
+
 const unsigned short* CAIAICallback::GetRadarMap() {
 
 	static unsigned short* radarMap = NULL;
@@ -913,9 +921,9 @@ float3 CAIAICallback::GetMousePos() {
 	return float3(sAICallback->Clb_Map_getMousePos(teamId));
 }
 
-int CAIAICallback::GetMapPoints(PointMarker* pm, int maxPoints) {
+int CAIAICallback::GetMapPoints(PointMarker* pm, int pm_sizeMax, bool includeAllies) {
 
-	int numPoints = sAICallback->Clb_Map_0MULTI1SIZE0Point(teamId);
+	int numPoints = sAICallback->Clb_Map_0MULTI1SIZE0Point(teamId, includeAllies);
 	for (int p=0; p < numPoints; ++p) {
 		pm[p].pos = float3(sAICallback->Clb_Map_Point_getPosition(teamId, p));
 		SAIFloat3 tmpColor = sAICallback->Clb_Map_Point_getColor(teamId, p);
@@ -929,9 +937,9 @@ int CAIAICallback::GetMapPoints(PointMarker* pm, int maxPoints) {
 	return numPoints;
 }
 
-int CAIAICallback::GetMapLines(LineMarker* lm, int maxLines) {
+int CAIAICallback::GetMapLines(LineMarker* lm, int lm_sizeMax, bool includeAllies) {
 
-	int numLines = sAICallback->Clb_Map_0MULTI1SIZE0Line(teamId);
+	int numLines = sAICallback->Clb_Map_0MULTI1SIZE0Line(teamId, includeAllies);
 	for (int l=0; l < numLines; ++l) {
 		lm[l].pos = float3(sAICallback->Clb_Map_Line_getFirstPosition(teamId, l));
 		lm[l].pos2 = float3(sAICallback->Clb_Map_Line_getSecondPosition(teamId, l));
@@ -1029,7 +1037,6 @@ featureDef->collisionVolumeTest = sAICallback->Clb_FeatureDef_CollisionVolume_ge
 featureDef->upright = sAICallback->Clb_FeatureDef_isUpright(teamId, featureDefId);
 featureDef->drawType = sAICallback->Clb_FeatureDef_getDrawType(teamId, featureDefId);
 featureDef->modelname = sAICallback->Clb_FeatureDef_getModelName(teamId, featureDefId);
-featureDef->modelType = sAICallback->Clb_FeatureDef_getModelType(teamId, featureDefId);
 featureDef->resurrectable = sAICallback->Clb_FeatureDef_getResurrectable(teamId, featureDefId);
 featureDef->smokeTime = sAICallback->Clb_FeatureDef_getSmokeTime(teamId, featureDefId);
 featureDef->destructable = sAICallback->Clb_FeatureDef_isDestructable(teamId, featureDefId);

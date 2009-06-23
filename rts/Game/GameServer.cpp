@@ -1,4 +1,15 @@
+#ifdef _MSC_VER
+#	include "StdAfx.h"
+#elif defined(_WIN32)
+#	include <windows.h>
+#endif
+
+#include "Net/UDPListener.h"
+#include "Net/UDPConnection.h"
+
+#ifndef _MSC_VER
 #include "StdAfx.h"
+#endif
 
 #include <stdarg.h>
 #include <ctime>
@@ -14,6 +25,7 @@
 #endif
 #include <stdlib.h> // why is this here?
 
+#include "Net/Connection.h"
 #include "mmgr.h"
 #include "ExternalAI/SkirmishAIKey.h"
 
@@ -31,9 +43,6 @@
 #include "CommandMessage.h"
 #include "BaseNetProtocol.h"
 #include "PlayerHandler.h"
-#include "Net/UDPListener.h"
-#include "Net/Connection.h"
-#include "Net/UDPConnection.h"
 #include "Net/LocalConnection.h"
 #include "Net/UnpackPacket.h"
 #include "DemoReader.h"
@@ -167,6 +176,7 @@ CGameServer::CGameServer(const ClientSetup* settings, bool onlyLocal, const Game
 	std::copy(setup->playerStartingData.begin(), setup->playerStartingData.end(), players.begin());
 
 	teams.resize(setup->teamStartingData.size());
+	std::copy(setup->teamStartingData.begin(), setup->teamStartingData.end(), teams.begin());
 
 	RestrictedAction("kick");			RestrictedAction("kickbynum");
 	RestrictedAction("setminspeed");	RestrictedAction("setmaxspeed");
@@ -195,6 +205,15 @@ CGameServer::CGameServer(const ClientSetup* settings, bool onlyLocal, const Game
 	demoRecorder->SaveToDemo(ret->data, ret->length, modGameTime);
 	delete ret;
 #endif
+	// AIs do not join in here, so jsut set their teams as active
+	for (size_t i = 0; i < setup->numTeams; ++i)
+	{
+		if (setup->GetSkirmishAIDataForTeam(i))
+		{
+			teams[i].active = true;
+		}
+	}
+
 	thread = new boost::thread(boost::bind<void, CGameServer, CGameServer*>(&CGameServer::UpdateLoop, this));
 
 #ifdef STREFLOP_H
@@ -403,6 +422,7 @@ void CGameServer::CheckSync()
 		}
 
 		if (!noSyncResponse.empty()) {
+			size_t mss = noSyncResponse.size();
 			if (!syncWarningFrame || (*f - syncWarningFrame > static_cast<int>(SYNCCHECK_MSG_TIMEOUT))) {
 				syncWarningFrame = *f;
 
@@ -814,7 +834,6 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 			Broadcast(packet); //forward data
 			break;
 
-#ifdef DIRECT_CONTROL_ALLOWED
 		case NETMSG_DIRECT_CONTROL:
 			if(inbuf[1]!=a){
 				Message(str(format(WrongPlayer) %(unsigned)inbuf[0] %a %(unsigned)inbuf[1]));
@@ -832,7 +851,6 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 					Broadcast(CBaseNetProtocol::Get().SendDirectControlUpdate(inbuf[1], inbuf[2], *((short*)&inbuf[3]), *((short*)&inbuf[5])));
 			}
 			break;
-#endif
 
 		case NETMSG_STARTPLAYING:
 		{
@@ -842,7 +860,7 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 		}
 		case NETMSG_TEAM:
 		{
-						//TODO update players[] and teams[] and send all to hostif
+			//TODO update players[] and teams[] and send all to hostif
 			const unsigned player = (unsigned)inbuf[1];
 			if (player != a)
 			{
@@ -862,6 +880,11 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 				switch (action)
 				{
 					case TEAMMSG_GIVEAWAY: {
+						if (players[player].spectator)
+						{
+							Message(str( boost::format("Spectator %s tried to hack the game (spoofed TEAMMSG_GIVEAWAY)") %players[player].name), true);
+							break;
+						}
 						const unsigned toTeam = inbuf[3];
 						Broadcast(CBaseNetProtocol::Get().SendGiveAwayEverything(player, toTeam));
 						if (numPlayersInTeam <= 1)
@@ -874,6 +897,11 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 						break;
 					}
 					case TEAMMSG_RESIGN: {
+						if (players[player].spectator)
+						{
+							Message(str(boost::format("Spectator %s tried to hack the game (spoofed TEAMMSG_RESIGN)") %players[player].name), true);
+							break;
+						}
 						Broadcast(CBaseNetProtocol::Get().SendResign(player));
 						players[player].team = 0;
 						players[player].spectator = true;
@@ -1083,7 +1111,7 @@ void CGameServer::CheckForGameStart(bool forced)
 		{
 			allReady = false;
 			break;
-		} else if (teams[players[a].team].active && !teams[players[a].team].readyToStart && !demoReader)
+		} else if (!players[a].spectator && teams[players[a].team].active && !teams[players[a].team].readyToStart && !demoReader)
 		{
 			allReady = false;
 			break;
@@ -1124,10 +1152,7 @@ void CGameServer::StartGame()
 	GenerateAndSendGameID();
 	for (int a = 0; a < setup->numTeams; ++a)
 	{
-		if (teams[a].active) // its a player
-			Broadcast(CBaseNetProtocol::Get().SendStartPos(SERVER_PLAYER, a, 1, teams[a].startPos.x, teams[a].startPos.y, teams[a].startPos.z));
-		else // maybe an AI?
-			Broadcast(CBaseNetProtocol::Get().SendStartPos(SERVER_PLAYER, a, 1, setup->teamStartingData[a].startPos.x, setup->teamStartingData[a].startPos.y, setup->teamStartingData[a].startPos.z));
+		Broadcast(CBaseNetProtocol::Get().SendStartPos(SERVER_PLAYER, a, 1, teams[a].startPos.x, teams[a].startPos.y, teams[a].startPos.z));
 	}
 
 	Broadcast(CBaseNetProtocol::Get().SendRandSeed(rng()));
@@ -1303,13 +1328,13 @@ void CGameServer::CheckForGameEnd()
 			}
 		}
 		const SkirmishAIData* sad = setup->GetSkirmishAIDataForTeam(a);
-		if (sad)
-		{
-				hasPlayer = true;
+		if (sad) {
+			hasPlayer = true;
 		}
 
-		if (teams[a].active && hasPlayer)
+		if (teams[a].active && hasPlayer) {
 			++numActiveTeams[teams[a].teamAllyteam];
+		}
 	}
 #endif // !defined DEDICATED
 	for (size_t a = 0; a < numActiveTeams.size(); ++a) {
@@ -1395,17 +1420,7 @@ void CGameServer::UpdateLoop()
 {
 	while (!quitServer)
 	{
-		bool hasData = false;
-		if (hasLocalClient || !UDPNet)
-		{
-			spring_sleep(spring_msecs(10));
-			hasData = true;
-		}
-		else
-		{
-			assert(UDPNet);
-			hasData = UDPNet->HasIncomingData(10); // may block up to 10 ms if there is no data (don't need a lock)
-		}
+		spring_sleep(spring_msecs(10));
 
 		if (UDPNet)
 			UDPNet->Update();
@@ -1507,24 +1522,14 @@ unsigned CGameServer::BindConnection(std::string name, const std::string& versio
 
 	if (!demoReader || setup->demoName.empty()) // gamesetup from demo?
 	{
-		const unsigned hisTeam = setup->playerStartingData[hisNewNumber].team;
-		if (!teams[hisTeam].active) // create new team
+			const unsigned hisTeam = setup->playerStartingData[hisNewNumber].team;
+		if (!players[hisNewNumber].spectator && !teams[hisTeam].active) // create new team
 		{
 			teams[hisTeam].readyToStart = (setup->startPosType != CGameSetup::StartPos_ChooseInGame);
-			teams[hisTeam].teamAllyteam = setup->teamStartingData[hisTeam].teamAllyteam;
-			if (setup->startPosType == CGameSetup::StartPos_ChooseInGame) {
-				// if the player didn't choose a start position, choose one for him
-				// it should be near the center of his startbox
-				// we let the startscript handle it
-				teams[hisTeam].startPos.x = 0;
-				teams[hisTeam].startPos.y = -500;
-				teams[hisTeam].startPos.z = 0;
-			} else {
-				teams[hisTeam].startPos = setup->teamStartingData[hisTeam].startPos;
-			}
 			teams[hisTeam].active = true;
 		}
-		players[hisNewNumber].team = hisTeam;
+			players[hisNewNumber].team = hisTeam;
+
 		if (!setup->playerStartingData[hisNewNumber].spectator)
 			Broadcast(CBaseNetProtocol::Get().SendJoinTeam(hisNewNumber, hisTeam));
 		for (size_t a = 0; a < teams.size(); ++a)
@@ -1533,7 +1538,9 @@ unsigned CGameServer::BindConnection(std::string name, const std::string& versio
 		}
 	}
 
-	Message(str(format(NewConnection) %name %hisNewNumber %version));
+	Message(str(format(NewConnection) %name %hisNewNumber));
+	Message(str(format(" -> Address: %s") %link->GetFullAddress()));
+	Message(str(format(" -> Client version: %s") %version));
 
 	link->Flush(true);
 	return hisNewNumber;

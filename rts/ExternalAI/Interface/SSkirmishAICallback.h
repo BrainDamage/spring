@@ -432,8 +432,8 @@ int (CALLING_CONV *Clb_UnitDef_getArmorType)(int teamId, int unitDefId);
 int (CALLING_CONV *Clb_UnitDef_FlankingBonus_getMode)(int teamId,
 		int unitDefId);
 /**
- * The unit takes less damage when attacked from this direction
- * -> encourage flanking fire TODO: REVIEW THIS DOC-COMMENT
+ * The unit takes less damage when attacked from this direction.
+ * This encourage flanking fire.
  */
 struct SAIFloat3 (CALLING_CONV *Clb_UnitDef_FlankingBonus_getDir)(int teamId,
 		int unitDefId);
@@ -1170,7 +1170,7 @@ int (CALLING_CONV *Clb_Map_0ARRAY1VALS0getSlopeMap)(int teamId, float slopes[],
  *Clb_Mod_getLosMipLevel
  * - do NOT modify or delete the height-map (native code relevant only)
  * - index 0 is top left
- * - resolution factor (res) is min(1, gs->mapx << Clb_Mod_getLosMipLevel())
+ * - resolution factor (res) is min(1, 1 << Clb_Mod_getLosMipLevel())
  *   examples:
  *   	+ losMipLevel(0) -> res(1)
  *   	+ losMipLevel(1) -> res(2)
@@ -1253,20 +1253,30 @@ float (CALLING_CONV *Clb_Map_getMinWind)(int teamId);
 float (CALLING_CONV *Clb_Map_getMaxWind)(int teamId);
 float (CALLING_CONV *Clb_Map_getTidalStrength)(int teamId);
 float (CALLING_CONV *Clb_Map_getGravity)(int teamId);
-int (CALLING_CONV *Clb_Map_0MULTI1SIZE0Point)(int teamId);
+/**
+ * Returns all points drawn with this AIs team color,
+ * and additionally the ones drawn with allied team colors,
+ * if <code>includeAllies</code> is true.
+ */
+int (CALLING_CONV *Clb_Map_0MULTI1SIZE0Point)(int teamId, bool includeAllies);
 struct SAIFloat3 (CALLING_CONV *Clb_Map_Point_getPosition)(int teamId,
 		int pointId);
 struct SAIFloat3 (CALLING_CONV *Clb_Map_Point_getColor)(int teamId,
 		int pointId);
 const char* (CALLING_CONV *Clb_Map_Point_getLabel)(int teamId, int pointId);
-int (CALLING_CONV *Clb_Map_0MULTI1SIZE0Line)(int teamId);
+/**
+ * Returns all lines drawn with this AIs team color,
+ * and additionally the ones drawn with allied team colors,
+ * if <code>includeAllies</code> is true.
+ */
+int (CALLING_CONV *Clb_Map_0MULTI1SIZE0Line)(int teamId, bool includeAllies);
 struct SAIFloat3 (CALLING_CONV *Clb_Map_Line_getFirstPosition)(int teamId,
 		int lineId);
 struct SAIFloat3 (CALLING_CONV *Clb_Map_Line_getSecondPosition)(int teamId,
 		int lineId);
 struct SAIFloat3 (CALLING_CONV *Clb_Map_Line_getColor)(int teamId, int lineId);
-bool (CALLING_CONV *Clb_Map_0REF1UnitDef2unitDefId0isPossibleToBuildAt)(int teamId, int unitDefId,
-		struct SAIFloat3 pos, int facing);
+bool (CALLING_CONV *Clb_Map_0REF1UnitDef2unitDefId0isPossibleToBuildAt)(
+		int teamId, int unitDefId, struct SAIFloat3 pos, int facing);
 /**
  * Returns the closest position from a given position that a building can be built at.
  * @param minDist the distance in squares that the building must keep to other buildings,
@@ -1324,7 +1334,6 @@ bool (CALLING_CONV *Clb_FeatureDef_isUpright)(int teamId, int featureDefId);
 int (CALLING_CONV *Clb_FeatureDef_getDrawType)(int teamId, int featureDefId);
 const char* (CALLING_CONV *Clb_FeatureDef_getModelName)(int teamId,
 		int featureDefId);
-int (CALLING_CONV *Clb_FeatureDef_getModelType)(int teamId, int featureDefId);
 /**
  * Used to determine whether the feature is resurrectable.
  *

@@ -19,6 +19,7 @@ int AAIMap::xSize;
 int AAIMap::ySize;
 int AAIMap::xMapSize;
 int AAIMap::yMapSize;
+int AAIMap::losMapRes;
 int AAIMap::xLOSMapSize;
 int AAIMap::yLOSMapSize;
 int AAIMap::xDefMapSize;
@@ -138,8 +139,9 @@ void AAIMap::Init()
 		xSize = xMapSize * SQUARE_SIZE;
 		ySize = yMapSize * SQUARE_SIZE;
 
-		xLOSMapSize = xMapSize / 2;
-		yLOSMapSize = yMapSize / 2;
+		losMapRes = cb->GetLosMapResolution();
+		xLOSMapSize = xMapSize / losMapRes;
+		yLOSMapSize = yMapSize / losMapRes;
 
 		xDefMapSize = xMapSize / 4;
 		yDefMapSize = yMapSize / 4;
@@ -2214,11 +2216,11 @@ void AAIMap::UpdateRecon()
 	{
 		for(int x = 0; x < xLOSMapSize; ++x)
 		{
-			if(los_map[x + y * yLOSMapSize])
+			if(los_map[x + y * xLOSMapSize])
 			{
 				scout_map[x + y * xLOSMapSize] = 0;
 				last_updated_map[x + y * xLOSMapSize] = frame;
-				++sector_in_los[(2*x / xSectorSizeMap) + (2*y / ySectorSizeMap) * (xSectors+1)];
+				++sector_in_los[(losMapRes*x / xSectorSizeMap) + (losMapRes*y / ySectorSizeMap) * (xSectors+1)];
 			}
 		}
 	}
@@ -2241,8 +2243,8 @@ void AAIMap::UpdateRecon()
 
 		if(def) // unit is within los
 		{
-			x_pos = (int)pos.x / (2 * SQUARE_SIZE);
-			y_pos = (int)pos.z / (2 * SQUARE_SIZE);
+			x_pos = (int)pos.x / (losMapRes * SQUARE_SIZE);
+			y_pos = (int)pos.z / (losMapRes * SQUARE_SIZE);
 
 			// make sure unit is within the map (e.g. no aircraft that has flown outside of the map)
 			if(x_pos >= 0 && x_pos < xLOSMapSize && y_pos >= 0 && y_pos < yLOSMapSize)
@@ -2253,7 +2255,7 @@ void AAIMap::UpdateRecon()
 				if(cat >= STATIONARY_DEF && cat <= SUBMARINE_ASSAULT)
 				{
 					scout_map[x_pos + y_pos * xLOSMapSize] = def->id;
-					++sector_in_los_with_enemies[(2 * x_pos) / xSectorSizeMap + (xSectors + 1) * ((2 * y_pos) / ySectorSizeMap) ];
+					++sector_in_los_with_enemies[(losMapRes * x_pos) / xSectorSizeMap + (xSectors + 1) * ((losMapRes * y_pos) / ySectorSizeMap) ];
 				}
 
 				if(cat >= GROUND_ASSAULT && cat <= SUBMARINE_ASSAULT)
@@ -2359,9 +2361,9 @@ void AAIMap::UpdateEnemyScoutingData()
 			fill(sector->enemy_stat_combat_power.begin(), sector->enemy_stat_combat_power.end(), 0);
 			fill(sector->enemy_mobile_combat_power.begin(), sector->enemy_mobile_combat_power.end(), 0);
 
-			for(int y = sector->y * ySectorSizeMap/2; y < (sector->y + 1) * ySectorSizeMap/2; ++y)
+			for(int y = sector->y * ySectorSizeMap/losMapRes; y < (sector->y + 1) * ySectorSizeMap/losMapRes; ++y)
 			{
-				for(int x = sector->x * xSectorSizeMap/2; x < (sector->x + 1) * xSectorSizeMap/2; ++x)
+				for(int x = sector->x * xSectorSizeMap/losMapRes; x < (sector->x + 1) * xSectorSizeMap/losMapRes; ++x)
 				{
 					def_id = scout_map[x + y * xLOSMapSize];
 

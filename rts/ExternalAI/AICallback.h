@@ -95,6 +95,7 @@ public:
 	float GetMaxHeight();
 	const float* GetSlopeMap();
 	const unsigned short* GetLosMap();
+	int GetLosMapResolution();
 	const unsigned short* GetRadarMap();
 	const unsigned short* GetJammerMap();
 	const unsigned char* GetMetalMap();
@@ -163,11 +164,11 @@ public:
 
 	int GetSelectedUnits(int* unitIds, int unitIds_max);
 	float3 GetMousePos();
-	int GetMapPoints(PointMarker* pm, int maxPoints);
-	int GetMapLines(LineMarker* lm, int maxLines);
+	int GetMapPoints(PointMarker* pm, int pm_sizeMax, bool includeAllies);
+	int GetMapLines(LineMarker* lm, int lm_sizeMax, bool includeAllies);
 
-	float GetUnitDefRadius(int def);
-	float GetUnitDefHeight(int def);
+	float GetUnitDefRadius(int unitDefId);
+	float GetUnitDefHeight(int unitDefId);
 
 	const WeaponDef* GetWeapon(const char* weaponName);
 private:

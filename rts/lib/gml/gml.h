@@ -26,35 +26,35 @@ extern gmlQueue gmlQueues[GML_MAX_NUM_THREADS];
 
 extern boost::thread *gmlThreads[GML_MAX_NUM_THREADS];
 
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderServer_VERTEX;
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderServer_FRAGMENT;
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderServer_GEOMETRY_EXT;
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderObjectARBServer_VERTEX;
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderObjectARBServer_FRAGMENT;
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderObjectARBServer_GEOMETRY_EXT;
+
 #if defined(__GNUC__) && (__GNUC__ >= 4) && (__GNUC_MINOR__ >= 3) && (__GNUC_PATCHLEVEL__ == 0)
 // gcc has issues with attributes in function pointers it seems
-
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlProgramServer;
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlProgramObjectARBServer;
-
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (**)(void)> gmlProgramServer;
+extern gmlSingleItemServer<GLhandleARB, GLhandleARB (**)(void)> gmlProgramObjectARBServer;
 extern gmlSingleItemServer<GLUquadric *, GLUquadric *(*)(void)> gmlQuadricServer;
 
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei,GLuint *)> gmlTextureServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint *)> gmlTextureServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (**)(GLsizei, GLuint *)> gmlBufferARBServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (**)(GLsizei, GLuint *)> gmlFencesNVServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (**)(GLsizei, GLuint *)> gmlProgramsARBServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (**)(GLsizei, GLuint *)> gmlRenderbuffersEXTServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (**)(GLsizei, GLuint *)> gmlFramebuffersEXTServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (**)(GLsizei, GLuint *)> gmlQueryServer;
+extern gmlMultiItemServer<GLuint, GLsizei, void (**)(GLsizei, GLuint *)> gmlBufferServer;
 
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint*)> gmlBufferARBServer;
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint*)> gmlFencesNVServer;
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint*)> gmlProgramsARBServer;
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint*)> gmlRenderbuffersEXTServer;
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint*)> gmlFramebuffersEXTServer;
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint*)> gmlQueryServer;
-extern gmlMultiItemServer<GLuint, GLsizei, void (*)(GLsizei, GLuint*)> gmlBufferServer;
-
-extern gmlItemSequenceServer<GLuint, GLsizei,GLuint (*)(GLsizei)> gmlListServer;
-
+extern gmlItemSequenceServer<GLuint, GLsizei,GLuint (**)(GLsizei)> gmlListServer;
 #else
-
 extern gmlSingleItemServer<GLhandleARB, PFNGLCREATEPROGRAMPROC *> gmlProgramServer;
 extern gmlSingleItemServer<GLhandleARB, PFNGLCREATEPROGRAMOBJECTARBPROC *> gmlProgramObjectARBServer;
-
 extern gmlSingleItemServer<GLUquadric *, GLUquadric *(GML_GLAPIENTRY *)(void)> gmlQuadricServer;
 
-extern gmlMultiItemServer<GLuint, GLsizei, void (GML_GLAPIENTRY *)(GLsizei,GLuint *)> gmlTextureServer;
-
+extern gmlMultiItemServer<GLuint, GLsizei, void (GML_GLAPIENTRY *)(GLsizei, GLuint *)> gmlTextureServer;
 extern gmlMultiItemServer<GLuint, GLsizei, PFNGLGENBUFFERSARBPROC *> gmlBufferARBServer;
 extern gmlMultiItemServer<GLuint, GLsizei, PFNGLGENFENCESNVPROC *> gmlFencesNVServer;
 extern gmlMultiItemServer<GLuint, GLsizei, PFNGLGENPROGRAMSARBPROC *> gmlProgramsARBServer;
@@ -64,16 +64,7 @@ extern gmlMultiItemServer<GLuint, GLsizei, PFNGLGENQUERIESPROC *> gmlQueryServer
 extern gmlMultiItemServer<GLuint, GLsizei, PFNGLGENBUFFERSPROC *> gmlBufferServer;
 
 extern gmlItemSequenceServer<GLuint, GLsizei,GLuint (GML_GLAPIENTRY *)(GLsizei)> gmlListServer;
-
 #endif
-
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderServer_VERTEX;
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderServer_FRAGMENT;
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderServer_GEOMETRY_EXT;
-
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderObjectARBServer_VERTEX;
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderObjectARBServer_FRAGMENT;
-extern gmlSingleItemServer<GLhandleARB, GLhandleARB (*)(void)> gmlShaderObjectARBServer_GEOMETRY_EXT;
 
 extern void gmlInit();
 
@@ -166,7 +157,7 @@ extern boost::mutex mapmutex;
 extern boost::mutex inmapmutex;
 extern boost::mutex tempmutex;
 extern boost::mutex posmutex;
-extern boost::mutex rendermutex;
+extern boost::mutex runitmutex;
 extern boost::mutex simmutex;
 extern boost::mutex netmutex;
 extern boost::mutex histmutex;
@@ -176,8 +167,10 @@ extern boost::mutex watermutex;
 extern boost::mutex dquemutex;
 extern boost::mutex scarmutex;
 extern boost::mutex trackmutex;
+extern boost::mutex projmutex;
 extern boost::mutex rprojmutex;
 extern boost::mutex rflashmutex;
+extern boost::mutex rpiecemutex;
 
 #include <boost/thread/recursive_mutex.hpp>
 extern boost::recursive_mutex unitmutex;
@@ -185,15 +178,11 @@ extern boost::recursive_mutex quadmutex;
 extern boost::recursive_mutex selmutex;
 extern boost::recursive_mutex &luamutex;
 extern boost::recursive_mutex featmutex;
-extern boost::recursive_mutex projmutex;
 extern boost::recursive_mutex grassmutex;
 extern boost::recursive_mutex &guimutex;
 extern boost::recursive_mutex filemutex;
 extern boost::recursive_mutex &qnummutex;
-extern boost::recursive_mutex soundmutex;
 extern boost::recursive_mutex groupmutex;
-extern boost::recursive_mutex flashmutex;
-extern boost::recursive_mutex piecemutex;
 
 #if GML_MUTEX_PROFILER
 #	include "System/TimeProfiler.h"

@@ -58,7 +58,7 @@ void CTransportUnit::Update()
 		for (ti = transported.begin(); ti != transported.end(); ++ti) {
 			float3 relPos;
 			if (ti->piece >= 0) {
-				relPos = this->cob->GetPiecePos(ti->piece);
+				relPos = script->GetPiecePos(ti->piece);
 			} else {
 				relPos = float3(0.0f, -1000.0f, 0.0f);
 			}
@@ -114,10 +114,12 @@ void CTransportUnit::KillUnit(bool selfDestruct, bool reclaimed, CUnit* attacker
 			u->KillUnit(false, false, NULL, false);
 			continue;
 		} else {
-			if (gh < -u->unitDef->movedata->depth) {
-				// treat depth as maxWaterDepth (fails if
-				// the transportee is a ship, but so does
-				// using UnitDef::{min, max}WaterDepth)
+			// immobile units can still be transported
+			// via script trickery, guard against this
+			if (u->unitDef->movedata != NULL && gh < -u->unitDef->movedata->depth) {
+				// always treat depth as maxWaterDepth (fails if
+				// the transportee is a ship, but so does using
+				// UnitDef::{min, max}WaterDepth)
 				u->KillUnit(false, false, NULL, false);
 				continue;
 			}

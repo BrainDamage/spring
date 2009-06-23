@@ -18,10 +18,10 @@
 package nulloojavaai;
 
 
-import com.clan_sy.spring.ai.AICommand;
-import com.clan_sy.spring.ai.command.*;
-import com.clan_sy.spring.ai.AIFloat3;
-import com.clan_sy.spring.ai.oo.*;
+import com.springrts.ai.AICommand;
+import com.springrts.ai.command.*;
+import com.springrts.ai.AIFloat3;
+import com.springrts.ai.oo.*;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -110,7 +110,7 @@ public class NullOOJavaAI extends AbstractOOAI implements OOAI {
 
 	private int handleEngineCommand(AICommand command) {
 		return clb.getEngine().handleCommand(
-				com.clan_sy.spring.ai.AICommandWrapper.COMMAND_TO_ID_ENGINE,
+				com.springrts.ai.AICommandWrapper.COMMAND_TO_ID_ENGINE,
 				-1, command);
 	}
 	private int sendTextMsg(String msg) {
@@ -195,7 +195,7 @@ public class NullOOJavaAI extends AbstractOOAI implements OOAI {
 	}
 
 	@Override
-	public int unitCreated(Unit unit, int builder) {
+	public int unitCreated(Unit unit, Unit builder) {
 
 		int ret = sendTextMsg("unitCreated: " + unit.toString());
 		sendTextMsg("unitCreated def: " + unit.getDef().getName());

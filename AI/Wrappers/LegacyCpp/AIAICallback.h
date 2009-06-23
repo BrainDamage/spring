@@ -115,6 +115,7 @@ public:
 	virtual const float* GetSlopeMap();
 
 	virtual const unsigned short* GetLosMap();
+	virtual int GetLosMapResolution();
 	virtual const unsigned short* GetRadarMap();
 	virtual const unsigned short* GetJammerMap();
 	virtual const unsigned char* GetMetalMap();
@@ -166,8 +167,8 @@ public:
 
 	virtual int GetSelectedUnits(int* unitIds, int unitIds_max);
 	virtual float3 GetMousePos();
-	virtual int GetMapPoints(PointMarker* pm, int maxPoints);
-	virtual int GetMapLines(LineMarker* lm, int maxLines);
+	virtual int GetMapPoints(PointMarker* pm, int pm_sizeMax, bool includeAllies);
+	virtual int GetMapLines(LineMarker* lm, int lm_sizeMax, bool includeAllies);
 
 	virtual float GetMetal();
 	virtual float GetMetalIncome();
