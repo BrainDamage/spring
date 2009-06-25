@@ -5,8 +5,8 @@
 
 
 #define PACKXZ(x,z) (((int)(x) << 16)+((int)(z) & 0xffff))
-#define UNPACKX(xz) ((signed short)((boost::uint32_t)(xz) >> 16))
-#define UNPACKZ(xz) ((signed short)((boost::uint32_t)(xz) & 0xffff))
+#define UNPACKX(xz) ((signed short)((unsigned int)(xz) >> 16))
+#define UNPACKZ(xz) ((signed short)((unsigned int)(xz) & 0xffff))
 
 
 static const int COBSCALE = 65536;
