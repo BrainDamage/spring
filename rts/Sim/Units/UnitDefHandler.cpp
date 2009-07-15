@@ -337,7 +337,6 @@ void CUnitDefHandler::ParseTAUnit(const LuaTable& udTable, const string& unitNam
 	ud.canRestore = udTable.GetBool("canRestore", ud.builder);
 	ud.canRepair  = udTable.GetBool("canRepair",  ud.builder);
 	ud.canReclaim = udTable.GetBool("canReclaim", ud.builder);
-	ud.canBuild   = udTable.GetBool("canBuild",   ud.builder);
 	ud.canAssist  = udTable.GetBool("canAssist",  ud.builder);
 
 	ud.canBeAssisted = udTable.GetBool("canBeAssisted", true);
@@ -864,11 +863,12 @@ void CUnitDefHandler::LoadSounds(const LuaTable& soundsTable,
 void CUnitDefHandler::LoadSound(GuiSoundSet& gsound,
                                 const string& fileName, const float volume)
 {
-	if (!sound->HasSoundItem(fileName))
+	CFileHandler raw(fileName);
+	if (!sound->HasSoundItem(fileName) && !raw.FileExists())
 	{
 		string soundFile = "sounds/" + fileName;
 
-		if (soundFile.find(".wav") == string::npos) {
+		if (soundFile.find(".wav") == string::npos && soundFile.find(".ogg") == string::npos) {
 			// .wav extension missing, add it
 			soundFile += ".wav";
 		}

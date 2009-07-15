@@ -42,6 +42,8 @@
 #include "Sim/MoveTypes/TAAirMoveType.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/Projectile.h"
+#include "Sim/Projectiles/PieceProjectile.h"
+#include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
@@ -167,6 +169,8 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(UseUnitResource);
 
 	REGISTER_LUA_CFUNC(RemoveBuildingDecal);
+	REGISTER_LUA_CFUNC(AddGrass);
+	REGISTER_LUA_CFUNC(RemoveGrass);
 
 	REGISTER_LUA_CFUNC(SetFeatureHealth);
 	REGISTER_LUA_CFUNC(SetFeatureReclaim);
@@ -176,9 +180,18 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetFeatureNoSelect);
 	REGISTER_LUA_CFUNC(SetFeatureCollisionVolumeData);
 
+
 	REGISTER_LUA_CFUNC(SetProjectilePosition);
 	REGISTER_LUA_CFUNC(SetProjectileVelocity);
 	REGISTER_LUA_CFUNC(SetProjectileCollision);
+
+	REGISTER_LUA_CFUNC(SetProjectileGravity);
+	REGISTER_LUA_CFUNC(SetProjectileSpinAngle);
+	REGISTER_LUA_CFUNC(SetProjectileSpinSpeed);
+	REGISTER_LUA_CFUNC(SetProjectileSpinVec);
+
+	REGISTER_LUA_CFUNC(SetProjectileCEG);
+
 
 	REGISTER_LUA_CFUNC(CallCOBScript);
 	REGISTER_LUA_CFUNC(GetCOBScriptID);
@@ -2035,6 +2048,26 @@ int LuaSyncedCtrl::RemoveBuildingDecal(lua_State* L)
 }
 
 
+int LuaSyncedCtrl::AddGrass(lua_State* L)
+{
+	float3 pos(luaL_checkfloat(L, 1), 0.0f, luaL_checkfloat(L, 2));
+	pos.CheckInBounds();
+
+	treeDrawer->AddGrass(pos);
+	return 0;
+}
+
+
+int LuaSyncedCtrl::RemoveGrass(lua_State* L)
+{
+	float3 pos(luaL_checkfloat(L, 1), 0.0f, luaL_checkfloat(L, 2));
+	pos.CheckInBounds();
+
+	treeDrawer->RemoveGrass((int)pos.x,(int)pos.z);
+	return 0;
+}
+
+
 /******************************************************************************/
 
 int LuaSyncedCtrl::CreateFeature(lua_State* L)
@@ -2258,7 +2291,6 @@ int LuaSyncedCtrl::SetProjectilePosition(lua_State* L)
 	return 0;
 }
 
-
 int LuaSyncedCtrl::SetProjectileVelocity(lua_State* L)
 {
 	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
@@ -2281,9 +2313,85 @@ int LuaSyncedCtrl::SetProjectileCollision(lua_State* L)
 	}
 
 	proj->Collision();
+	return 0;
+}
+
+
+int LuaSyncedCtrl::SetProjectileGravity(lua_State* L)
+{
+	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
+	if (proj == NULL) {
+		return 0;
+	}
+
+	proj->gravity = luaL_optfloat(L, 2, 0.0f);
+	return 0;
+}
+
+int LuaSyncedCtrl::SetProjectileSpinAngle(lua_State* L)
+{
+	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
+	if (proj == NULL || !proj->piece) {
+		return 0;
+	}
+
+	CPieceProjectile* pproj = dynamic_cast<CPieceProjectile*>(proj);
+	pproj->spinAngle = luaL_optfloat(L, 2, 0.0f);
+	return 0;
+}
+
+int LuaSyncedCtrl::SetProjectileSpinSpeed(lua_State* L)
+{
+	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
+	if (proj == NULL || !proj->piece) {
+		return 0;
+	}
+
+	CPieceProjectile* pproj = dynamic_cast<CPieceProjectile*>(proj);
+	pproj->spinSpeed = luaL_optfloat(L, 2, 0.0f);
+	return 0;
+}
+
+int LuaSyncedCtrl::SetProjectileSpinVec(lua_State* L)
+{
+	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
+	if (proj == NULL || !proj->piece) {
+		return 0;
+	}
+
+	CPieceProjectile* pproj = dynamic_cast<CPieceProjectile*>(proj);
+	pproj->spinVec.x = luaL_optfloat(L, 2, 0.0f);
+	pproj->spinVec.y = luaL_optfloat(L, 3, 0.0f);
+	pproj->spinVec.z = luaL_optfloat(L, 4, 0.0f);
+	return 0;
+}
+
+
+int LuaSyncedCtrl::SetProjectileCEG(lua_State* L)
+{
+	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
+	if (proj == NULL) {
+		return 0;
+	}
+
+	assert(proj->weapon || proj->piece);
+
+	if (proj->weapon) {
+		CWeaponProjectile* wproj = dynamic_cast<CWeaponProjectile*>(proj);
+		if (wproj != NULL) {
+			wproj->ceg.Load(explGenHandler, luaL_checkstring(L, 2));
+		}
+	}
+	if (proj->piece) {
+		CPieceProjectile* pproj = dynamic_cast<CPieceProjectile*>(proj);
+		if (pproj != NULL) {
+			pproj->ceg.Load(explGenHandler, luaL_checkstring(L, 2));
+		}
+	}
 
 	return 0;
 }
+
 
 /******************************************************************************/
 /******************************************************************************/
@@ -2768,11 +2876,11 @@ int LuaSyncedCtrl::SpawnCEG(lua_State* L)
 {
 	const string name = luaL_checkstring(L, 1);
 	const float3 pos(luaL_optfloat(L, 2, 0.0f),
-									 luaL_optfloat(L, 3, 0.0f),
-									 luaL_optfloat(L, 4, 0.0f));
+		luaL_optfloat(L, 3, 0.0f),
+		luaL_optfloat(L, 4, 0.0f));
 	const float3 dir(luaL_optfloat(L, 5, 0.0f),
-									 luaL_optfloat(L, 6, 0.0f),
-									 luaL_optfloat(L, 7, 0.0f));
+		luaL_optfloat(L, 6, 0.0f),
+		luaL_optfloat(L, 7, 0.0f));
 	const float rad = luaL_optfloat(L, 8, 0.0f);
 	const float dmg = luaL_optfloat(L, 9, 0.0f);
 	const float dmgMod = 1.0f;
