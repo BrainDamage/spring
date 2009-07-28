@@ -105,7 +105,7 @@ public:
 
 	virtual void Init(unsigned char *hMap, int bx, int by,float * heightData);
 	virtual void Reset();
-	virtual void Tessellate(float cx,float cy, float cz);
+	virtual void Tessellate(float cx,float cy, float cz, int viewradius);
 	virtual void Render(CBFGroundDrawer * parent);
 
 };

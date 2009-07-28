@@ -112,7 +112,7 @@ inline void CBFGroundDrawer::AdvDraw(int bty) {
 	//ma->Initialize();
 	//ma->EnlargeArrays(1000000,1000000);
 	landscape.Reset();
-	landscape.Tessellate(cx2,cy2,cz2);
+	landscape.Tessellate(cx2,cy2,cz2,viewRadius);
 	
 	int patchesdrawn=0;
 	for(int i=0;i< (gs->mapx/PATCH_SIZE)*(gs->mapy/PATCH_SIZE);i++){

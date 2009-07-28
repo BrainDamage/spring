@@ -60,7 +60,7 @@ public:
 	// The static half of the Patch Class
 	virtual void Init( int heightX, int heightY, int worldX, int worldY, unsigned char *hMap, int mx,float maxH,float minH );
 	virtual void Reset();
-	virtual void Tessellate(float cx,float cy, float cz);
+	virtual void Tessellate(float cx,float cy, float cz,int viewradius);
 	virtual void Render(CVertexArray *ma,CBFGroundDrawer * parent, int n);
 	virtual void ComputeVariance();
 
