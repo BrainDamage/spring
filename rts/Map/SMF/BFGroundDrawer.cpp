@@ -15,7 +15,7 @@
 #include "FastMath.h"
 #include "GlobalUnsynced.h"
 #include "mmgr.h"
-#include "utility.h"
+#include "Utility.h"
 #include "Landscape.h"
 
 #ifdef USE_GML
