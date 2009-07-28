@@ -156,7 +156,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="dsound.lib freetype.lib zlibwapi.lib glew32s.lib opengl32.lib glu32.lib ogg.lib vorbis.lib vorbisfile.lib SDL.lib DevIL.lib winmm.lib wsock32.lib ilu.lib imagehlp.lib advapi32.lib ole32.lib openal32.lib"
+				AdditionalDependencies="freetype.lib zlibwapi.lib glew32s.lib opengl32.lib glu32.lib ogg.lib vorbis.lib vorbisfile.lib SDL.lib DevIL.lib winmm.lib wsock32.lib ilu.lib imagehlp.lib advapi32.lib ole32.lib openal32.lib"
 				OutputFile="../../../game/spring.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="true"
@@ -6372,7 +6372,19 @@
 					>
 				</File>
 				<File
+					RelativePath="..\..\Map\SMF\Landscape.h"
+					>
+				</File>
+				<File
 					RelativePath="..\..\Map\Smf\mapfile.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Map\SMF\Patch.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Map\SMF\Roamsimple.cpp"
 					>
 				</File>
 				<File
@@ -6389,6 +6401,14 @@
 				</File>
 				<File
 					RelativePath="..\..\Map\Smf\SmfReadMap.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Map\SMF\Utility.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Map\SMF\Utility.h"
 					>
 				</File>
 			</Filter>
