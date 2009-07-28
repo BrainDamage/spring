@@ -32,7 +32,6 @@ class Patch
 {
 protected:
 	unsigned char *m_HeightMap;									// Pointer to height map to use
-	int m_WorldX, m_WorldY;										// World coordinate offset of this patch.
 
 	unsigned char m_VarianceLeft[ 1<<(VARIANCE_DEPTH)];			// Left variance tree
 	unsigned char m_VarianceRight[1<<(VARIANCE_DEPTH)];			// Right variance tree
@@ -46,6 +45,11 @@ protected:
 
 public:
 	// Some encapsulation functions & extras
+	float distfromcam;
+	int m_WorldX, m_WorldY;										// World coordinate offset of this patch.
+	int mapx;
+	int offx, offy;
+
 	TriTreeNode *GetBaseLeft()  { return &m_BaseLeft; }
 	TriTreeNode *GetBaseRight() { return &m_BaseRight; }
 	char isDirty()     { return m_VarianceDirty; }
@@ -53,9 +57,9 @@ public:
 	void SetVisibility( int eyeX, int eyeY, int leftX, int leftY, int rightX, int rightY );
 
 	// The static half of the Patch Class
-	virtual void Init( int heightX, int heightY, int worldX, int worldY, unsigned char *hMap );
+	virtual void Init( int heightX, int heightY, int worldX, int worldY, unsigned char *hMap, int mx );
 	virtual void Reset();
-	virtual void Tessellate();
+	virtual void Tessellate(float cx,float cy, float cz);
 	virtual void Render(CVertexArray *ma,CBFGroundDrawer * parent, int n);
 	virtual void ComputeVariance();
 

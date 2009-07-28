@@ -46,7 +46,7 @@ class CBFGroundDrawer;
 #define POOL_SIZE (250000)
 
 // Some more definitions
-#define PATCH_SIZE (MAP_SIZE/NUM_PATCHES_PER_SIDE)
+#define PATCH_SIZE 128
 #define TEXTURE_SIZE (128)
 
 // Drawing Modes
@@ -86,7 +86,7 @@ class Landscape
 {
 protected:
 	unsigned char *m_HeightMap;										// HeightMap of the Landscape
-	Patch m_Patches[NUM_PATCHES_PER_SIDE][NUM_PATCHES_PER_SIDE];	// Array of patches
+	Patch * m_Patches;//[NUM_PATCHES_PER_SIDE][NUM_PATCHES_PER_SIDE];	// Array of patches
 
 	static int	m_NextTriNode;										// Index to next free TriTreeNode
 	static TriTreeNode m_TriPool[POOL_SIZE];						// Pool of TriTree nodes for splitting
@@ -96,10 +96,11 @@ protected:
 
 public:
 	static TriTreeNode *AllocateTri();
+	int h, w;
 
 	virtual void Init(unsigned char *hMap, int bx, int by);
 	virtual void Reset();
-	virtual void Tessellate();
+	virtual void Tessellate(float cx,float cy, float cz);
 	virtual void Render(CBFGroundDrawer * parent);
 
 };

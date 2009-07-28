@@ -15,7 +15,7 @@
 #include "FastMath.h"
 #include "GlobalUnsynced.h"
 #include "mmgr.h"
-#include "utility.h"
+#include "Utility.h"
 #include "Landscape.h"
 
 #ifdef USE_GML
@@ -73,22 +73,22 @@ CBFGroundDrawer::CBFGroundDrawer(CSmfReadMap* rm) :
 	}
 	//make landscaope:
 	int numhpix=gs->mapx *gs->mapy;
-	charheight= new unsigned char[numhpix+1024];
+	charheight= new unsigned char[numhpix+2*gs->mapx];
 	float hmin=10000;
 	float hmax=-10000;
 	for (int i=0; i<numhpix;i++) {hmin=min(hmin,heightData[i]); hmax=max(hmax,heightData[i]);
-		if (heightData[i]>1000)
-			continue;
+		//if (heightData[i]>1000)
+			//continue;
 	}
 	for (int x=0; x<gs->mapx;x++) {
 		for (int y=0; y<gs->mapy;y++) {
-			charheight[x+y*gs->mapx+512]=(int) (256*(heightData[x+y*(gs->mapy+1)]-hmin)/(hmax-hmin));}
+			charheight[x+y*gs->mapx+gs->mapx]=(int) (256*(heightData[x+y*(gs->mapy+1)]-hmin)/(hmax-hmin));}
 	}
 	for (int x=0; x<gs->mapx;x++) {
-		charheight[x]=charheight[x+512];
-		charheight[x+512+numhpix]=charheight[x+numhpix];
+		charheight[x]=charheight[x+gs->mapx];
+		charheight[x+gs->mapx+numhpix]=charheight[x+numhpix];
 	}
-	landscape.Init(charheight+512,gs->mapx,gs->mapy);
+	landscape.Init(charheight+gs->mapx,gs->mapx,gs->mapy);
 
 
 
@@ -101,15 +101,15 @@ CBFGroundDrawer::CBFGroundDrawer(CSmfReadMap* rm) :
 
 inline void CBFGroundDrawer::AdvDraw(int bty) {
 
-	float cx2 = cam2->pos.x / (SQUARE_SIZE*bigSquareSize);
-	float cz2 = cam2->pos.z / (SQUARE_SIZE*bigSquareSize);
-	float cy2 = cam2->pos.y / (SQUARE_SIZE*bigSquareSize);
+	float cx2 = cam2->pos.x ;
+	float cz2 = cam2->pos.z ;
+	float cy2 = cam2->pos.y ;
 	//CVertexArray *ma = GetVertexArray();
 
 	//ma->Initialize();
 	//ma->EnlargeArrays(1000000,1000000);
 	landscape.Reset();
-	landscape.Tessellate();
+	landscape.Tessellate(cx2,cy2,cz2);
 	landscape.Render(this);
 	//SetupBigSquare(btx,bty);
 	//DrawGroundVertexArrayQ(ma);
