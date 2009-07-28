@@ -63,6 +63,7 @@ class CBFGroundDrawer;
 
 #define SQR(x) ((x) * (x))
 #define MAX(a,b) ((a < b) ? (b) : (a))
+#define MIN(a,b) ((a > b) ? (b) : (a))
 #define DEG2RAD(a) (((a) * M_PI) / 180.0f)
 #define M_PI (3.14159265358979323846f)
 
@@ -86,7 +87,6 @@ class Landscape
 {
 protected:
 	unsigned char *m_HeightMap;										// HeightMap of the Landscape
-	Patch * m_Patches;//[NUM_PATCHES_PER_SIDE][NUM_PATCHES_PER_SIDE];	// Array of patches
 
 	static int	m_NextTriNode;										// Index to next free TriTreeNode
 	static TriTreeNode m_TriPool[POOL_SIZE];						// Pool of TriTree nodes for splitting
@@ -94,11 +94,16 @@ protected:
 	static int GetNextTriNode() { return m_NextTriNode; }
 	static void SetNextTriNode( int nNextNode ) { m_NextTriNode = nNextNode; }
 
-public:
+public:	
+	Patch * m_Patches;//[NUM_PATCHES_PER_SIDE][NUM_PATCHES_PER_SIDE];	// Array of patches
+
 	static TriTreeNode *AllocateTri();
 	int h, w;
+	float * minhpatch; //min and maximum heights for each patch for view testing.
+	float * maxhpatch;
+	float * heightData;
 
-	virtual void Init(unsigned char *hMap, int bx, int by);
+	virtual void Init(unsigned char *hMap, int bx, int by,float * heightData);
 	virtual void Reset();
 	virtual void Tessellate(float cx,float cy, float cz);
 	virtual void Render(CBFGroundDrawer * parent);

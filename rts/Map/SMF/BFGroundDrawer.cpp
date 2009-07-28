@@ -88,7 +88,10 @@ CBFGroundDrawer::CBFGroundDrawer(CSmfReadMap* rm) :
 		charheight[x]=charheight[x+gs->mapx];
 		charheight[x+gs->mapx+numhpix]=charheight[x+numhpix];
 	}
-	landscape.Init(charheight+gs->mapx,gs->mapx,gs->mapy);
+
+
+	landscape.Init(charheight+gs->mapx,gs->mapx,gs->mapy,heightData);
+	
 
 
 
@@ -110,6 +113,13 @@ inline void CBFGroundDrawer::AdvDraw(int bty) {
 	//ma->EnlargeArrays(1000000,1000000);
 	landscape.Reset();
 	landscape.Tessellate(cx2,cy2,cz2);
+	
+	int patchesdrawn=0;
+	for(int i=0;i< (gs->mapx/PATCH_SIZE)*(gs->mapy/PATCH_SIZE);i++){
+		if (landscape.m_Patches[i].isVisibile()==1) patchesdrawn++;
+	}
+	patchesdrawn++;
+
 	landscape.Render(this);
 	//SetupBigSquare(btx,bty);
 	//DrawGroundVertexArrayQ(ma);

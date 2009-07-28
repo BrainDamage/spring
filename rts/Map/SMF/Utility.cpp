@@ -1,17 +1,9 @@
 //
 // Utility.cpp
-// Bryan Turner
+//Added to Spring by Peter Sarkozy (mysterme AT gmail DOT com)
+// Billion thanks to Bryan Turner (Jan, 2000)
+//                    brturn@bellsouth.net
 //
-// Parts of the code in this file were borrowed from numerous public sources &
-//   literature.  I reserve NO rights to this code and give a hearty thank-you to all the
-//   excellent sources used in this project.  These include, but are not limited to:
-//
-//   Longbow Digital Arts Programming Forum (www.LongbowDigitalArts.com)
-//   Gamasutra Features (www.Gamasutra.com)
-//   GameDev References (www.GameDev.net)
-//   C. Cookson's ROAM implementation (C.J.Cookson@dcs.warwick.ac.uk OR cjcookson@hotmail.com)
-//   OpenGL Super Bible (Waite Group Press)
-//   And many more...
 //
 
 //#include <windows.h>

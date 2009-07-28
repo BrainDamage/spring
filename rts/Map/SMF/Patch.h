@@ -49,6 +49,7 @@ public:
 	int m_WorldX, m_WorldY;										// World coordinate offset of this patch.
 	int mapx;
 	int offx, offy;
+	float maxh, minh;
 
 	TriTreeNode *GetBaseLeft()  { return &m_BaseLeft; }
 	TriTreeNode *GetBaseRight() { return &m_BaseRight; }
@@ -57,7 +58,7 @@ public:
 	void SetVisibility( int eyeX, int eyeY, int leftX, int leftY, int rightX, int rightY );
 
 	// The static half of the Patch Class
-	virtual void Init( int heightX, int heightY, int worldX, int worldY, unsigned char *hMap, int mx );
+	virtual void Init( int heightX, int heightY, int worldX, int worldY, unsigned char *hMap, int mx,float maxH,float minH );
 	virtual void Reset();
 	virtual void Tessellate(float cx,float cy, float cz);
 	virtual void Render(CVertexArray *ma,CBFGroundDrawer * parent, int n);
