@@ -509,7 +509,7 @@ void Landscape::Render(CBFGroundDrawer * parent)
 		if (patch->isVisibile()){
 			CVertexArray *ma = GetVertexArray();
 			ma->Initialize();
-			ma->EnlargeArrays(10000,10000);
+			ma->EnlargeArrays(100010,100010);
 			patch->Render(ma,parent,nCount);
 			parent->SetupBigSquare(nCount%(w/PATCH_SIZE),nCount/(w/PATCH_SIZE));
 			parent->DrawGroundVertexArrayQ(ma);
