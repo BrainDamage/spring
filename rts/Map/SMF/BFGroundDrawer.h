@@ -95,6 +95,7 @@ protected:
 	void DrawGroundVertexArrayQ(CVertexArray * &ma);
 	void EndStripQ(CVertexArray *ma);
 protected:
+	float prevcam[6];
 	void CreateWaterPlanes(const bool &camOufOfMap);
 	inline void DrawWaterPlane(bool drawWaterReflection);
 

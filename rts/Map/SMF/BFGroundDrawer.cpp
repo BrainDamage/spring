@@ -91,6 +91,7 @@ CBFGroundDrawer::CBFGroundDrawer(CSmfReadMap* rm) :
 
 
 	landscape.Init(charheight+gs->mapx,gs->mapx,gs->mapy,heightData);
+	//prevcam=NULL;
 	
 
 
@@ -108,11 +109,30 @@ inline void CBFGroundDrawer::AdvDraw(int bty) {
 	float cz2 = cam2->pos.z ;
 	float cy2 = cam2->pos.y ;
 	//CVertexArray *ma = GetVertexArray();
+	//cam2->
+	bool framchanged=false;
+	if (prevcam[0]!=cam2->pos.x) framchanged=true;
+	else if (prevcam[1]!=cam2->pos.y) framchanged=true;
+	else if (prevcam[2]!=cam2->pos.z) framchanged=true;
+	else if (prevcam[3]!=cam2->forward.x) framchanged=true;
+	else if (prevcam[4]!=cam2->forward.y) framchanged=true;
+	else if (prevcam[5]!=cam2->forward.z) framchanged=true;
+	
+		
 
 	//ma->Initialize();
 	//ma->EnlargeArrays(1000000,1000000);
-	landscape.Reset();
-	landscape.Tessellate(cx2,cy2,cz2,viewRadius);
+	if (framchanged){
+		landscape.Reset();
+		landscape.Tessellate(cx2,cy2,cz2,viewRadius);
+		prevcam[0]=cam2->pos.x;
+		prevcam[1]=cam2->pos.y;
+		prevcam[2]=cam2->pos.z;
+		prevcam[3]=cam2->forward.x;
+		prevcam[4]=cam2->forward.y;
+		prevcam[5]=cam2->forward.z;
+
+	}
 	
 	int patchesdrawn=0;
 	for(int i=0;i< (gs->mapx/PATCH_SIZE)*(gs->mapy/PATCH_SIZE);i++){
