@@ -1,6 +1,10 @@
 #ifndef __BF_GROUND_DRAWER_INLINES_H__
 #define __BF_GROUND_DRAWER_INLINES_H__
 
+#include "Game/Camera.h"
+#include "Map/ReadMap.h"
+
+
 /* inlines originally in BFGroundDrawer.cpp moved here, so they can be used
    from other files too (by including this file after BFGroundDrawer.h) */
 

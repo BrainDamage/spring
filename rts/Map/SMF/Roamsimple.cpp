@@ -15,10 +15,10 @@
 
 #include "Rendering/GL/VertexArray.h"
 #include "BFGroundDrawer.h"
+#include "BFGroundDrawer_inlines.h"
 #include "Landscape.h"
 #include "Game/Camera.h"
 //#include "FastMath.h"
-#define NULL 0
 
 // -------------------------------------------------------------------------------------------------
 //	PATCH CLASS
@@ -123,7 +123,7 @@ void Patch::RecursTessellate( TriTreeNode *tri,
 		 (TriVariance > gFrameVariance))	// OR if we are not below the variance tree, test for variance.
 	{
 		Split(tri);														// Split this triangle.
-		
+
 		if (tri->LeftChild &&											// If this triangle was split, try to split it's children as well.
 			((abs(leftX - rightX) >= 3) || (abs(leftY - rightY) >= 3)))	// Tessellate all the way down to one vertex per height field entry
 		{
@@ -286,7 +286,7 @@ void Patch::SetVisibility( int eyeX, int eyeY, int leftX, int leftY, int rightX,
 	patchpos1.y=(maxh+minh)/2;
 	if(cam2->InView(patchpos1,768)) m_isVisible=1;
 	else m_isVisible=0;
-	//m_isVisible = 1; 
+	//m_isVisible = 1;
 }
 
 // ---------------------------------------------------------------------
@@ -305,7 +305,7 @@ void Patch::Tessellate(float cx,float cy, float cz, int viewradius)
 						m_WorldX+PATCH_SIZE,	m_WorldY,
 						m_WorldX,				m_WorldY,
 						1 );
-					
+
 	m_CurrentVariance = m_VarianceRight;
 	RecursTessellate(	&m_BaseRight,
 						m_WorldX+PATCH_SIZE,	m_WorldY,
@@ -319,13 +319,13 @@ void Patch::Tessellate(float cx,float cy, float cz, int viewradius)
 //
 void Patch::Render(CVertexArray *ma,CBFGroundDrawer * parent, int n)
 {
-		
+
 		RecursRender (	&m_BaseLeft,
 			0,				PATCH_SIZE,
 			PATCH_SIZE,		0,
 			0,				0,
 			ma,parent,n);
-		
+
 		RecursRender(	&m_BaseRight,
 			PATCH_SIZE,		0,
 			0,				PATCH_SIZE,
@@ -382,7 +382,7 @@ void Landscape::Init(unsigned char *hMap, int bx, int by,float * heightData)//51
 		maxhpatch[i]=-10000;
 		minhpatch[i]=10000;
 	}
-	
+
 	// Initialize all terrain patches
 	for ( Y=0; Y < by/PATCH_SIZE; Y++)
 		for ( X=0; X < bx/PATCH_SIZE; X++ )
@@ -435,11 +435,11 @@ void Landscape::Reset()
 		for ( X=0; X < w/PATCH_SIZE; X++)
 		{
 			patch = &(m_Patches[Y*(w/PATCH_SIZE)+X]);
-			
+
 			// Reset the patch
 			patch->Reset();
 			patch->SetVisibility( eyeX, eyeY, leftX, leftY, rightX, rightY );
-			
+
 			// Check to see if this patch has been deformed since last frame.
 			// If so, recompute the varience tree for it.
 			if ( patch->isDirty() )
@@ -480,7 +480,7 @@ void Landscape::Tessellate(float cx,float cy, float cz,int viewradius)
 	// Perform Tessellation
 	int nCount;
 	Patch *patch = &(m_Patches[0]);
-	
+
 
 	for (nCount=0; nCount < (w/PATCH_SIZE)*(h/PATCH_SIZE); nCount++, patch++ )
 	{
@@ -500,7 +500,7 @@ void Landscape::Render(CBFGroundDrawer * parent)
 	Patch *patch = &(m_Patches[0]);
 
 	// Scale the terrain by the terrain scale specified at compile time.
-	
+
 
 	for (nCount=0; nCount < (w/PATCH_SIZE)*(h/PATCH_SIZE); nCount++, patch++ )
 	{
