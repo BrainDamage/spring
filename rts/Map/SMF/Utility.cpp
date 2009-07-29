@@ -14,7 +14,7 @@
 //#include <gl/glu.h>		// GLU library
 
 #include "Utility.h"
-//#include "Landscape.h"
+//#include "landscape.h"
 
 // Observer and Follower modes
 #define FOLLOW_MODE (0)
@@ -62,9 +62,9 @@ int gDesiredTris = 100000;
 void ReduceToUnit(float vector[3])
 	{
 	float length;
-
-	// Calculate the length of the vector
-	length = sqrt((vector[0]*vector[0]) +
+	
+	// Calculate the length of the vector		
+	length = sqrt((vector[0]*vector[0]) + 
 				   (vector[1]*vector[1]) +
 				   (vector[2]*vector[2]));
 
@@ -121,9 +121,9 @@ void loadTerrain(int size, unsigned char **dest)
 	// Optimization:  Add an extra row above and below the height map.
 	//   - The extra top row contains a copy of the last row in the height map.
 	//   - The extra bottom row contains a copy of the first row in the height map.
-	// This simplifies the wrapping of height values to a trivial case.
+	// This simplifies the wrapping of height values to a trivial case. 
 	gHeightMaster = (unsigned char *)malloc( size * size * sizeof(unsigned char) + size * 2 );
-
+	
 	// Give the rest of the application a pointer to the actual start of the height map.
 	*dest = gHeightMaster + size;
 
@@ -142,7 +142,7 @@ void loadTerrain(int size, unsigned char **dest)
 	if (fp == NULL)
 	{
 		// Oops!  Couldn't find the file.
-
+		
 		// Clear the board.
 		memset( gHeightMaster, 0, size * size + size * 2 );
 		return;
