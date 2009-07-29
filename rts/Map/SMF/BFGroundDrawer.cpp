@@ -81,7 +81,7 @@ CBFGroundDrawer::CBFGroundDrawer(CSmfReadMap* rm) :
 	}
 	for (int x=0; x<gs->mapx;x++) {
 		for (int y=0; y<gs->mapy;y++) {
-			charheight[x+y*gs->mapx+gs->mapx]=(int) (256*(heightData[x+y*(gs->mapx+1)]-hmin)/(hmax-hmin));}
+			charheight[x+y*gs->mapx+gs->mapx]=5+(int) (245*(heightData[x+y*(gs->mapx+1)]-hmin)/(hmax-hmin));}
 	}
 	for (int x=0; x<gs->mapx;x++) {
 		charheight[x]=charheight[x+gs->mapx];
