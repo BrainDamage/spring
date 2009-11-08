@@ -385,7 +385,7 @@ void CLogOutput::ToFile(const CLogSubsystem& subsystem, const std::string messag
 		return;
 	const bool newline = (message.at(message.size() -1) != '\n');
 
-#if !defined UNITSYNC && !defined DEDICATED
+#if !defined UNITSYNC && !defined DEDICATED && !defined DEDICATED_CLIENT
 	if (gs) {
 		(*filelog) << IntToString(gs->frameNum, "[%7d] ");
 	}
