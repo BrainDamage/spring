@@ -17,7 +17,9 @@
 
 #include "TdfParser.h"
 #include "tdf_grammar.hpp"
+#ifndef DEDIDICATED_CLIENT
 #include "FileSystem/FileHandler.h"
+#endif
 #include "LogOutput.h"
 
 TdfParser::parse_error::parse_error( std::size_t l, std::size_t c, std::string const& f) throw()
@@ -181,7 +183,7 @@ void TdfParser::LoadBuffer( char const* buf, std::size_t size){
   parse_buffer( buf, size );
 }
 
-
+#ifndef DEDICATED_CLIENT
 void TdfParser::LoadFile(std::string const& filename){
 
   this->filename = filename;
@@ -201,7 +203,7 @@ TdfParser::TdfParser(std::string const& filename) {
 
   LoadFile(filename);
 }
-
+#endif
 
 //find value, return default value if no such value found
 std::string TdfParser::SGetValueDef(std::string const& defaultvalue, std::string const& location) const

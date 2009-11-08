@@ -6,8 +6,10 @@
 
 #include "mmgr.h"
 
+#ifndef DEDICATED_CLIENT
 #include "FileSystem/FileSystem.h"
 #include "FileSystem/FileHandler.h"
+#endif
 #include "Game/GameVersion.h"
 #include "Game/GameSetup.h"
 #include "Util.h"
@@ -17,14 +19,20 @@
 
 CDemoRecorder::CDemoRecorder()
 {
+	#ifndef DEDICATED_CLIENT
 	// We want this folder to exist
 	if (!filesystem.CreateDirectory("demos"))
 		return;
+	#endif
 
 	SetName("unnamed");
 	demoName = GetName();
-
+	#ifndef DEDICATED_CLIENT
 	std::string filename = filesystem.LocateFile(demoName, FileSystem::WRITE);
+	#else
+	// assumes CWD is writeable
+	std::string filename = demoName;
+	#endif
 	recordDemo.open(filename.c_str(), std::ios::out | std::ios::binary);
 
 	memset(&fileHeader, 0, sizeof(DemoFileHeader));
@@ -112,6 +120,7 @@ void CDemoRecorder::SetName(const std::string& mapname)
 	}
 
 	char buf[1024];
+	#ifndef DEDICATED_CLIENT
 	SNPRINTF(buf, sizeof(buf), "demos/%s.sdf", name.c_str());
 	CFileHandler ifs(buf);
 	if (ifs.FileExists()) {
@@ -122,6 +131,18 @@ void CDemoRecorder::SetName(const std::string& mapname)
 				break;
 		}
 	}
+	#else
+	// scan cwd instead, also using ifstream is slower
+	std::ifstream ifs(name.c_str());
+	if (ifs.is_open()) {
+		for (int a = 0; a < 9999; ++a) {
+			SNPRINTF(buf, sizeof(buf), "%s_(%i).sdf", name.c_str(), a);
+			std::ifstream ifs(buf);
+			if (!ifs.is_open())
+				break;
+		}
+	}
+	#endif
 
 	wantedName = buf;
 }

@@ -10,11 +10,13 @@
 
 #include "GameSetup.h"
 #include "TdfParser.h"
+#ifndef DEDICATED_CLEINT
 #include "FileSystem/ArchiveScanner.h"
 #include "Map/MapParser.h"
-#include "Rendering/Textures/TAPalette.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "UnsyncedRNG.h"
+#endif
+#include "Rendering/Textures/TAPalette.h"
 #include "Exceptions.h"
 #include "Util.h"
 #include "LogOutput.h"
@@ -50,7 +52,7 @@ void CGameSetup::LoadUnitRestrictions(const TdfParser& file)
 		restrictedUnits[resName] = resLimit;
 	}
 }
-
+#ifndef DEDICATED_CLIENT
 void CGameSetup::LoadStartPositionsFromMap()
 {
 	MapParser mapParser(mapName);
@@ -62,7 +64,6 @@ void CGameSetup::LoadStartPositionsFromMap()
 		teamStartingData[a].startPos = float3(pos.x, pos.y, pos.z);
 	}
 }
-
 void CGameSetup::LoadStartPositions(bool withoutMap)
 {
 	TdfParser file(gameSetupText.c_str(), gameSetupText.length());
@@ -118,7 +119,7 @@ void CGameSetup::LoadStartPositions(bool withoutMap)
 		}
 	}
 }
-
+#endif
 
 void CGameSetup::LoadPlayers(const TdfParser& file, std::set<std::string>& nameList)
 {
@@ -267,7 +268,7 @@ void CGameSetup::LoadTeams(const TdfParser& file)
 
 		if (data.startMetal == -1.0)
 			data.startMetal = startMetal;
-		
+
 		if (data.startEnergy == -1.0)
 			data.startEnergy = startEnergy;
 		teamStartingData.push_back(data);
@@ -456,8 +457,10 @@ bool CGameSetup::Init(const std::string& buf)
 
 	LoadUnitRestrictions(file);
 
+	#ifndef DEDICATED_CLIENT
 	// Postprocessing
 	modName = archiveScanner->ModArchiveToModName(modName);
+	#endif
 
 	return true;
 }
