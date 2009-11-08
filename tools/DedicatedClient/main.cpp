@@ -147,14 +147,6 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 
 	if (temp->Init(gameData->GetSetup()))
 	{
-		if (settings.isHost)
-		{
-			const std::string& setupTextStr = gameData->GetSetup();
-			std::fstream setupTextFile("_script.txt", std::ios::out);
-
-			setupTextFile.write(setupTextStr.c_str(), setupTextStr.size());
-			setupTextFile.close();
-		}
 		gameSetup = const_cast<const CGameSetup*>(temp);
 		// gs->LoadFromSetup(gameSetup); TODO: load just team infos
 		//CPlayer::UpdateControlledTeams();
