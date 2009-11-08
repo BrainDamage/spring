@@ -17,7 +17,7 @@ unsigned timer;
 boost::scoped_ptr<const GameData> gameData;
 
 bool Update();
-void UpdateClientNet();
+bool UpdateClientNet();
 void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet);
 void GameOver();
 

@@ -88,17 +88,15 @@ int main(int argc, char *argv[])
 bool Update()
 {
 	net->Update();
-	UpdateClientNet();
-
-	return net->Active();
+	return UpdateClientNet();
 }
 
-void UpdateClientNet()
+bool UpdateClientNet()
 {
 	if (!net->Active())
 	{
 		logOutput.Print("Server not reachable");
-		return;
+		return false;
 	}
 
 	boost::shared_ptr<const netcode::RawPacket> packet;
@@ -126,7 +124,7 @@ void UpdateClientNet()
 			{
 				logOutput.Print("Server shutdown");
 				logOutput.Print("Quitting");
-				exit(0);
+				return false;
 				break;
 			}
 			default:
@@ -136,6 +134,7 @@ void UpdateClientNet()
 			}
 		}
 	}
+	return true;
 }
 
 
