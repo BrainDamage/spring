@@ -112,7 +112,7 @@ bool UpdateClientNet()
 			}
 			case NETMSG_SETPLAYERNUM: // this is sent afterwards to let us know which playernum we have
 			{
-				gu->SetMyPlayer(packet->data[1]);
+				gu->SetMyPlayer(inbuf[1]);
 				logOutput.Print("User number %i (team %i, allyteam %i)", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
 
 				// send myPlayerName to let the server know you finished loading
@@ -128,6 +128,20 @@ bool UpdateClientNet()
 				return false;
 				break;
 			}
+			case NETMSG_GAMEID:
+			{
+				const unsigned char* p = &inbuf[1];
+				CDemoRecorder* record = net->GetDemoRecorder();
+				if (record != NULL) {
+					record->SetGameID(p);
+				}
+				logOutput.Print(
+				  "GameID: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+				  p[ 0], p[ 1], p[ 2], p[ 3], p[ 4], p[ 5], p[ 6], p[ 7],
+				  p[ 8], p[ 9], p[10], p[11], p[12], p[13], p[14], p[15]);
+				break;
+			}
+
 			default:
 			{
 				logOutput.Print("Unknown net-msg recieved : %i", int(packet->data[0]));
