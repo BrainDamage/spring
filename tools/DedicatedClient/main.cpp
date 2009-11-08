@@ -54,9 +54,10 @@ int main(int argc, char *argv[])
 		std::cout << "Starting client..." << std::endl;
 		// Create the client
 		net = new CNetProtocol();
+		net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
+
 		boost::thread thread(boost::bind<void, CNetProtocol, CNetProtocol*>(&CNetProtocol::UpdateLoop, net));
 
-		net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
 		timer = SDL_GetTicks();
 
 		while( Update() ) // don't quit as long as connection is active

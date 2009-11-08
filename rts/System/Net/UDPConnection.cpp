@@ -31,7 +31,7 @@ public:
 	{
 		pos = 0;
 	};
-	
+
 	template<typename T>
 	void Unpack(T& t)
 	{
@@ -62,7 +62,7 @@ public:
 	{
 		assert(data.size() == 0);
 	};
-	
+
 	template<typename T>
 	void Pack(T& t)
 	{
@@ -84,7 +84,7 @@ Packet::Packet(const unsigned char* data, unsigned length)
 	Unpacker buf(data, length);
 	buf.Unpack(lastContinuous);
 	buf.Unpack(nakType);
-	
+
 	if (nakType > 0)
 	{
 		naks.reserve(nakType);
@@ -448,7 +448,11 @@ void UDPConnection::Init()
 	resentChunks = 0;
 	sentPackets = recvPackets = 0;
 	droppedChunks = 0;
+	#ifndef DEDICATED_CLIENT
 	mtu = std::max(configHandler->Get("MaximumTransmissionUnit", 1400), 300);
+	#else
+	mtu = 1400;
+	#endif
 }
 
 void UDPConnection::CreateChunk(const unsigned char* data, const unsigned length, const int packetNum)
@@ -465,10 +469,10 @@ void UDPConnection::CreateChunk(const unsigned char* data, const unsigned length
 void UDPConnection::SendIfNecessary(bool flushed)
 {
 	const spring_time curTime = spring_gettime();
-	
+
 	int nak = 0;
 	std::vector<int> dropped;
-	
+
 	{
 		int packetNum = lastInOrder+1;
 		for (packetMap::iterator it = waitingPackets.begin(); it != waitingPackets.end(); ++it)
@@ -533,7 +537,7 @@ void UDPConnection::SendIfNecessary(bool flushed)
 				}
 				nak = 0; // 1 request is enought
 			}
-			
+
 			while (true)
 			{
 				if (!newChunks.empty() && buf.GetSize() + newChunks[0]->GetSize() <= mtu)
@@ -551,7 +555,7 @@ void UDPConnection::SendIfNecessary(bool flushed)
 				else
 					break;
 			}
-			
+
 			SendPacket(buf);
 			if (resendRequested.empty() && newChunks.empty())
 				todo = false;
