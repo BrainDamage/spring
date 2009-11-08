@@ -123,6 +123,7 @@ bool UpdateClientNet()
 			case NETMSG_QUIT:
 			{
 				logOutput.Print("Server shutdown");
+				GameOver();
 				logOutput.Print("Quitting");
 				return false;
 				break;
@@ -162,18 +163,20 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 	}
 }
 
-/*
+
 void GameOver()
 {
-
 	if (net && net->GetDemoRecorder())
 	{
-		net->GetDemoRecorder()->SetTime(serverframenum / 30, spring_tomsecs(spring_gettime()-serverStartTime)/1000);
-		net->GetDemoRecorder()->InitializeStats(players.size(), numTeams, winner);
+		/*
+		CDemoRecorder* record = net->GetDemoRecorder();
+
+		record->SetTime(serverframenum / 30, spring_tomsecs(spring_gettime()-serverStartTime)/1000);
+		record->InitializeStats(players.size(), numTeams, winner);
 		for ()
 		{
 
-			net->GetDemoRecorder()->SetPlayerStats(i, playerHandler->players[i].lastStats);
+			record->SetPlayerStats(i, playerHandler->players[i].lastStats);
 		}
 		for (size_t i = 0; i < ais.size(); ++i)
 		{
@@ -183,6 +186,7 @@ void GameOver()
 		{
 			record->SetTeamStats(i, teamHandler->Team(i)->statHistory);
 		}
+		*/
 	}
 }
-*/
+
