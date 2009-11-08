@@ -114,11 +114,11 @@ void UpdateClientNet()
 			}
 			case NETMSG_SETPLAYERNUM: // this is sent afterwards to let us know which playernum we have
 			{
-				SetMyPlayer(packet->data[1]);
-				logOutput.Print("User number %i (team %i, allyteam %i)", myPlayerNum, myTeam, myAllyTeam);
+				gu->SetMyPlayer(packet->data[1]);
+				logOutput.Print("User number %i (team %i, allyteam %i)", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
 
 				// send myPlayerName to let the server know you finished loading
-				net->Send(CBaseNetProtocol::Get().SendPlayerName(myPlayerNum, settings.myPlayerName));
+				net->Send(CBaseNetProtocol::Get().SendPlayerName(gu->myPlayerNum, settings.myPlayerName));
 
 				break;
 			}
@@ -138,23 +138,6 @@ void UpdateClientNet()
 	}
 }
 
-void SetMyPlayer(const int mynumber)
-{
-	myPlayerNum = mynumber;
-	if (gameSetup && gameSetup->playerStartingData.size() > mynumber)
-	{
-		myTeam = gameSetup->playerStartingData[myPlayerNum].team;
-		myAllyTeam = gameSetup->teamStartingData[myTeam].teamAllyteam;
-
-		spectating = gameSetup->playerStartingData[myPlayerNum].spectator;
-		spectatingFullView   = gameSetup->playerStartingData[myPlayerNum].spectator;
-
-		assert(myPlayerNum >= 0
-				&& gameSetup->playerStartingData.size() >= static_cast<size_t>(myPlayerNum)
-				&& myTeam >= 0
-				&& gameSetup->teamStartingData.size() >= myTeam);
-	}
-}
 
 void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 {
