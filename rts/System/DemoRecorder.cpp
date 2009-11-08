@@ -133,7 +133,8 @@ void CDemoRecorder::SetName(const std::string& mapname)
 	}
 	#else
 	// scan cwd instead, also using ifstream is slower
-	std::ifstream ifs(name.c_str());
+	SNPRINTF(buf, sizeof(buf), "%s.sdf", name.c_str());
+	std::ifstream ifs(buf);
 	if (ifs.is_open()) {
 		for (int a = 0; a < 9999; ++a) {
 			SNPRINTF(buf, sizeof(buf), "%s_(%i).sdf", name.c_str(), a);
