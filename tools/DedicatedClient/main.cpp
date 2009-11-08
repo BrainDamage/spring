@@ -6,6 +6,7 @@
 #include "System/ConfigHandler.h"
 #include "System/Exceptions.h"
 #include "Game/GameVersion.h"
+#include "System/GlobalUnsynced.h"
 
 #include "main.h"
 
@@ -53,6 +54,7 @@ int main(int argc, char *argv[])
 
 		std::cout << "Starting client..." << std::endl;
 		// Create the client
+		gu = new CGlobalUnsyncedStuff();
 		net = new CNetProtocol();
 		net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
 
@@ -118,7 +120,14 @@ void UpdateClientNet()
 				// send myPlayerName to let the server know you finished loading
 				net->Send(CBaseNetProtocol::Get().SendPlayerName(myPlayerNum, settings.myPlayerName));
 
-				return;
+				break;
+			}
+			case NETMSG_QUIT:
+			{
+				logOutput.Print("Server shutdown");
+				logOutput.Print("Quitting");
+				exit(0);
+				break;
 			}
 			default:
 			{
