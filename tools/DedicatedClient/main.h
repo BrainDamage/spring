@@ -15,9 +15,10 @@
 ClientSetup settings;
 unsigned timer;
 boost::scoped_ptr<const GameData> gameData;
+bool gameOver;
 
 bool Update();
 bool UpdateClientNet();
 void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet);
 void GameOver();
-
+std::vector<int> active_players;

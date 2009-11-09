@@ -56,6 +56,7 @@ int main(int argc, char *argv[])
 		// Create the client
 		gu = new CGlobalUnsyncedStuff();
 		net = new CNetProtocol();
+		gameOver = false;
 		net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
 
 		boost::thread thread(boost::bind<void, CNetProtocol, CNetProtocol*>(&CNetProtocol::UpdateLoop, net));
@@ -141,7 +142,22 @@ bool UpdateClientNet()
 				  p[ 8], p[ 9], p[10], p[11], p[12], p[13], p[14], p[15]);
 				break;
 			}
-
+			case NETMSG_PLAYERSTAT:
+			{
+				int player=inbuf[1];
+				if(player >= active_players.size() || player<0){
+					logOutput.Print("Got invalid player num %i in playerstat msg",player);
+					break;
+				}
+				PlayerStatistics playerstats = *(CPlayer::Statistics*)&inbuf[2];
+				if (gameOver) {
+					CDemoRecorder* record = net->GetDemoRecorder();
+					if (record != NULL) {
+						record->SetPlayerStats(player, playerstats);
+					}
+				}
+				break;
+			}
 			default:
 			{
 				logOutput.Print("Unknown net-msg recieved : %i", int(packet->data[0]));
@@ -202,5 +218,6 @@ void GameOver()
 		}
 		*/
 	}
+	gameOver = true;
 }
 
