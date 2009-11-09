@@ -5,8 +5,12 @@
 #include "System/LogOutput.h"
 #include "System/ConfigHandler.h"
 #include "System/Exceptions.h"
-#include "Game/GameVersion.h"
 #include "System/GlobalUnsynced.h"
+
+#include "Game/GameVersion.h"
+#include "Game/GameSetup.h"
+#include "Game/ClientSetup.h"
+#include "Game/GameData.h"
 
 #include "main.h"
 
@@ -14,6 +18,12 @@
 #include <iostream>
 #include <fstream>
 #include <SDL.h>
+
+#include <boost/thread/thread.hpp>
+#include <boost/bind.hpp>
+#include <boost/thread/barrier.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -183,7 +193,6 @@ bool UpdateClientNet()
 				active_players.erase(player);
 				break;
 			}
-
 			case NETMSG_PLAYERNAME:
 			{
 				int player = inbuf[2];

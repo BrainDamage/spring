@@ -1,27 +1,18 @@
-#include "Game/GameSetup.h"
-#include "Game/ClientSetup.h"
-#include "Game/GameData.h"
-#include "Game/PlayerHandler.h"
-#include "System/NetProtocol.h"
-
-#include <boost/thread/thread.hpp>
-#include <boost/bind.hpp>
-#include <boost/thread/barrier.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
-
-#include <set>
 #include <map>
 #include <string>
 
 ClientSetup settings;
 boost::scoped_ptr<const GameData> gameData;
 bool gameOver;
-typedef std::map<int,std::string> ActivePlayersMap;
+typedef std::map<int,std::string> ActivePlayersMap; // playerid -> playername
 typedef ActivePlayersMap::iterator ActivePlayersMapIter;
+typedef std::map<int,int> ActiveTeamsMap; // teamid -> numplayers
+typedef ActiveTeamsMap::iterator ActiveTeamsMapIter;
+typedef std::map<int,int> ActiveAllyTeamsMap; // teamid -> numplayers
+typedef ActiveAllyTeamsMap::iterator ActiveAllyTeamsMapIter;
 ActivePlayersMap active_players;
-std::vector<int> active_teams;
-std::vector<int> active_allyteams;
+ActiveTeamsMap active_teams;
+ActiveAllyTeamsMap active_allyteams;
 int winner;
 int serverframenum;
 unsigned int gameStartTime;
