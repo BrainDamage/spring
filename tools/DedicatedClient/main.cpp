@@ -176,11 +176,11 @@ bool UpdateClientNet()
 				}
 				const char *type = gameSetup->playerStartingData[player].GetType();
 				std::string playername = active_players[player].c_str();
-				switch (inbuf[2]) {
-					case 1: {
+				switch (inbuf[2])
+				{
+					case 1:
 						logOutput.Print("%s %s left", type, playername.c_str());
 						break;
-					}
 					case 2:
 						logOutput.Print("%s %s has been kicked", type, playername.c_str());
 						break;
