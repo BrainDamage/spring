@@ -203,11 +203,7 @@ void GameOver()
 
 		record->SetTime(serverframenum / 30, spring_tomsecs(spring_gettime()-serverStartTime)/1000);
 		record->InitializeStats(players.size(), numTeams, winner);
-		for ()
-		{
 
-			record->SetPlayerStats(i, playerHandler->players[i].lastStats);
-		}
 		for (size_t i = 0; i < ais.size(); ++i)
 		{
 			demoRecorder->SetSkirmishAIStats(i, ais[i].lastStats);
