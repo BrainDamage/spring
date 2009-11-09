@@ -13,12 +13,16 @@
 #include <set>
 
 ClientSetup settings;
-unsigned timer;
 boost::scoped_ptr<const GameData> gameData;
 bool gameOver;
+std::vector<int> active_players;
+std::vector<int> active_teams;
+std::vector<int> active_allyteams;
+int winner;
+int serverframenum;
+unsigned int gameStartTime;
 
 bool Update();
 bool UpdateClientNet();
 void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet);
 void GameOver();
-std::vector<int> active_players;

@@ -57,11 +57,12 @@ int main(int argc, char *argv[])
 		gu = new CGlobalUnsyncedStuff();
 		net = new CNetProtocol();
 		gameOver = false;
+		winner = -1;
+		serverframenum = 0;
 		net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
+		gameStartTime = SDL_GetTicks();
 
 		boost::thread thread(boost::bind<void, CNetProtocol, CNetProtocol*>(&CNetProtocol::UpdateLoop, net));
-
-		timer = SDL_GetTicks();
 
 		while( Update() ) // don't quit as long as connection is active
 #ifdef _WIN32
@@ -119,6 +120,17 @@ bool UpdateClientNet()
 				// send myPlayerName to let the server know you finished loading
 				net->Send(CBaseNetProtocol::Get().SendPlayerName(gu->myPlayerNum, settings.myPlayerName));
 
+				break;
+			}
+			case NETMSG_KEYFRAME:
+			{
+				serverframenum = *(int*)(inbuf+1);
+				net->Send(CBaseNetProtocol::Get().SendKeyFrame(serverframenum));
+				break;
+			}
+			case NETMSG_NEWFRAME:
+			{
+				serverframenum++;
 				break;
 			}
 			case NETMSG_QUIT:
@@ -198,12 +210,12 @@ void GameOver()
 {
 	if (net && net->GetDemoRecorder())
 	{
-		/*
 		CDemoRecorder* record = net->GetDemoRecorder();
-
-		record->SetTime(serverframenum / 30, spring_tomsecs(spring_gettime()-serverStartTime)/1000);
-		record->InitializeStats(players.size(), numTeams, winner);
-
+		int numteams = active_teams.size();
+		if (gameSetup->useLuaGaia) numteams -= 1;
+		record->SetTime(serverframenum / 30, (SDL_GetTicks()-gameStartTime)/1000);
+		record->InitializeStats(active_players.size(), numteams, winner);
+		/*
 		for (size_t i = 0; i < ais.size(); ++i)
 		{
 			demoRecorder->SetSkirmishAIStats(i, ais[i].lastStats);
