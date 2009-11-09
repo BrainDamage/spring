@@ -137,12 +137,14 @@ bool UpdateClientNet()
 			case NETMSG_KEYFRAME:
 			{
 				serverframenum = *(int*)(inbuf+1);
+				gu->modGameTime = serverframenum/30;
 				net->Send(CBaseNetProtocol::Get().SendKeyFrame(serverframenum));
 				break;
 			}
 			case NETMSG_NEWFRAME:
 			{
 				serverframenum++;
+				gu->modGameTime = serverframenum/30;
 				net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
 				break;
 			}
