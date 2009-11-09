@@ -4,6 +4,7 @@
 ClientSetup settings;
 boost::scoped_ptr<const GameData> gameData;
 bool gameOver;
+bool hasStartedPlaying;
 typedef std::map<int,std::string> ActivePlayersMap; // playerid -> playername
 typedef ActivePlayersMap::iterator ActivePlayersMapIter;
 typedef std::map<int,int> ActiveTeamsMap; // teamid -> numplayers

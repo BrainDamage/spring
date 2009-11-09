@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
 		net = new CNetProtocol();
 		gameOver = false;
 		winner = -1;
+		hasStartedPlaying = false;
 		serverframenum = 0;
 		net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
 		gameStartTime = SDL_GetTicks();
@@ -221,6 +222,19 @@ bool UpdateClientNet()
 				logOutput.Print("Player %s connected as id %d", active_players[player].c_str(), player );
 				break;
 			}
+
+			case NETMSG_STARTPLAYING:
+			{
+				unsigned timeToStart = *(unsigned*)(inbuf+1);
+				if (timeToStart < 1)
+				{
+					logOutput.Print("Game started");
+					hasStartedPlaying = true;
+				}
+				else logOutput.Print("Starting game in %d", timeToStart);
+				break;
+			}
+
 			case NETMSG_PLAYERSTAT:
 			{
 				int player=inbuf[1];
