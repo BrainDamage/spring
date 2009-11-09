@@ -237,7 +237,7 @@ bool UpdateClientNet()
 
 			case NETMSG_GAMEOVER:
 			{
-				logOutput.Print("Server sent game over");
+				logOutput.Print("Game over");
 				GameOver();
 			}
 
