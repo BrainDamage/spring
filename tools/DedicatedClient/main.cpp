@@ -81,6 +81,7 @@ int main(int argc, char *argv[])
 #else
 			sleep(1);	// if so, wait 1  second
 #endif
+		logOutput.Print("Quitting");
 	}
 	else
 	{
@@ -149,7 +150,6 @@ bool UpdateClientNet()
 			{
 				logOutput.Print("Server shutdown");
 				GameOver();
-				logOutput.Print("Quitting");
 				return false;
 				break;
 			}
@@ -235,6 +235,12 @@ bool UpdateClientNet()
 				break;
 			}
 
+			case NETMSG_GAMEOVER:
+			{
+				logOutput.Print("Server sent game over");
+				GameOver();
+			}
+
 			case NETMSG_PLAYERSTAT:
 			{
 				int player=inbuf[1];
@@ -288,6 +294,7 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 
 void GameOver()
 {
+	if (gameOver) return;
 	if (net && net->GetDemoRecorder())
 	{
 		CDemoRecorder* record = net->GetDemoRecorder();
