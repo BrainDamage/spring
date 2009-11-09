@@ -131,6 +131,7 @@ bool UpdateClientNet()
 			case NETMSG_NEWFRAME:
 			{
 				serverframenum++;
+				//net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
 				break;
 			}
 			case NETMSG_QUIT:
