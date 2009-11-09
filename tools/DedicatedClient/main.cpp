@@ -257,11 +257,13 @@ bool UpdateClientNet()
 				}
 				break;
 			}
+			/*
 			default:
 			{
 				logOutput.Print("Unknown net-msg recieved : %i", int(packet->data[0]));
 				break;
 			}
+			*/
 		}
 	}
 	return true;
