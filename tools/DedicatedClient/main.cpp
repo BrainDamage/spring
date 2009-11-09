@@ -300,7 +300,10 @@ void GameOver()
 	if (net && net->GetDemoRecorder())
 	{
 		CDemoRecorder* record = net->GetDemoRecorder();
-		record->SetTime(serverframenum / 30, (SDL_GetTicks()-gameStartTime)/1000);
+		int gamelenght = serverframenum / 30;
+		int wallclocklenght = (SDL_GetTicks()-gameStartTime)/1000;
+		logOutput.Print("Game lenght: %d Wall clock lenght: %d", gamelenght, wallclocklenght );
+		record->SetTime( gamelenght, wallclocklenght);
 		record->InitializeStats(active_players.size(), active_teams.size(), winner);
 		/*
 		for (size_t i = 0; i < ais.size(); ++i)
