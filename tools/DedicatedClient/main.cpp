@@ -131,7 +131,7 @@ bool UpdateClientNet()
 			case NETMSG_NEWFRAME:
 			{
 				serverframenum++;
-				//net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
+				net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
 				break;
 			}
 			case NETMSG_QUIT:
@@ -155,6 +155,43 @@ bool UpdateClientNet()
 				  p[ 8], p[ 9], p[10], p[11], p[12], p[13], p[14], p[15]);
 				break;
 			}
+
+			case NETMSG_PLAYERLEFT:
+			{
+				int player = inbuf[1];
+				if (!active_players.count(player))
+				{
+					logOutput.Print("Got invalid player num (%i) in NETMSG_PLAYERLEFT", player);
+					break;
+				}
+				const char *type = gameSetup->playerStartingData[player].GetType();
+				std::string playername = active_players[player].c_str();
+				switch (inbuf[2]) {
+					case 1: {
+						logOutput.Print("%s %s left", type, playername.c_str());
+						break;
+					}
+					case 2:
+						logOutput.Print("%s %s has been kicked", type, playername.c_str());
+						break;
+					case 0:
+						logOutput.Print("%s %s dropped (connection lost)", type, playername.c_str());
+						break;
+					default:
+						logOutput.Print("%s %s left the game (reason unknown: %i)", type, playername.c_str(), inbuf[2]);
+				}
+				active_players.erase(player);
+				break;
+			}
+
+			case NETMSG_PLAYERNAME:
+			{
+				int player = inbuf[2];
+				active_players[player] = (char*)(&inbuf[3]);
+				logOutput.Print("Player %s connected as id %d", active_players[player].c_str(), player );
+				break;
+			}
+
 			case NETMSG_PLAYERSTAT:
 			{
 				int player=inbuf[1];
@@ -180,7 +217,6 @@ bool UpdateClientNet()
 	}
 	return true;
 }
-
 
 void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 {

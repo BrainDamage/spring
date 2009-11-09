@@ -11,11 +11,15 @@
 #include <boost/scoped_ptr.hpp>
 
 #include <set>
+#include <map>
+#include <string>
 
 ClientSetup settings;
 boost::scoped_ptr<const GameData> gameData;
 bool gameOver;
-std::vector<int> active_players;
+typedef std::map<int,std::string> ActivePlayersMap;
+typedef ActivePlayersMap::iterator ActivePlayersMapIter;
+ActivePlayersMap active_players;
 std::vector<int> active_teams;
 std::vector<int> active_allyteams;
 int winner;
