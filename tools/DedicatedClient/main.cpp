@@ -244,7 +244,7 @@ bool UpdateClientNet()
 			case NETMSG_PLAYERSTAT:
 			{
 				int player=inbuf[1];
-				if(player >= active_players.size() || player<0){
+				if(!active_players.count(player)){
 					logOutput.Print("Got invalid player num %i in playerstat msg",player);
 					break;
 				}
