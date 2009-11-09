@@ -197,7 +197,7 @@ bool UpdateClientNet()
 				{
 					int team = gameSetup->playerStartingData[player].team;
 					active_teams[team] = active_teams[team] - 1;
-					if ( active_teams[team] == 0 ) active_teams.erase(team);
+					if ( active_teams[team] == 0 ) active_teams.erase(team); // TODO: use TEAMMSG_TEAM_DIED ?
 					int allyteam = gameSetup->teamStartingData[team].teamAllyteam;
 					active_allyteams[allyteam] = active_allyteams[team] - 1;
 					if ( active_allyteams[allyteam] == 0 ) active_allyteams.erase(allyteam);
@@ -212,6 +212,7 @@ bool UpdateClientNet()
 				is_spectator[player] = spectator;
 				if ( !spectator )
 				{
+					//TODO: use TEAMMSG_JOIN_TEAM
 					int team = gameSetup->playerStartingData[player].team;
 					active_teams[team] = active_teams[team] + 1;
 					int allyteam = gameSetup->teamStartingData[team].teamAllyteam;
@@ -220,7 +221,6 @@ bool UpdateClientNet()
 				logOutput.Print("Player %s connected as id %d", active_players[player].c_str(), player );
 				break;
 			}
-
 			case NETMSG_PLAYERSTAT:
 			{
 				int player=inbuf[1];
