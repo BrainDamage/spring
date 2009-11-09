@@ -191,12 +191,32 @@ bool UpdateClientNet()
 						logOutput.Print("%s %s left the game (reason unknown: %i)", type, playername.c_str(), inbuf[2]);
 				}
 				active_players.erase(player);
+				bool spectator = is_spectator[player];
+				is_spectator.erase(player);
+				if ( !spectator )
+				{
+					int team = gameSetup->playerStartingData[player].team;
+					active_teams[team] = active_teams[team] - 1;
+					if ( active_teams[team] == 0 ) active_teams.erase(team);
+					int allyteam = gameSetup->teamStartingData[team].teamAllyteam;
+					active_allyteams[allyteam] = active_allyteams[team] - 1;
+					if ( active_allyteams[allyteam] == 0 ) active_allyteams.erase(allyteam);
+				}
 				break;
 			}
 			case NETMSG_PLAYERNAME:
 			{
 				int player = inbuf[2];
 				active_players[player] = (char*)(&inbuf[3]);
+				bool spectator = gameSetup->playerStartingData[player].spectator;
+				is_spectator[player] = spectator;
+				if ( !spectator )
+				{
+					int team = gameSetup->playerStartingData[player].team;
+					active_teams[team] = active_teams[team] + 1;
+					int allyteam = gameSetup->teamStartingData[team].teamAllyteam;
+					active_allyteams[allyteam] = active_allyteams[team] + 1;
+				}
 				logOutput.Print("Player %s connected as id %d", active_players[player].c_str(), player );
 				break;
 			}
@@ -258,7 +278,6 @@ void GameOver()
 	{
 		CDemoRecorder* record = net->GetDemoRecorder();
 		int numteams = active_teams.size();
-		if (gameSetup->useLuaGaia) numteams -= 1;
 		record->SetTime(serverframenum / 30, (SDL_GetTicks()-gameStartTime)/1000);
 		record->InitializeStats(active_players.size(), numteams, winner);
 		/*
