@@ -213,7 +213,7 @@ bool UpdateClientNet()
 			case NETMSG_NEWFRAME:
 			{
 				serverframenum++;
-				logOutput.Print("Frame %d", serverframenum);
+				//logOutput.Print("Frame %d", serverframenum);
 				gu->modGameTime = serverframenum/30.0f;
 				if (!isReplay)
 				{
