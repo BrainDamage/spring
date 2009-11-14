@@ -12,8 +12,7 @@ typedef std::map<int,int> ActiveTeamsMap; // teamid -> numplayers
 typedef ActiveTeamsMap::iterator ActiveTeamsMapIter;
 typedef std::map<int,int> ActiveAllyTeamsMap; // allyteamid -> numplayers
 typedef ActiveAllyTeamsMap::iterator ActiveAllyTeamsMapIter;
-typedef std::map<int,bool> IsSpectatorMap; // playerid -> isspectator
-typedef IsSpectatorMap::iterator IsSpectatorMapIter;
+std::vector<PlayerBase> playerData;
 ActivePlayersMap active_players;
 ActiveTeamsMap active_teams;
 ActiveAllyTeamsMap active_allyteams;

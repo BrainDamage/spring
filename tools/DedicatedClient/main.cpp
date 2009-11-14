@@ -271,9 +271,7 @@ bool UpdateClientNet()
 						logOutput.Print("%s %s left the game (reason unknown: %i)", type, playername.c_str(), inbuf[2]);
 				}
 				active_players.erase(player);
-				bool spectator = is_spectator[player];
-				is_spectator.erase(player);
-				if ( !spectator )
+				if ( !playerData[player].spectator )
 				{
 					int team = gameSetup->playerStartingData[player].team;
 					active_teams[team] = active_teams[team] - 1;
@@ -288,9 +286,7 @@ bool UpdateClientNet()
 			{
 				int player = inbuf[2];
 				active_players[player] = (char*)(&inbuf[3]);
-				bool spectator = gameSetup->playerStartingData[player].spectator;
-				is_spectator[player] = spectator;
-				if ( !spectator )
+				if ( !playerData[player].spectator )
 				{
 					//TODO: use TEAMMSG_JOIN_TEAM
 					int team = gameSetup->playerStartingData[player].team;
@@ -361,6 +357,7 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 		gameSetup = const_cast<const CGameSetup*>(temp);
 		// gs->LoadFromSetup(gameSetup); TODO: load just team infos
 		//CPlayer::UpdateControlledTeams();
+		playerData = gameSetup->playerStartingData; // copy contents
 	}
 	else
 	{
