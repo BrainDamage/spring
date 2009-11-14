@@ -5,6 +5,7 @@ ClientSetup settings;
 boost::scoped_ptr<const GameData> gameData;
 bool gameOver;
 bool hasStartedPlaying;
+bool isReplay;
 typedef std::map<int,std::string> ActivePlayersMap; // playerid -> playername
 typedef ActivePlayersMap::iterator ActivePlayersMapIter;
 typedef std::map<int,int> ActiveTeamsMap; // teamid -> numplayers
@@ -20,6 +21,7 @@ IsSpectatorMap is_spectator;
 int winner;
 int serverframenum;
 unsigned int gameStartTime;
+CDemoReader* demoReader;
 
 bool Update();
 bool UpdateClientNet();

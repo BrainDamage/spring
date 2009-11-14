@@ -1,6 +1,7 @@
 #include "System/Net/RawPacket.h"
 #include "System/NetProtocol.h"
 #include "System/DemoRecorder.h"
+#include "System/DemoReader.h"
 #include "System/TdfParser.h"
 #include "System/LogOutput.h"
 #include "System/ConfigHandler.h"
@@ -40,40 +41,80 @@ int main(int argc, char *argv[])
 	if (argc > 1)
 	{
 		const std::string script(argv[1]);
-		std::cout << "Loading script from file: " << script << std::endl;
-
-		std::ifstream fh(argv[1]);
-		if (!fh.is_open())
-			throw content_error("Setupscript doesn't exists in given location: "+script);
-
-		std::string buf;
-    while (!fh.eof() )
-    {
-    	std::string line;
-      std::getline(fh,line);
-      buf += line + "\n";
-    }
-		fh.close();
-		settings.Init(buf);
-
-		if ( settings.isHost ) // won't work with host mode
+		if ( script.rfind(".txt") != std::string::npos )
 		{
-			std::cout << "Host mode enabled in Setupscript, quitting." << std::endl;
-			return 1;
+			isReplay = false;
+			std::cout << "Loading script from file: " << script << std::endl;
+		}
+		else if ( script.rfind(".sdf") != std::string::npos )
+		{
+			isReplay = true;
+			std::cout << "Loading demo file: " << script << std::endl;
+		}
+		else
+		{
+			 std::cout << "Invalid command line input: " << script << std::endl;
+			 return 1;
 		}
 
+		if (!isReplay)
+		{
+			std::ifstream fh(argv[1]);
+			if (!fh.is_open())
+			{
+				 std::cout << "Setupscript doesn't exists in given location: " << script << std::endl;
+				 return 1;
+			}
+
+			std::string buf;
+			while (!fh.eof() )
+			{
+				std::string line;
+				std::getline(fh,line);
+				buf += line + "\n";
+			}
+			fh.close();
+			settings.Init(buf);
+
+			if ( settings.isHost ) // won't work with host mode
+			{
+				std::cout << "Host mode enabled in Setupscript, quitting." << std::endl;
+				return 1;
+			}
+		}
 		std::cout << "Starting client..." << std::endl;
 		// Create the client
 		gu = new CGlobalUnsyncedStuff();
-		net = new CNetProtocol();
 		gameOver = false;
 		winner = -1;
 		hasStartedPlaying = false;
 		serverframenum = 0;
-		net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
-		gameStartTime = SDL_GetTicks();
+		net = 0;
+		demoReader = 0;
+		if (!isReplay)
+		{
+			net = new CNetProtocol();
+			net->InitClient(settings.hostip.c_str(), settings.hostport, settings.sourceport, settings.myPlayerName, settings.myPasswd, SpringVersion::GetFull());
 
-		boost::thread thread(boost::bind<void, CNetProtocol, CNetProtocol*>(&CNetProtocol::UpdateLoop, net));
+			boost::thread thread(boost::bind<void, CNetProtocol, CNetProtocol*>(&CNetProtocol::UpdateLoop, net));
+		}
+		else
+		{
+			demoReader = new CDemoReader( script, 0 );
+
+			CGameSetup* temp = new CGameSetup();
+			if (temp->Init(demoReader->GetSetupScript()))
+			{
+				gameSetup = const_cast<const CGameSetup*>(temp);
+				// gs->LoadFromSetup(gameSetup); TODO: load just team infos
+				//CPlayer::UpdateControlledTeams();
+			}
+			else
+			{
+				throw content_error("Demo contains incorrect script");
+			}
+		}
+		gameStartTime = SDL_GetTicks();
 
 		while( Update() ) // don't quit as long as connection is active
 #ifdef _WIN32
@@ -85,7 +126,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		std::cout << "usage: spring-dedicated-client <full_path_to_script>" << std::endl;
+		std::cout << "usage:\nspring-dedicated-client <full_path_to_script>\nspring-dedicated-client <full_path_to_demo_file>" << std::endl;
 	}
 
 #ifdef _WIN32
@@ -101,20 +142,42 @@ int main(int argc, char *argv[])
 
 bool Update()
 {
-	net->Update();
+	if (!isReplay) net->Update();
 	return UpdateClientNet();
+}
+
+boost::shared_ptr<const netcode::RawPacket> GetData()
+{
+	if (!isReplay) return net->GetData();
+	else
+	{
+		boost::shared_ptr<const netcode::RawPacket> ret;
+		ret.reset(demoReader->GetData(demoReader->GetNextReadTime()));
+		return ret;
+	}
 }
 
 bool UpdateClientNet()
 {
-	if (!net->Active())
+	if (!isReplay)
 	{
-		logOutput.Print("Server not reachable");
-		return false;
+		if (!net->Active())
+		{
+			logOutput.Print("Server not reachable");
+			return false;
+		}
+	}
+	else
+	{
+		if (demoReader->ReachedEnd())
+		{
+			logOutput.Print("End of demo reached");
+			return false;
+		}
 	}
 
 	boost::shared_ptr<const netcode::RawPacket> packet;
-	while ((packet = net->GetData()))
+	while ((packet = GetData()))
 	{
 		const unsigned char* inbuf = packet->data;
 		switch (inbuf[0])
@@ -129,8 +192,11 @@ bool UpdateClientNet()
 				gu->SetMyPlayer(inbuf[1]);
 				logOutput.Print("User number %i (team %i, allyteam %i)", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
 
-				// send myPlayerName to let the server know you finished loading
-				net->Send(CBaseNetProtocol::Get().SendPlayerName(gu->myPlayerNum, settings.myPlayerName));
+				if (!isReplay)
+				{
+					// send myPlayerName to let the server know you finished loading
+					net->Send(CBaseNetProtocol::Get().SendPlayerName(gu->myPlayerNum, settings.myPlayerName));
+				}
 
 				break;
 			}
@@ -138,14 +204,21 @@ bool UpdateClientNet()
 			{
 				serverframenum = *(int*)(inbuf+1);
 				gu->modGameTime = serverframenum/30.0f;
-				net->Send(CBaseNetProtocol::Get().SendKeyFrame(serverframenum));
+				if (!isReplay)
+				{
+					net->Send(CBaseNetProtocol::Get().SendKeyFrame(serverframenum));
+				}
 				break;
 			}
 			case NETMSG_NEWFRAME:
 			{
 				serverframenum++;
+				logOutput.Print("Frame %d", serverframenum);
 				gu->modGameTime = serverframenum/30.0f;
-				net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
+				if (!isReplay)
+				{
+					net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
+				}
 				break;
 			}
 			case NETMSG_QUIT:
@@ -158,9 +231,13 @@ bool UpdateClientNet()
 			case NETMSG_GAMEID:
 			{
 				const unsigned char* p = &inbuf[1];
-				CDemoRecorder* record = net->GetDemoRecorder();
-				if (record != NULL) {
-					record->SetGameID(p);
+				if (!isReplay)
+				{
+					CDemoRecorder* record = net->GetDemoRecorder();
+					if (record != NULL)
+					{
+						record->SetGameID(p);
+					}
 				}
 				logOutput.Print(
 				  "GameID: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
@@ -251,9 +328,11 @@ bool UpdateClientNet()
 					break;
 				}
 				PlayerStatistics playerstats = *(CPlayer::Statistics*)&inbuf[2];
-				if (gameOver) {
+				if (gameOver && !isReplay)
+				{
 					CDemoRecorder* record = net->GetDemoRecorder();
-					if (record != NULL) {
+					if (record != NULL)
+					{
 						record->SetPlayerStats(player, playerstats);
 					}
 				}

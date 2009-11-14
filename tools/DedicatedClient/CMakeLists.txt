@@ -18,6 +18,7 @@ SET(system_files
 	../../rts/System/BaseNetProtocol
 	../../rts/System/Demo
 	../../rts/System/DemoRecorder
+	../../rts/System/DemoReader
 	../../rts/System/GlobalUnsynced
 	../../rts/Game/GameSetup
 	../../rts/Game/GameData

@@ -17,7 +17,7 @@ public:
 	@throw std::runtime_error Demofile not found / header corrupt / outdated
 	*/
 	CDemoReader(const std::string& filename, float curTime);
-	
+
 	/**
 	@brief read from demo file
 	@return The data read (or 0 if no data), don't forget to delete it
@@ -37,7 +37,11 @@ public:
 	};
 
 private:
+	#ifndef DEDICATED_CLIENT
 	CFileHandler* playbackDemo;
+	#else
+	std::ifstream* playbackDemo;
+	#endif
 	float demoTimeOffset;
 	float nextDemoRead;
 	int bytesRemaining;
