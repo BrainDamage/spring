@@ -4354,6 +4354,29 @@ void CGame::ClientReadNet()
 				AddTraffic(-1, packetCode, dataLength);
 				break;
 			}
+
+			case NETMSG_REQUEST_TEAMSTAT: {
+				const int teamNum = inbuf[1];
+				const size_t statFrameNum = inbuf[2];
+				if ( !teamHandler->IsValidTeam(teamNum) ) {
+					logOutput.Print("Invalid teamNum %d in REQUEST_TEAMSTAT message", teamNum);
+					break;
+				}
+				size_t statsLenght = teamHandler->Team(teamNum)->statHistory.size();
+				if ( statFrameNum >= statsLenght ) {
+					logOutput.Print("Invalid statFrameNum %d in REQUEST_TEAMSTAT message", statFrameNum);
+					break;
+				}
+				// reverse iterate to find the correct frame, if requests are timed properly
+				// and constantly requesting last element, this means iterating over 1-2 elements max
+				std::list<CTeam::Statistics>::reverse_iterator itor = teamHandler->Team(teamNum)->statHistory.rbegin();
+				std::advance( itor, statsLenght - statFrameNum );
+				netcode::PackPacket* buf = new netcode::PackPacket( 4 + sizeof(CTeam::Statistics), NETMSG_TEAMSTAT);
+				*buf << (uint8_t)teamNum << (uint16_t)statFrameNum << *itor;
+				net->Send(buf);
+				AddTraffic(-1, packetCode, dataLength);
+				break;
+			}
 			default: {
 #ifdef SYNCDEBUG
 				if (!CSyncDebugger::GetInstance()->ClientReceived(inbuf))
@@ -4548,9 +4571,6 @@ void CGame::GameEnd()
 			}
 			for (int i = 0; i < numTeams; ++i) {
 				record->SetTeamStats(i, teamHandler->Team(i)->statHistory);
-				netcode::PackPacket* buf = new netcode::PackPacket(2 + sizeof(CTeam::Statistics), NETMSG_TEAMSTAT);
-				*buf << (uint8_t)teamHandler->Team(i)->teamNum << teamHandler->Team(i)->currentStats;
-				net->Send(buf);
 			}
 		}
 	}

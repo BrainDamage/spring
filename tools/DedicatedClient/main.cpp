@@ -157,6 +157,32 @@ boost::shared_ptr<const netcode::RawPacket> GetData()
 	}
 }
 
+void TeamDied( int team )
+{
+	if ( teams_to_ally.count(team) == 0 ) teams_to_ally[team] = gameSetup->teamStartingData[team].teamAllyteam;
+	const int ally = teams_to_ally[team];
+	// make all players in the team be spectators
+	ActivePlayersToTeamMap tempcopy = players_to_teams;
+	for ( ActivePlayersToTeamMapIter itor = players_to_teams.begin(); itor != players_to_teams.end(); itor++ )
+	{
+		if ( itor->second == team )
+		{
+			tempcopy.erase(itor->first);
+			logOutput.Print("Player %d died", itor->first );
+		}
+	}
+	players_to_teams = tempcopy;
+	teams_to_ally.erase(team);
+	active_teams.erase(team);
+	logOutput.Print("team %d died", team );
+	active_allyteams[ally] = active_allyteams[ally] - 1;
+	if ( active_allyteams.count(ally) == 0 )
+	{
+		logOutput.Print("ally %d died", ally );
+		active_allyteams.erase(ally);
+	}
+}
+
 bool UpdateClientNet()
 {
 	if (!isReplay)
@@ -203,7 +229,7 @@ bool UpdateClientNet()
 			case NETMSG_KEYFRAME:
 			{
 				serverframenum = *(int*)(inbuf+1);
-				gu->modGameTime = serverframenum/30.0f;
+				gu->modGameTime = serverframenum/(float)GAME_SPEED;
 				if (!isReplay)
 				{
 					net->Send(CBaseNetProtocol::Get().SendKeyFrame(serverframenum));
@@ -214,7 +240,7 @@ bool UpdateClientNet()
 			{
 				serverframenum++;
 				//logOutput.Print("Frame %d", serverframenum);
-				gu->modGameTime = serverframenum/30.0f;
+				gu->modGameTime = serverframenum/(float)GAME_SPEED;
 				if (!isReplay)
 				{
 					net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
@@ -271,31 +297,78 @@ bool UpdateClientNet()
 						logOutput.Print("%s %s left the game (reason unknown: %i)", type, playername.c_str(), inbuf[2]);
 				}
 				active_players.erase(player);
-				if ( !playerData[player].spectator )
-				{
-					int team = gameSetup->playerStartingData[player].team;
-					active_teams[team] = active_teams[team] - 1;
-					if ( active_teams[team] == 0 ) active_teams.erase(team); // TODO: use TEAMMSG_TEAM_DIED ?
-					int allyteam = gameSetup->teamStartingData[team].teamAllyteam;
-					active_allyteams[allyteam] = active_allyteams[team] - 1;
-					if ( active_allyteams[allyteam] == 0 ) active_allyteams.erase(allyteam);
-				}
 				break;
 			}
 			case NETMSG_PLAYERNAME:
 			{
 				int player = inbuf[2];
 				active_players[player] = (char*)(&inbuf[3]);
-				if ( !playerData[player].spectator )
-				{
-					//TODO: use TEAMMSG_JOIN_TEAM
-					int team = gameSetup->playerStartingData[player].team;
-					active_teams[team] = active_teams[team] + 1;
-					int allyteam = gameSetup->teamStartingData[team].teamAllyteam;
-					active_allyteams[allyteam] = active_allyteams[team] + 1;
-				}
 				logOutput.Print("Player %s connected as id %d", active_players[player].c_str(), player );
 				break;
+			}
+
+			case NETMSG_TEAM:
+			{
+				int player = inbuf[1];
+				const unsigned char action = inbuf[2];
+				if ( players_to_teams.count(player) == 0 ) players_to_teams[player] = gameSetup->playerStartingData[player].team;
+				const int fromTeam = players_to_teams[player];
+				if ( teams_to_ally.count(fromTeam) == 0 ) teams_to_ally[fromTeam] = gameSetup->teamStartingData[fromTeam].teamAllyteam;
+				const int fromAlly = teams_to_ally[fromTeam];
+				switch (action)
+				{
+					case TEAMMSG_GIVEAWAY:
+					{
+						TeamDied( fromTeam );
+						break;
+					}
+					case TEAMMSG_RESIGN:
+					{
+						TeamDied( fromTeam );
+						break;
+					}
+					case TEAMMSG_JOIN_TEAM:
+					{
+						const int newTeam = int(inbuf[3]);
+						if ( teams_to_ally.count(newTeam) == 0 ) teams_to_ally[newTeam] = gameSetup->teamStartingData[newTeam].teamAllyteam;
+						const int newAlly = teams_to_ally[newTeam];
+						active_teams[newTeam] = active_teams[newTeam] + 1;
+						if ( fromTeam != newTeam ) // delete player from old team
+						{
+							active_teams[fromTeam] = active_teams[fromTeam] - 1;
+							if ( active_teams[fromTeam] == 0 ) // remove team from allyteam if empty
+							{
+								logOutput.Print("team %d died", fromTeam );
+								active_teams.erase(fromTeam);
+								teams_to_ally.erase(fromTeam);
+								active_allyteams[fromAlly] = active_allyteams[fromAlly] - 1;
+								if ( active_allyteams.count(fromAlly) == 0 )
+								{
+									logOutput.Print("ally %d died", fromAlly );
+									active_allyteams.erase(fromAlly);
+								}
+							}
+							logOutput.Print("Player %d changed team %d ally %d to team %d ally %d", player, fromTeam, fromAlly, newTeam, newAlly );
+						}
+						else
+						{
+							logOutput.Print("Player %d joined team %d ally %d", player, newTeam, newAlly );
+						}
+						players_to_teams[player] = newTeam;
+						if ( teams_to_ally[newTeam] != newAlly )
+						{
+							active_allyteams[newAlly] = active_allyteams[newAlly] + 1;
+						}
+						teams_to_ally[newTeam] = newAlly;
+						break;
+					}
+					case TEAMMSG_TEAM_DIED:
+					{
+						const unsigned team = inbuf[3];
+						TeamDied( team );
+						break;
+					}
+				}
 			}
 
 			case NETMSG_STARTPLAYING:
@@ -313,6 +386,8 @@ bool UpdateClientNet()
 			case NETMSG_GAMEOVER:
 			{
 				logOutput.Print("Game over");
+				for ( ActivePlayersToTeamMapIter itor = players_to_teams.begin(); itor != players_to_teams.end(); itor++  ) logOutput.Print( "player %d team %d", itor->first, itor->second );
+				for ( ActiveTeamsToAllyMapIter itor = teams_to_ally.begin(); itor != teams_to_ally.end(); itor++  ) logOutput.Print( "team %d ally %d", itor->first, itor->second );
 				GameOver();
 			}
 
@@ -334,6 +409,27 @@ bool UpdateClientNet()
 				}
 				break;
 			}
+
+			case NETMSG_TEAMSTAT:
+			{
+				int team=inbuf[1];
+				int frameCount = inbuf[2];
+				if( team > gameSetup->teamStartingData.size() ){
+					logOutput.Print("Got invalid team num %i in teamstat msg",team);
+					break;
+				}
+				TeamStatistics stathistory = teams_stats[team];
+				if ( frameCount < stathistory.size() )
+				{
+					logOutput.Print("Recieved duplicated stat frame %d for team %d",frameCount, team);
+					break;
+				}
+				CTeam::Statistics statframe = *(CTeam::Statistics*)&inbuf[3];
+				stathistory.push_back(statframe);
+				teams_stats[team] = stathistory;
+				break;
+			}
+
 			/*
 			default:
 			{
@@ -358,6 +454,7 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 		// gs->LoadFromSetup(gameSetup); TODO: load just team infos
 		//CPlayer::UpdateControlledTeams();
 		playerData = gameSetup->playerStartingData; // copy contents
+		teams_stats.resize( gameSetup->teamStartingData.size() ); // allocate speace in team stats for all teams in script
 	}
 	else
 	{
@@ -378,21 +475,15 @@ void GameOver()
 	if (net && net->GetDemoRecorder())
 	{
 		CDemoRecorder* record = net->GetDemoRecorder();
-		int gamelenght = serverframenum / 30;
+		int gamelenght = serverframenum / GAME_SPEED;
 		int wallclocklenght = (SDL_GetTicks()-gameStartTime)/1000;
 		logOutput.Print("Game lenght: %d Wall clock lenght: %d", gamelenght, wallclocklenght );
 		record->SetTime( gamelenght, wallclocklenght);
-		record->InitializeStats(active_players.size(), active_teams.size(), winner);
-		/*
-		for (size_t i = 0; i < ais.size(); ++i)
+		record->InitializeStats(active_players.size(), teams_stats.size(), winner);
+		for ( size_t team = 0; team < teams_stats.size(); team++ )
 		{
-			demoRecorder->SetSkirmishAIStats(i, ais[i].lastStats);
+			record->SetTeamStats( team, teams_stats[team] );
 		}
-		for (int i = 0; i < numTeams; ++i)
-		{
-			record->SetTeamStats(i, teamHandler->Team(i)->statHistory);
-		}
-		*/
 	}
 	gameOver = true;
 }

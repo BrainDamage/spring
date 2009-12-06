@@ -61,6 +61,8 @@
 	#undef interface
 #endif
 #include "Sim/Misc/GlobalSynced.h"
+#include "Sim/Misc/Team.h"
+#include "Sim/Misc/TeamHandler.h"
 #include "Server/MsgStrings.h"
 
 
@@ -84,6 +86,9 @@ const spring_duration serverTimeout = spring_secs(30);
 
 /// every n'th frame will be a keyframe (and contain the server's framenumber)
 const unsigned serverKeyframeIntervall = 16;
+
+/// every n'th frame will be a teamStat frame update
+const unsigned teamStatsKeyFrameIntervall = GAME_SPEED * CTeam::statsPeriod;
 
 const std::string commands[numCommands] = { "kick", "kickbynum", "setminspeed", "setmaxspeed",
 						"nopause", "nohelp", "cheat", "godmode", "globallos",
@@ -1566,6 +1571,12 @@ void CGameServer::CheckForGameEnd()
 	}
 }
 
+bool ComparePings(GameParticipant a,GameParticipant b)
+{
+	return (a.ping < b.ping);
+}
+
+
 void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 {
 	if (!demoReader) // use NEWFRAME_MSGes from demo otherwise
@@ -1622,6 +1633,22 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 #ifdef SYNCCHECK
 				outstandingSyncFrames.push_back(serverframenum);
 #endif
+				// request for teamStats updates only after key frames
+				if (0 == (serverframenum % teamStatsKeyFrameIntervall)){
+					size_t currentTeamStatFrame = serverframenum/teamStatsKeyFrameIntervall;
+					size_t requestSize = players.size();
+					if ( requestSize > 0 ) {
+						//find players to request team stats from
+						std::vector<GameParticipant> requestlist = players;
+						// sort by ping
+						std::sort( requestlist.begin(), requestlist.end(), ComparePings );
+						size_t activeTeams = teamHandler->ActiveTeams();
+						for( unsigned teamNum = 0; teamNum < activeTeams; teamNum++ ){
+							//request stat frame
+							requestlist[teamNum%requestSize].SendData(CBaseNetProtocol::Get().SendRequestTeamStat(teamNum,currentTeamStatFrame));
+						}
+					}
+				}
 			}
 		}
 	}

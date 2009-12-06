@@ -185,6 +185,13 @@ PacketType CBaseNetProtocol::SendSendPlayerStat()
 	return PacketType(new PackPacket(1, NETMSG_SENDPLAYERSTAT));
 }
 
+PacketType CBaseNetProtocol::SendRequestTeamStat( uchar teamNum, ushort teamStatFrameCount )
+{
+	PackPacket* packet = new netcode::PackPacket( 4, NETMSG_REQUEST_TEAMSTAT);
+	*packet << (uint8_t)teamNum << (uint16_t)teamStatFrameCount;
+	return PacketType(packet);
+}
+
 PacketType CBaseNetProtocol::SendPlayerStat(uchar myPlayerNum, const PlayerStatistics& currentStats)
 {
 	PackPacket* packet = new PackPacket(2 + sizeof(PlayerStatistics), NETMSG_PLAYERSTAT);
@@ -370,7 +377,7 @@ PacketType CBaseNetProtocol::SendSdBlockrequest(unsigned short begin, unsigned s
 	PackPacket* packet = new PackPacket(7, NETMSG_SD_BLKREQUEST);
 	*packet << begin << length << requestSize;
 	return PacketType(packet);
-	
+
 }
 
 PacketType CBaseNetProtocol::SendSdBlockresponse(uchar myPlayerNum, std::vector<unsigned> checksums)
