@@ -1300,6 +1300,23 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 		case NETMSG_TEAMSTAT: {
 			if (hostif)
 				hostif->Send(packet->data, packet->length);
+			#ifdef DEDICATED
+				const unsigned char teamNum = inbuf[1];
+				const unsigned int statFrameNum = inbuf[2];
+				const CTeam::Statistics newStats = *(CTeam::Statistics*)&inbuf[6];
+				if ( teamNum < 0 || teamNum > teamHandler->ActiveTeams() ) {
+					logOutput.Print("Invalid teamNum number (%i) in NETMSG_TEAMSTAT", teamNum);
+					break;
+				}
+				CTeam* team = teamHandler->Team(teamNum);
+				if ( statFrameNum < team->lastStatSave ) {
+					logOutput.Print("Invalid statFrameNum number (%i) in NETMSG_TEAMSTAT", statFrameNum);
+					break;
+				}
+				team->currentStats = newStats;
+				team->lastStatSave = statFrameNum;
+				team->statHistory.push_back( newStats );
+			#endif
 			break;
 		}
 

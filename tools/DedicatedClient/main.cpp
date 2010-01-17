@@ -427,7 +427,7 @@ bool UpdateClientNet()
 					logOutput.Print("Recieved duplicated stat frame %d for team %d",frameCount, team);
 					break;
 				}
-				CTeam::Statistics statframe = *(CTeam::Statistics*)&inbuf[3];
+				CTeam::Statistics statframe = *(CTeam::Statistics*)&inbuf[6];
 				stathistory.push_back(statframe);
 				teams_stats[team] = stathistory;
 				break;
