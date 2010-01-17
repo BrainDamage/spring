@@ -4325,7 +4325,7 @@ void CGame::ClientReadNet()
 			case NETMSG_REQUEST_TEAMSTAT: {
 				const unsigned char teamNum = inbuf[1];
 				const unsigned int statFrameNum= inbuf[2];
-				if ((teamNum >= teamHandler->ActiveTeams()) || (teamNum < 0)) {
+				if ((teamNum >= gameSetup->teamStartingData.size()) || (teamNum < 0)) {
 					logOutput.Print("Invalid teamNum number (%i) in NETMSG_REQUEST_TEAMSTAT", teamNum);
 					break;
 				}

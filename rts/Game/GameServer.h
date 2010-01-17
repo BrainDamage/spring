@@ -17,6 +17,10 @@
 #include "float3.h"
 #include "System/myTime.h"
 
+#ifdef DEDICATED
+#include "Sim/Misc/TeamStatistics.h"
+#endif
+
 namespace netcode
 {
 	class RawPacket;
@@ -209,6 +213,14 @@ private:
 	typedef std::set<unsigned char> PlayersToForwardMsgvec;
 	typedef std::map<unsigned char, PlayersToForwardMsgvec> MsgToForwardMap;
 	MsgToForwardMap relayingMessagesMap;
+#ifdef DEDICATED
+	typedef std::list<TeamStatistics> TeamStatsList;
+	struct TeamStatsStruct {
+		TeamStatsList statHistory;
+		int lastStatSave;
+	};
+	std::map<unsigned int, TeamStatsStruct> teamStats;
+#endif
 };
 
 extern CGameServer* gameServer;

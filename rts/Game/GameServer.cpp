@@ -61,10 +61,8 @@
 	#undef interface
 #endif
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/Team.h"
-#include "Sim/Misc/TeamHandler.h"
 #include "Server/MsgStrings.h"
-
+#include "Sim/Misc/Team.h"
 
 using netcode::RawPacket;
 
@@ -258,7 +256,7 @@ CGameServer::~CGameServer()
 		demoRecorder->SetSkirmishAIStats(i, ais[i].lastStats);
 	}*/
 	for (int i = 0; i < numTeams; ++i) {
-		record->SetTeamStats(i, teamHandler->Team(i)->statHistory);
+		demoRecorder->SetTeamStats(i, teamStats[i].statHistory);
 	}
 #endif // DEDICATED
 }
@@ -1304,18 +1302,18 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 				const unsigned char teamNum = inbuf[1];
 				const unsigned int statFrameNum = inbuf[2];
 				const CTeam::Statistics newStats = *(CTeam::Statistics*)&inbuf[6];
-				if ( teamNum < 0 || teamNum > teamHandler->ActiveTeams() ) {
+				if ( teamNum < 0 || teamNum > setup->teamStartingData.size() ) {
 					logOutput.Print("Invalid teamNum number (%i) in NETMSG_TEAMSTAT", teamNum);
 					break;
 				}
-				CTeam* team = teamHandler->Team(teamNum);
-				if ( statFrameNum < team->lastStatSave ) {
+				TeamStatsStruct teamInfo = teamStats[teamNum];
+				if ( statFrameNum < teamInfo.lastStatSave ) {
 					logOutput.Print("Invalid statFrameNum number (%i) in NETMSG_TEAMSTAT", statFrameNum);
 					break;
 				}
-				team->currentStats = newStats;
-				team->lastStatSave = statFrameNum;
-				team->statHistory.push_back( newStats );
+				teamInfo.lastStatSave = statFrameNum;
+				teamInfo.statHistory.push_back( newStats );
+				teamStats[teamNum] = teamInfo; // overwrite old value
 			#endif
 			break;
 		}
@@ -1821,8 +1819,8 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 						}
 						// sort by ping
 						std::sort( requestlist.begin(), requestlist.end(), ComparePings );
-						size_t activeTeams = teamHandler->ActiveTeams();
-						for( unsigned teamNum = 0; teamNum < activeTeams; teamNum++ ){
+						size_t numTeams = setup->teamStartingData.size();
+						for( unsigned teamNum = 0; teamNum < numTeams; teamNum++ ){
 							//request stat frame
 							unsigned int playerToRequest = teamNum%requestSize;
 							if ( playersToSkip.find( playerToRequest ) != playersToSkip.end() ) {
