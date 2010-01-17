@@ -43,9 +43,7 @@ CR_REG_METADATA(CAttackHandler, (
 
 
 
-CAttackHandler::CAttackHandler(AIClasses* ai) {
-	this->ai = ai;
-
+CAttackHandler::CAttackHandler(AIClasses* aic): ai(aic) {
 	if (ai) {
 		// setting a position to the middle of the map
 		float mapWidth = ai->cb->GetMapWidth() * 8.0f;
@@ -312,8 +310,8 @@ float3 CAttackHandler::FindSafeArea(float3 pos) {
 	if (this->DistanceToBase(pos) < SAFE_SPOT_DISTANCE)
 		return pos;
 
-	float min = 0.6;
-	float max = 0.95;
+	float min = 0.6f;
+	float max = 0.95f;
 	float3 safe = this->FindSafeSpot(pos, min, max);
 	// HACK
 	safe += pos;
@@ -323,14 +321,14 @@ float3 CAttackHandler::FindSafeArea(float3 pos) {
 }
 
 float3 CAttackHandler::FindVerySafeArea(float3 pos) {
-	float min = 0.9;
-	float max = 1.0;
+	float min = 0.9f;
+	float max = 1.0f;
 	return (this->FindSafeSpot(pos, min, max));
 }
 
 float3 CAttackHandler::FindUnsafeArea(float3 pos) {
-	float min = 0.1;
-	float max = 0.3;
+	float min = 0.1f;
+	float max = 0.3f;
 	return (this->FindSafeSpot(pos, min, max));
 }
 
@@ -455,7 +453,7 @@ void CAttackHandler::UpdateKMeans(void) {
 				friendlyPositions.push_back(ai->cb->GetUnitPos(ai->unitIDs[0]));
 			}
 			else {
-			 	// when everything is dead
+				// when everything is dead
 				friendlyPositions.push_back(float3(RANDINT % (ai->cb->GetMapWidth() * 8), 1000, RANDINT % (ai->cb->GetMapHeight() * 8)));
 			}
 		}
@@ -465,7 +463,7 @@ void CAttackHandler::UpdateKMeans(void) {
 		// iterate k-means algo over these positions and move the means
 		this->kMeansBase = KMeansIteration(this->kMeansBase, friendlyPositions, this->kMeansK);
 	}
-	
+
 	// update enemy position k-means
 	// get positions of all enemy units and put them in a vector (completed buildings only)
 	std::vector<float3> enemyPositions;
@@ -558,6 +556,7 @@ void CAttackHandler::AirAttack(int currentFrame) {
 	int bestTargetID = -1;
 	float bestTargetCost = -1.0f;
 
+	// TODO: if enemy has antinuke and we have nuke, etc
 	for (int i = 0; i < numEnemies; i++) {
 		int enemyID = ai->unitIDs[i];
 		const UnitDef* udef = (enemyID >= 0)? ai->ccb->GetUnitDef(enemyID): 0;
@@ -633,12 +632,12 @@ void CAttackHandler::AirPatrol(int currentFrame) {
 
 
 void CAttackHandler::UpdateAir(int currentFrame) {
-	if (armedAirUnits.size() == 0)
-		return;
+	airIsAttacking = (airIsAttacking && !armedAirUnits.empty());
 
 	if (airIsAttacking) {
 		if (airTarget == -1) {
-			// we are attacking an invalid target
+			// we are attacking an invalid target, or
+			// have no more attack-capable planes left
 			airIsAttacking = false;
 		} else {
 			// if we are attacking but our target is dead
@@ -657,12 +656,7 @@ void CAttackHandler::UpdateAir(int currentFrame) {
 			AirAttack(currentFrame);
 		} else {
 			// return to base
-			airIsAttacking = false;
 			airTarget = -1;
-
-			if (!airPatrolOrdersGiven) {
-				AirPatrol(currentFrame);
-			}
 		}
 	}
 
@@ -848,7 +842,7 @@ void CAttackHandler::AssignTarget(CAttackGroup* group_in) {
 
 			// get all enemies surrounding endpoint of found path
 			int enemiesInArea = ai->ccb->GetEnemyUnits(&ai->unitIDs[0], endPos, ATTACKED_AREA_RADIUS);
-			float powerOfEnemies = 0.000001;
+			float powerOfEnemies = 0.000001f;
 
 			// calculate combined "firepower" of armed enemies near endpoint
 			for (int i = 0; i < enemiesInArea; i++) {

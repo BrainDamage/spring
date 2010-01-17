@@ -1,4 +1,5 @@
 #include "StdAfx.h"
+#include <string>
 #include <ostream>
 #include <fstream>
 #include <SDL.h>
@@ -28,7 +29,10 @@ static CVertexArray* vertexArray1 = NULL;
 static CVertexArray* vertexArray2 = NULL;
 static CVertexArray* currentVertexArray = NULL;
 
-static GLuint startupTexture = 0;
+static GLuint     startupTexture = 0;
+static float      startupTexture_aspectRatio = 1.0; // x/y
+// make this var configurable if we need streching load-screens
+static const bool startupTexture_keepAspectRatio = true;
 
 #ifdef USE_GML
 static CVertexArray vertexArrays1[GML_MAX_NUM_THREADS];
@@ -76,7 +80,7 @@ void LoadExtensions()
 	logOutput.Print("GL:   %s\n", glGetString(GL_RENDERER));
 	logOutput.Print("GLEW: %s\n", glewGetString(GLEW_VERSION));
 
-	/** Get available fullscreen/hardware modes **/
+	// Get available fullscreen/hardware modes
 /*
 	SDL_Rect **modes=SDL_ListModes(NULL, SDL_FULLSCREEN|SDL_OPENGL|SDL_RESIZABLE);
 
@@ -93,6 +97,47 @@ void LoadExtensions()
 		logOutput.Print("SDL_ListModes: %s\n",buffer);
 	}
 */
+
+	if (!GLEW_VERSION_1_4) {
+		logOutput.Print("Minimal required OpenGL version is 1.4\n");
+#if       !defined DEBUG
+		exit(0);
+#endif // !defined DEBUG
+	}
+
+#if       !defined DEBUG
+	// Print out warnings for really crappy graphic cards/drivers
+	{
+		const std::string gfxCard_vendor = (const char*) glGetString(GL_VENDOR);
+		const std::string gfxCard_model  = (const char*) glGetString(GL_RENDERER);
+		bool gfxCard_isWorthATry = true;
+		if (gfxCard_vendor == "SiS") {
+			gfxCard_isWorthATry = false;
+		} else if (gfxCard_model.find("Intel") != std::string::npos) {
+			// the vendor does not have to be Intel
+			if (gfxCard_model.find(" 945G") != std::string::npos) {
+				gfxCard_isWorthATry = false;
+			} else if (gfxCard_model.find(" 915G") != std::string::npos) {
+				gfxCard_isWorthATry = false;
+			}
+		}
+
+		if (!gfxCard_isWorthATry) {
+			logOutput.Print("o_O\n");
+			logOutput.Print("WW     WWW     WW    AAA     RRRRR   NNN  NN  II  NNN  NN   GGGGG  \n");
+			logOutput.Print(" WW   WW WW   WW    AA AA    RR  RR  NNNN NN  II  NNNN NN  GG      \n");
+			logOutput.Print("  WW WW   WW WW    AAAAAAA   RRRRR   NN NNNN  II  NN NNNN  GG   GG \n");
+			logOutput.Print("   WWW     WWW    AA     AA  RR  RR  NN  NNN  II  NN  NNN   GGGGG  \n");
+			logOutput.Print("(warning)\n");
+			logOutput.Print("Your graphic card is ...\n");
+			logOutput.Print("well, you know ...\n");
+			logOutput.Print("insufficient\n");
+			logOutput.Print("(in case you are not using a horribly wrong driver).\n");
+			logOutput.Print("If the game crashes, looks ugly or runs slow, buy a better card!\n");
+			logOutput.Print(".\n");
+		}
+	}
+#endif // !defined DEBUG
 
 	std::string s = (char*)glGetString(GL_EXTENSIONS);
 	for (unsigned int i=0; i<s.length(); i++)
@@ -236,9 +281,27 @@ void LoadStartPicture(const std::string& name)
 		throw content_error("Could not load startpicture from file " + name);
 	}
 
-	/* HACK Really big load pictures made a GLU choke. */
+	startupTexture_aspectRatio = (float) bm.xsize / bm.ysize;
+
+	// HACK Really big load pictures made GLU choke.
 	if ((bm.xsize > gu->viewSizeX) || (bm.ysize > gu->viewSizeY)) {
-		bm = bm.CreateRescaled(gu->viewSizeX, gu->viewSizeY);
+		float newX = gu->viewSizeX;
+		float newY = gu->viewSizeY;
+
+		if (startupTexture_keepAspectRatio) {
+			// Make smaller but preserve aspect ratio.
+			// The resulting resolution will make it fill one axis of the
+			// screen, and be smaller or equal to the screen on the other axis.
+			const float screen_aspectRatio = gu->aspectRatio;
+			const float ratioComp = screen_aspectRatio / startupTexture_aspectRatio;
+			if (ratioComp > 1.0f) {
+				newX = newX / ratioComp;
+			} else {
+				newY = newY * ratioComp;
+			}
+		}
+
+		bm = bm.CreateRescaled((int) newX, (int) newY);
 	}
 
 	startupTexture = bm.CreateTexture(false);
@@ -289,28 +352,49 @@ void PrintLoadMsg(const char* text, bool swapbuffers)
 
 	good_fpu_control_registers(text);
 
+	float xDiv = 0.0f;
+	float yDiv = 0.0f;
+	if (startupTexture_keepAspectRatio) {
+		const float screen_aspectRatio = gu->aspectRatio;
+		const float ratioComp = screen_aspectRatio / startupTexture_aspectRatio;
+		if ((ratioComp > 0.99f) && (ratioComp < 1.01f)) { // ~= 1
+			// show Load-Screen full screen
+			// nothing to do
+		} else if (ratioComp > 1.0f) {
+			// show Load-Screen on part of the screens X-Axis only
+			xDiv = (1 - (1 / ratioComp)) / 2;
+		} else {
+			// show Load-Screen on part of the screens Y-Axis only
+			yDiv = (1 - ratioComp) / 2;
+		}
+	}
+
 	// Draw loading screen & print load msg.
 	ClearScreen();
 	if (startupTexture) {
 		glBindTexture(GL_TEXTURE_2D,startupTexture);
 		glBegin(GL_QUADS);
-			glTexCoord2f(0,1);glVertex2f(0,0);
-			glTexCoord2f(0,0);glVertex2f(0,1);
-			glTexCoord2f(1,0);glVertex2f(1,1);
-			glTexCoord2f(1,1);glVertex2f(1,0);
+			glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f + xDiv, 0.0f + yDiv);
+			glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f + xDiv, 1.0f - yDiv);
+			glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f - xDiv, 1.0f - yDiv);
+			glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f - xDiv, 0.0f + yDiv);
 		glEnd();
 	}
 
 	font->SetOutlineColor(0.0f,0.0f,0.0f,0.65f);
 	font->SetTextColor(1.0f,1.0f,1.0f,1.0f);
 
-	font->glPrint(0.5f,0.5f,   gu->viewSizeY / 15.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM, text);
+	font->glPrint(0.5f,0.5f,   gu->viewSizeY / 15.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM,
+			text);
 #ifdef USE_GML
-	font->glFormat(0.5f,0.06f, gu->viewSizeY / 35.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM, "Spring %s MT (%d threads)", SpringVersion::GetFull().c_str(), gmlThreadCount);
+	font->glFormat(0.5f,0.06f, gu->viewSizeY / 35.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM,
+			"Spring %s (%d threads)", SpringVersion::GetFull().c_str(), gmlThreadCount);
 #else
-	font->glFormat(0.5f,0.06f, gu->viewSizeY / 35.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM, "Spring %s", SpringVersion::GetFull().c_str());
+	font->glFormat(0.5f,0.06f, gu->viewSizeY / 35.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM,
+			"Spring %s", SpringVersion::GetFull().c_str());
 #endif
-	font->glFormat(0.5f,0.02f, gu->viewSizeY / 50.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM, "This program is distributed under the GNU General Public License, see license.html for more info");
+	font->glFormat(0.5f,0.02f, gu->viewSizeY / 50.0f, FONT_OUTLINE | FONT_CENTER | FONT_NORM,
+			"This program is distributed under the GNU General Public License, see license.html for more info");
 
 	if (swapbuffers) {
 		SDL_GL_SwapBuffers();
@@ -374,7 +458,7 @@ static bool CheckParseErrors(GLenum target, const char* filename, const char* pr
 	const GLubyte* errString = glGetString(GL_PROGRAM_ERROR_STRING_ARB);
 
 	logOutput.Print(
-		"[myGL::CheckParseErrors] Shader compilation error at index"
+		"[myGL::CheckParseErrors] Shader compilation error at index "
 		"%d (near \"%.30s\") when loading %s-program file %s:\n%s",
 		errorPos, program + errorPos,
 		(target == GL_VERTEX_PROGRAM_ARB? "vertex": "fragment"),
@@ -451,3 +535,18 @@ void glClearErrors()
 
 
 /******************************************************************************/
+
+void SetTexGen(const float& scalex, const float& scaley, const float& offsetx, const float& offsety)
+{
+	GLfloat plan[]={scalex,0,0,offsetx};
+	glTexGeni(GL_S,GL_TEXTURE_GEN_MODE,GL_EYE_LINEAR);
+	glTexGenfv(GL_S,GL_EYE_PLANE,plan);
+	glEnable(GL_TEXTURE_GEN_S);
+	GLfloat plan2[]={0,0,scaley,offsety};
+	glTexGeni(GL_T,GL_TEXTURE_GEN_MODE,GL_EYE_LINEAR);
+	glTexGenfv(GL_T,GL_EYE_PLANE,plan2);
+	glEnable(GL_TEXTURE_GEN_T);
+}
+
+/******************************************************************************/
+

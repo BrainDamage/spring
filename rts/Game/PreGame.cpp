@@ -11,6 +11,7 @@
 #include "PreGame.h"
 #include "Game.h"
 #include "GameVersion.h"
+#include "Player.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "FPUCheck.h"
 #include "GameServer.h"
@@ -209,6 +210,12 @@ void CPreGame::UpdateClientNet()
 	{
 		const unsigned char* inbuf = packet->data;
 		switch (inbuf[0]) {
+			case NETMSG_QUIT: {
+				const std::string message((char*)(inbuf+3));
+				logOutput.Print(message);
+				throw std::runtime_error(message);
+				break;
+			}
 			case NETMSG_GAMEDATA: { // server first sends this to let us know about teams, allyteams etc.
 				GameDataReceived(packet);
 				break;
@@ -348,19 +355,11 @@ void CPreGame::LoadMap(const std::string& mapName, const bool forceReload)
 
 	if (!alreadyLoaded || forceReload)
 	{
-		CFileHandler* f = new CFileHandler("maps/" + mapName);
-		if (!f->FileExists()) {
-			vector<string> ars = archiveScanner->GetArchivesForMap(mapName);
-			if (ars.empty()) {
-				throw content_error("Couldn't find any archives for map '" + mapName + "'.");
-			}
-			for (vector<string>::iterator i = ars.begin(); i != ars.end(); ++i) {
-				if (!vfsHandler->AddArchive(*i, false)) {
-					throw content_error("Couldn't load archive '" + *i + "' for map '" + mapName + "'.");
-				}
-			}
+		CFileHandler f("maps/" + mapName);
+		if (!f.FileExists())
+		{
+			vfsHandler->AddMapArchiveWithDeps(mapName, false);
 		}
-		delete f;
 		mapInfo = new CMapInfo(mapName);
 		alreadyLoaded = true;
 	}
@@ -416,7 +415,7 @@ void CPreGame::GameDataReceived(boost::shared_ptr<const netcode::RawPacket> pack
 	LogObject() << "Using map " << gameSetup->mapName << "\n";
 
 	if (net && net->GetDemoRecorder()) {
-		net->GetDemoRecorder()->SetName(gameSetup->mapName);
+		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
 		LogObject() << "Recording demo " << net->GetDemoRecorder()->GetName() << "\n";
 	}
 	LoadMap(gameSetup->mapName);

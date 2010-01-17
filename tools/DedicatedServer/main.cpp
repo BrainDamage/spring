@@ -1,22 +1,23 @@
+#include <string>
+#include <iostream>
+#include <SDL.h>
+#include <stdlib.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "Game/GameServer.h"
 #include "Game/GameSetup.h"
 #include "Game/ClientSetup.h"
 #include "Game/GameData.h"
-#include "System/FileSystem/FileSystem.h"
+#include "FileSystem/FileSystemHandler.h"
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/VFSHandler.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/ConfigHandler.h"
 #include "System/Exceptions.h"
 #include "System/UnsyncedRNG.h"
-
-#include <string>
-#include <iostream>
-#include <SDL.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 int main(int argc, char *argv[])
 {
@@ -26,7 +27,6 @@ int main(int argc, char *argv[])
 	SDL_Init(SDL_INIT_TIMER);
 	std::cout << "If you find any errors, report them to mantis or the forums." << std::endl << std::endl;
 	ConfigHandler::Instantiate("");
-	FileSystemHandler::Cleanup();
 	FileSystemHandler::Initialize(false);
 	CGameServer* server = 0;
 	CGameSetup* gameSetup = 0;
@@ -71,19 +71,10 @@ int main(int argc, char *argv[])
 		{
 			data->SetMapChecksum(archiveScanner->GetMapChecksum(gameSetup->mapName));
 
-			CFileHandler* f = new CFileHandler("maps/" + gameSetup->mapName);
-			if (!f->FileExists()) {
-				std::vector<std::string> ars = archiveScanner->GetArchivesForMap(gameSetup->mapName);
-				if (ars.empty()) {
-					throw content_error("Couldn't find any archives for map '" + gameSetup->mapName + "'.");
-				}
-				for (std::vector<std::string>::iterator i = ars.begin(); i != ars.end(); ++i) {
-					if (!vfsHandler->AddArchive(*i, false)) {
-						throw content_error("Couldn't load archive '" + *i + "' for map '" + gameSetup->mapName + "'.");
-					}
-				}
+			CFileHandler f("maps/" + gameSetup->mapName);
+			if (!f.FileExists()) {
+				vfsHandler->AddMapArchiveWithDeps("maps/" + gameSetup->mapName, false);
 			}
-			delete f;
 			gameSetup->LoadStartPositions(); // full mode
 		}
 

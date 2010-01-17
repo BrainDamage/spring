@@ -25,12 +25,14 @@ public:
 	virtual bool HandleEventSelf(const SDL_Event& ev);
 	std::string GetTooltip(int x,int y) { return tooltip; }
 
+	void RemoveAllItems();
 	void AddItem(const std::string& name,const std::string& description);
 	std::vector<std::string> items;
 	std::string name;
 
 	std::string GetCurrentItem() const;
 	bool SetCurrentItem(const std::string& item);
+	void CenterSelected();
 
 	// when attempting to cancel (by pressing escape, clicking outside a button)
 	// place is set to cancelPlace (if it's positive) and Select is called.
@@ -38,6 +40,8 @@ public:
 	std::string tooltip;
 
 	boost::signal<void (void)> FinishSelection; // Return or Double-Click
+	void SetFocus(bool focus);
+	void RefreshQuery();
 
 private:
 	bool Filter(bool reset);
@@ -46,6 +50,11 @@ private:
 	void UpPage();
 	void DownPage();
 	bool MouseUpdate(int x, int y);
+	void UpdateTopIndex();
+	void ScrollUpOne();
+	void ScrollDownOne();
+	int NumDisplay();
+	float ScaleFactor();
 
 	unsigned clickedTime;
 	int place;
@@ -57,6 +66,8 @@ private:
 	float borderSpacing;
 	float itemSpacing;
 	float itemHeight;
+	bool hasFocus;
+	int topIndex;
 
 	// for filtering
 	std::string query;

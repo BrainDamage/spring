@@ -8,57 +8,27 @@
 
 #include "Net/RawPacket.h"
 #include "Game/GameVersion.h"
-#ifndef DEDICATED_CLIENT
-#include "FileSystem/FileHandler.h"
-#else
-#include <fstream>
-#endif
 
 /////////////////////////////////////
 // CDemoReader implementation
 
 CDemoReader::CDemoReader(const std::string& filename, float curTime)
 {
-	#ifndef DEDICATED_CLIENT
-	std::string firstTry = "demos/" + filename;
+	playbackDemo.open(filename.c_str(), std::ios::binary);
 
-	playbackDemo = new CFileHandler(firstTry);
-
-	if (!playbackDemo->FileExists()) {
-		delete playbackDemo;
-		playbackDemo = new CFileHandler(filename);
-	}
-
-	if (!playbackDemo->FileExists()) {
+	if (!playbackDemo.is_open()) {
 		// file not found -> exception
-		delete playbackDemo;
-		playbackDemo = NULL;
-		throw std::runtime_error(std::string("Demofile not found: ")+filename);
-	}
-	playbackDemo->Read((void*)&fileHeader, sizeof(fileHeader));
-	#else
-	playbackDemo = new std::ifstream( filename.c_str() );
-	if (!playbackDemo->is_open())
-	{
-		delete playbackDemo;
-		playbackDemo = NULL;
 		throw std::runtime_error(std::string("Demofile not found: ")+filename);
 	}
 
-  playbackDemo->seekg(0, std::ios::end);
-  size_t fileLength = playbackDemo->tellg();
-  playbackDemo->seekg(0, std::ios::beg);
-
-	playbackDemo->read((char*)&fileHeader, sizeof(fileHeader));
-
-	#endif
-
-
+	playbackDemo.read((char*)&fileHeader, sizeof(fileHeader));
 	fileHeader.swab();
 
 	if (memcmp(fileHeader.magic, DEMOFILE_MAGIC, sizeof(fileHeader.magic))
 		|| fileHeader.version != DEMOFILE_VERSION
 		|| fileHeader.headerSize != sizeof(fileHeader)
+		|| fileHeader.playerStatElemSize != sizeof(PlayerStatistics)
+		|| fileHeader.teamStatElemSize != sizeof(TeamStatistics)
 		// Don't compare spring version in debug mode: we don't want to make
 		// debugging SVN demos impossible (because VERSION_STRING is different
 		// each build.)
@@ -66,43 +36,21 @@ CDemoReader::CDemoReader(const std::string& filename, float curTime)
 		|| (SpringVersion::Get().find("+") == std::string::npos && strcmp(fileHeader.versionString, SpringVersion::Get().c_str()))
 #endif
 	) {
-		delete playbackDemo;
-		playbackDemo = NULL;
 		throw std::runtime_error(std::string("Demofile corrupt or created by a different version of Spring: ")+filename);
 	}
 
 	if (fileHeader.scriptSize != 0) {
 		char* buf = new char[fileHeader.scriptSize];
-		#ifndef DEDICATED_CLIENT
-		playbackDemo->Read(buf, fileHeader.scriptSize);
-		#else
-		playbackDemo->read(buf, fileHeader.scriptSize);
-		#endif
+		playbackDemo.read(buf, fileHeader.scriptSize);
 		setupScript = std::string(buf);
 		delete[] buf;
 	}
-	#ifndef DEDICATED_CLIENT
-	playbackDemo->Read((void*)&chunkHeader, sizeof(chunkHeader));
-	#else
-	playbackDemo->read((char*)&chunkHeader, sizeof(chunkHeader));
-	#endif
+
+	playbackDemo.read((char*)&chunkHeader, sizeof(chunkHeader));
 	chunkHeader.swab();
 
 	demoTimeOffset = curTime - chunkHeader.modGameTime - 0.1f;
 	nextDemoRead = curTime - 0.01f;
-
-	if (fileHeader.demoStreamSize != 0) {
-		bytesRemaining = fileHeader.demoStreamSize;
-	} else {
-		// Spring crashed while recording the demo: replay until EOF,
-		// but at most filesize bytes to block watching demo of running game.
-		#ifndef DEDICATED_CLIENT
-		bytesRemaining = playbackDemo->FileSize() - fileHeader.headerSize - fileHeader.scriptSize;
-		#else
-		bytesRemaining = fileLength - fileHeader.headerSize - fileHeader.scriptSize;
-		#endif
-	}
-	bytesRemaining -= sizeof(chunkHeader);
 }
 
 netcode::RawPacket* CDemoReader::GetData(float curTime)
@@ -113,21 +61,11 @@ netcode::RawPacket* CDemoReader::GetData(float curTime)
 	// when paused, modGameTime wont increase so no seperate check needed
 	if (nextDemoRead < curTime) {
 		netcode::RawPacket* buf = new netcode::RawPacket(chunkHeader.length);
-		#ifndef DEDICATED_CLIENT
-		playbackDemo->Read((void*)(buf->data), chunkHeader.length);
-		#else
-		playbackDemo->read((char*)(buf->data), chunkHeader.length);
-		#endif
-		bytesRemaining -= chunkHeader.length;
+		playbackDemo.read((char*)(buf->data), chunkHeader.length);
 
-		#ifndef DEDICATED_CLIENT
-		playbackDemo->Read((void*)&chunkHeader, sizeof(chunkHeader));
-		#else
-		playbackDemo->read((char*)&chunkHeader, sizeof(chunkHeader));
-		#endif
+		playbackDemo.read((char*)&chunkHeader, sizeof(chunkHeader));
 		chunkHeader.swab();
 		nextDemoRead = chunkHeader.modGameTime + demoTimeOffset;
-		bytesRemaining -= sizeof(chunkHeader);
 
 		return buf;
 	} else {
@@ -137,11 +75,7 @@ netcode::RawPacket* CDemoReader::GetData(float curTime)
 
 bool CDemoReader::ReachedEnd() const
 {
-	#ifndef DEDICATED_CLIENT
-	if (bytesRemaining <= 0 || playbackDemo->Eof())
-	#else
-	if (bytesRemaining <= 0 || playbackDemo->eof())
-	#endif
+	if (playbackDemo.eof())
 		return true;
 	else
 		return false;
@@ -151,3 +85,50 @@ float CDemoReader::GetNextReadTime() const
 {
 	return chunkHeader.modGameTime;
 }
+
+const std::vector<PlayerStatistics>& CDemoReader::GetPlayerStats() const
+{
+	return playerStats;
+}
+
+const std::vector< std::vector<TeamStatistics> >& CDemoReader::GetTeamStats() const
+{
+	return teamStats;
+}
+
+void CDemoReader::LoadStats()
+{
+	const int curPos = playbackDemo.tellg();
+	playbackDemo.seekg(fileHeader.headerSize + fileHeader.scriptSize + fileHeader.demoStreamSize);
+
+	playerStats.clear();
+	for (int playerNum = 0; playerNum < fileHeader.numPlayers; ++playerNum)
+	{
+		PlayerStatistics buf;
+		playbackDemo.read((char*)&buf, sizeof(buf));
+		buf.swab();
+		playerStats.push_back(buf);
+	}
+
+	{ // Team statistics follow player statistics.
+		teamStats.clear();
+		teamStats.resize(fileHeader.numTeams);
+		// Read the array containing the number of team stats for each team.
+		std::vector<int> numStatsPerTeam(fileHeader.numTeams, 0);
+		playbackDemo.read((char*)(&numStatsPerTeam[0]), numStatsPerTeam.size());
+
+		for (int teamNum = 0; teamNum < fileHeader.numTeams; ++teamNum)
+		{
+			for (int i = 0; i < numStatsPerTeam[teamNum]; ++i)
+			{
+				TeamStatistics buf;
+				playbackDemo.read((char*)&buf, sizeof(buf));
+				buf.swab();
+				teamStats[teamNum].push_back(buf);
+			}
+		}
+	}
+
+	playbackDemo.seekg(curPos);
+}
+

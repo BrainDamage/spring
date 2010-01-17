@@ -19,8 +19,10 @@ using namespace std;
 static CLogSubsystem LOG_MAPINFO("mapinfo");
 
 
-// before delete, the const is const_cast'ed away.
-// there are no (other) situations where mapInfo may be modified
+// Before delete, the const is const_cast'ed away. There are
+// no (other) situations where mapInfo may be modified, except
+//   LuaUnsyncedCtrl may change water
+//   LuaSyncedCtrl may change terrainTypes
 const CMapInfo* mapInfo;
 
 
@@ -256,13 +258,18 @@ void CMapInfo::ReadSmf()
 	// SMF specific settings
 	const LuaTable mapResTable = parser->GetRoot().SubTable("resources");
 	smf.detailTexName = mapResTable.GetString("detailTex", "");
+	smf.specularTexName = mapResTable.GetString("specularTex", "");
+
 	if (!smf.detailTexName.empty()) {
 		smf.detailTexName = "maps/" + smf.detailTexName;
-	}
-	else {
+	} else {
 		const LuaTable resGfxMaps = resRoot->SubTable("graphics").SubTable("maps");
 		smf.detailTexName = resGfxMaps.GetString("detailtex", "detailtex2.bmp");
 		smf.detailTexName = "bitmaps/" + smf.detailTexName;
+	}
+
+	if (!smf.specularTexName.empty()) {
+		smf.specularTexName = "maps/" + smf.specularTexName;
 	}
 
 	// height overrides
@@ -301,7 +308,7 @@ void CMapInfo::ReadTerrainTypes()
 	const LuaTable terrTypeTable =
 		parser->GetRoot().SubTable("terrainTypes");
 
-	for (int tt = 0; tt < 256; tt++) {
+	for (int tt = 0; tt < NUM_TERRAIN_TYPES; tt++) {
 		TerrainType& terrType = terrainTypes[tt];
 		const LuaTable terrain = terrTypeTable.SubTable(tt);
 		terrType.name          = terrain.GetString("name", "Default");

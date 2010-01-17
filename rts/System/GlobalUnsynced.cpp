@@ -6,7 +6,7 @@
  * unsynced global stuff
  */
 #include "StdAfx.h"
-
+#include "Rendering/GL/myGL.h"
 #include "GlobalUnsynced.h"
 
 #include <cstring>
@@ -14,19 +14,16 @@
 
 #include "mmgr.h"
 #include "Util.h"
-#ifndef DEDICATED_CLIENT
 #include "Sim/Projectiles/ProjectileHandler.h"
-#include "Lua/LuaGaia.h"
-#include "Lua/LuaRules.h"
-#include "Sync/SyncTracer.h"
 #include "Game/GameHelper.h"
-#endif
 #include "Game/GameSetup.h"
+#include "Sync/SyncTracer.h"
 #include "Sim/Misc/Team.h"
 #include "Game/Player.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Rendering/Textures/TAPalette.h"
-
+#include "Lua/LuaGaia.h"
+#include "Lua/LuaRules.h"
 #include "SDL_timer.h"
 
 
@@ -96,19 +93,17 @@ CGlobalUnsyncedStuff::CGlobalUnsyncedStuff()
 	directControl = 0;
 	compressTextures = false;
 	atiHacks = false;
-	#ifndef DEDICATED_CLIENT
 	supportNPOTs = GLEW_ARB_texture_non_power_of_two;
 	{
 		std::string vendor = std::string((char*)glGetString(GL_VENDOR));
 		StringToLowerInPlace(vendor);
-		bool isATi = (vendor.find("ati ") != std::string::npos);
+		bool isATi = (vendor.find("ati ") != string::npos);
 		if (isATi) {
 			std::string renderer = std::string((char*)glGetString(GL_RENDERER));
 			StringToLowerInPlace(renderer);
-			supportNPOTs = (renderer.find(" x") == std::string::npos && renderer.find(" 9") == std::string::npos); //! x-series doesn't support NPOTs
+			supportNPOTs = (renderer.find(" x") == string::npos && renderer.find(" 9") == string::npos); //! x-series doesn't support NPOTs (but hd-series does)
 		}
 	}
-	#endif
 }
 
 /**

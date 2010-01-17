@@ -23,6 +23,7 @@
 #include "LogOutput.h"
 #include "DemoRecorder.h"
 #include "GlobalUnsynced.h"
+#include "lib/gml/gml.h"
 
 
 CNetProtocol::CNetProtocol()
@@ -31,7 +32,7 @@ CNetProtocol::CNetProtocol()
 
 CNetProtocol::~CNetProtocol()
 {
-	Send(CBaseNetProtocol::Get().SendQuit());
+	Send(CBaseNetProtocol::Get().SendQuit(""));
 	logOutput.Print(serverConn->Statistics());
 }
 

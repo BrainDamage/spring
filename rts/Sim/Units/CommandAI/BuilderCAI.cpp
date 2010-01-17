@@ -244,10 +244,9 @@ inline bool CBuilderCAI::OutOfImmobileRange(const Command& cmd) const
 	}
 	else {
 		// features don't move, but maybe the unit was transported?
-		const CFeatureSet& fset = featureHandler->GetActiveFeatures();
-		CFeatureSet::const_iterator it = fset.find(id - uh->MaxUnits());
-		if (it != fset.end()) {
-			obj = *it;
+		CFeature* feature = featureHandler->GetFeature(id - uh->MaxUnits());
+		if (feature) {
+			obj = feature;
 		}
 	}
 	if (obj == NULL) {
@@ -382,6 +381,7 @@ void CBuilderCAI::SlowUpdate()
 	if (!owner->beingBuilt && boi != buildOptions.end()) {
 		const UnitDef* ud = unitDefHandler->GetUnitDefByName(boi->second);
 		const float radius = GetUnitDefRadius(ud, c.id);
+
 		if (inCommand) {
 			if (building) {
 				if (f3SqDist(build.pos, fac->pos) > Square(fac->buildDistance + radius - 8.0f)) {
@@ -427,7 +427,7 @@ void CBuilderCAI::SlowUpdate()
 							FinishCommand();
 						}
 						else if (uh->MaxUnitsPerTeam() > (int) teamHandler->Team(owner->team)->units.size()) {
-							// max unitlimit reached
+							// unit-limit not yet reached
 							buildRetries++;
 							owner->moveType->KeepPointingTo(build.pos, fac->buildDistance * 0.7f + radius, false);
 
@@ -435,10 +435,22 @@ void CBuilderCAI::SlowUpdate()
 								building = true;
 							} else {
 								if ((owner->team == gu->myTeam) && !(buildRetries & 7)) {
-									logOutput.Print("%s: Build pos blocked", owner->unitDef->humanName.c_str());
+									logOutput.Print(
+										"%s: build-position <%.2f, %.2f, %.2f> blocked after %d attempts",
+										owner->unitDef->humanName.c_str(),
+										build.pos.x, build.pos.y, build.pos.z,
+										buildRetries
+									);
 									logOutput.SetLastMsgPos(owner->pos);
 								}
-								helper->BuggerOff(build.pos, radius, false);
+
+								const float fpSqRadius = (ud->xsize * ud->xsize + ud->zsize * ud->zsize);
+								const float fpRadius = (math::sqrt(fpSqRadius) * 0.5f) * SQUARE_SIZE;
+
+								// tell everything within the radius of the soon-to-be buildee
+								// to get out of the way; using the model radius is not correct
+								// because this can be shorter than half the footprint diagonal
+								helper->BuggerOff(build.pos, std::max(radius, fpRadius), false);
 								NonMoving();
 							}
 						}
@@ -792,10 +804,8 @@ void CBuilderCAI::ExecuteReclaim(Command& c)
 		}
 		const unsigned int id = signedId;
 		if (id >= uh->MaxUnits()) { // reclaim feature
-			const CFeatureSet& fset = featureHandler->GetActiveFeatures();
-			CFeatureSet::const_iterator it = fset.find(id - uh->MaxUnits());
-			if (it != fset.end()) {
-				CFeature* feature = *it;
+		CFeature* feature = featureHandler->GetFeature(id - uh->MaxUnits());
+			if (feature) {
 				if(((c.options & INTERNAL_ORDER) && !(c.options & CONTROL_KEY) && IsFeatureBeingResurrected(feature->id, owner)) ||
 					!ReclaimObject(feature)) {
 					StopMove();
@@ -891,9 +901,8 @@ void CBuilderCAI::ExecuteResurrect(Command& c)
 	if (c.params.size()==1) {
 		unsigned int id = (unsigned int) c.params[0];
 		if (id >= uh->MaxUnits()) { // resurrect feature
-			CFeatureSet::const_iterator it = featureHandler->GetActiveFeatures().find(id - uh->MaxUnits());
-			if (it != featureHandler->GetActiveFeatures().end() && (*it)->createdFromUnit != "") {
-				CFeature* feature = *it;
+		CFeature* feature = featureHandler->GetFeature(id - uh->MaxUnits());
+			if (feature && feature->createdFromUnit != "") {
 				if(((c.options & INTERNAL_ORDER) && !(c.options & CONTROL_KEY) && IsFeatureBeingReclaimed(feature->id, owner)) ||
 					!ResurrectObject(feature)) {
 					StopMove();
@@ -1010,7 +1019,7 @@ void CBuilderCAI::ExecuteFight(Command& c)
 	}
 	float3 curPosOnLine = ClosestPointOnLine(commandPos1, commandPos2, owner->pos);
 	if ((owner->unitDef->canRepair || owner->unitDef->canAssist) && // Priority 1: Repair
-	    FindRepairTargetAndRepair(curPosOnLine, 300*owner->moveState+fac->buildDistance-8, c.options, true, false)){
+	    FindRepairTargetAndRepair(curPosOnLine, 300*owner->moveState+fac->buildDistance-8, c.options, true, (c.options & META_KEY))){
 		tempOrder = true;
 		inCommand = false;
 		if (lastPC1 != gs->frameNum) {  //avoid infinite loops
@@ -1030,7 +1039,7 @@ void CBuilderCAI::ExecuteFight(Command& c)
 		return;
 	}
 	if (owner->unitDef->canReclaim && // Priority 3: Reclaim / reclaim non resurrectable (optional) / reclaim enemy units (optional)
-	    FindReclaimTargetAndReclaim(curPosOnLine, 300, c.options, false, false, (c.options & ALT_KEY), (c.options & META_KEY), (c.options & ALT_KEY))) {
+	    FindReclaimTargetAndReclaim(curPosOnLine, 300, c.options, false, true, (c.options & ALT_KEY), (c.options & META_KEY), (c.options & ALT_KEY))) {
 		tempOrder = true;
 		inCommand = false;
 		if (lastPC3 != gs->frameNum) {  //avoid infinite loops
@@ -1317,7 +1326,7 @@ bool CBuilderCAI::FindReclaimTargetAndReclaim(const float3& pos,
 		const std::vector<CFeature*> features = qf->GetFeaturesExact(pos, radius);
 		for (std::vector<CFeature*>::const_iterator fi = features.begin(); fi != features.end(); ++fi) {
 			const CFeature* f = *fi;
-			if (f->def->reclaimable && f->def->autoreclaim && (!recNonRez || !(f->def->destructable && f->createdFromUnit != "")) &&
+			if (f->def->reclaimable && ((options & CONTROL_KEY) || f->def->autoreclaim) && (!recNonRez || !(f->def->destructable && f->createdFromUnit != "")) &&
 				(recAnyTeam || (f->allyteam != owner->allyteam))) {
 				float dist = f3SqLen(f->pos - owner->pos);
 				if ((dist < bestDist) &&
@@ -1703,10 +1712,9 @@ void CBuilderCAI::DrawCommands(void)
 
 						GML_RECMUTEX_LOCK(feat); // DrawCommands
 
-						const CFeatureSet& fset = featureHandler->GetActiveFeatures();
-						CFeatureSet::const_iterator it = fset.find(id - uh->MaxUnits());
-						if (it != fset.end()) {
-							const float3 endPos = (*it)->midPos;
+						CFeature* feature = featureHandler->GetFeature(id - uh->MaxUnits());
+						if (feature) {
+							const float3 endPos = feature->midPos;
 							lineDrawer.DrawLineAndIcon(ci->id, endPos, color);
 						}
 					} else {

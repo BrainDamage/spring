@@ -897,6 +897,8 @@ static inline float GetPenalty(const unsigned char& c, unsigned int strpos, unsi
 
 CglFont::word CglFont::SplitWord(CglFont::word& w, float wantedWidth, bool smart) const
 {
+	//! returns two pieces 'L'eft and 'R'ight of the split word (returns L, *wi becomes R)
+
 	word w2;
 	w2.pos = w.pos;
 
@@ -996,6 +998,25 @@ void CglFont::AddEllipsis(std::list<line>& lines, std::list<word>& words, float 
 
 	line* l = &(lines.back());
 
+	//! If the last line ends with a linebreak, remove it
+	std::list<word>::iterator wi_end = l->end;
+	if (wi_end->isLineBreak) {
+		if (l->start == l->end || l->end == words.begin()) {
+			//! there is just the linebreak in that line, so replace linebreak with just a null space
+			word w;
+			w.pos       = wi_end->pos;
+			w.isSpace   = true;
+			w.numSpaces = 0;
+			l->start = words.insert(wi_end,w);
+			l->end = l->start;
+
+			words.erase(wi_end);
+		} else {
+			wi_end = words.erase(wi_end);
+			l->end = --wi_end;
+		}
+	}
+
 	//! remove as many words until we have enough free space for the ellipsis
 	while (l->end != l->start) {
 		word& w = *l->end;
@@ -1082,89 +1103,112 @@ void CglFont::AddEllipsis(std::list<line>& lines, std::list<word>& words, float 
 
 void CglFont::WrapTextConsole(std::list<word>& words, float maxWidth, float maxHeight) const
 {
-	if(words.empty())
+	if (words.empty())
 		return;
 
-	const bool splitWords = false;
-
+	const bool splitAllWords = false;
 	const unsigned int maxLines = (unsigned int)math::floor(std::max(0.0f, maxHeight / lineHeight ));
 
+	line* currLine;
 	word linebreak;
 	linebreak.isLineBreak = true;
 
 	bool addEllipsis = false;
+	bool currLineValid = false; //! true if there was added any data to the current line
 
+	std::list<word>::iterator wi = words.begin();
+
+	std::list<word> splitWords;
 	std::list<line> lines;
-	lines.push_back(line());
-	line* l = &(lines.back());
-	l->start = words.begin();
+		lines.push_back(line());
+		currLine = &(lines.back());
+		currLine->start = words.begin();
 
-	std::list<word>::iterator wi;
-	for (wi = words.begin(); wi != words.end(); wi++) {
-		//! force a LineBreak
+	for (; ;) {
+		currLineValid = true;
 		if (wi->isLineBreak) {
-			l->forceLineBreak = true;
+			currLine->forceLineBreak = true;
+			currLine->end = wi;
 
-			if (lines.size() >= maxLines) {
-				addEllipsis = true;
-				break;
-			}
-
-			l->end = wi;
-
+			//! start a new line after the '\n'
 			lines.push_back(line());
-			l = &(lines.back());
-			l->start = wi; l->start++;
-			continue;
+				currLineValid = false;
+				currLine = &(lines.back());
+				currLine->start = wi;
+				currLine->start++;
+		} else {
+			currLine->width += wi->width;
+			currLine->end = wi;
+
+			if (currLine->width > maxWidth) {
+				currLine->width -= wi->width;
+
+				//! line grew too long by adding the last word, insert a LineBreak
+				const bool splitLastWord = (wi->width > (0.5 * maxWidth));
+				const float freeWordSpace = (maxWidth - currLine->width);
+
+				if (splitAllWords || splitLastWord) {
+					//! last word W is larger than 0.5 * maxLineWidth, split it into
+					//! get 'L'eft and 'R'ight parts of the split (wL becomes Left, *wi becomes R)
+
+					//! turns *wi into R
+					word wL = SplitWord(*wi, freeWordSpace);
+
+					if (splitLastWord && wL.width == 0.0f) {
+						//! With smart splitting it can happen that the word isn't splitted at all,
+						//! this can cause a race condition when the word is longer than maxWidth.
+						//! In this case we have to force an unaesthetic split.
+						wL = SplitWord(*wi, freeWordSpace, false);
+					}
+
+					//! increase by the width of the L-part of *wi
+					currLine->width += wL.width;
+
+					//! insert the L-part right before R
+					wi = words.insert(wi, wL);
+					wi++;
+				}
+
+				//! insert the forced linebreak (either after W or before R)
+				linebreak.pos = wi->pos;
+				currLine->end = words.insert(wi, linebreak);
+
+				while (wi != words.end() && wi->isSpace)
+					wi = words.erase(wi);
+
+				lines.push_back(line());
+					currLineValid = false;
+					currLine = &(lines.back());
+					currLine->start = wi;
+					wi--; //! compensate the wi++ downwards
+			}
 		}
 
-		l->width += wi->width;
+		wi++;
 
-		//! line got too long add a LineBreak
-		if (l->width > maxWidth) {
-			l->width -= wi->width;
-			if (
-				(splitWords) ||
-				(wi->width > (0.5 * maxWidth) && (l->width + wi->width) > maxWidth) //! word is larger than 0.5*maxLineWidth, so it is better we split if needed
-			) {
-				float freeSpace = maxWidth - l->width;
-				l->end = words.insert( wi, SplitWord(*wi, freeSpace) );
-				l->width += (l->end)->width;
-			} else {
-				l->end = wi;
-				l->end--;
-			}
-
-			if (lines.size() >= maxLines) {
-				addEllipsis = true;
-				break;
-			}
-
-			linebreak.pos = wi->pos;
-			l->end = words.insert( wi, linebreak );
-
-			while(wi != words.end() && wi->isSpace)
-				wi = words.erase(wi);
-
-			lines.push_back(line());
-			l = &(lines.back());
-			l->start = wi;
-			wi--;
+		if (wi == words.end()) {
+			break;
 		}
-		l->end = wi;
+
+		if (lines.size() > maxLines) {
+			addEllipsis = true;
+			break;
+		}
 	}
+
+	
 
 	//! empty row
-	if (l->start == words.end() && !l->forceLineBreak) {
+	if (!currLineValid || (currLine->start == words.end() && !currLine->forceLineBreak)) {
 		lines.pop_back();
-		l = &(lines.back());
+		currLine = &(lines.back());
 	}
 
-	//! if we cut the text cos of missing space add an ellipsis
+	//! if we had to cut the text because of missing space, add an ellipsis
 	if (addEllipsis)
 		AddEllipsis(lines, words, maxWidth);
 
-	wi = l->end; wi++;
+	wi = currLine->end; wi++;
 	wi = words.erase(wi, words.end());
 }
 

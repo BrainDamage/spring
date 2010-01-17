@@ -4,6 +4,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "Game/PlayerBase.h"
+#include "Game/PlayerStatistics.h"
 
 namespace netcode
 {
@@ -18,7 +19,7 @@ public:
 	void SendData(boost::shared_ptr<const netcode::RawPacket> packet);
 
 	void Connected(boost::shared_ptr<netcode::CConnection> link, bool local);
-	void Kill();
+	void Kill(const std::string& reason);
 
 	void operator=(const PlayerBase& base) { PlayerBase::operator=(base); };
 
@@ -31,9 +32,7 @@ public:
 	};
 	State myState;
 	
-	float cpuUsage;
-	int ping;
-	int lastKeyframeResponse;
+	int lastFrameResponse;
 
 	bool isLocal;
 	boost::shared_ptr<netcode::CConnection> link;
