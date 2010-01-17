@@ -257,9 +257,9 @@ CGameServer::~CGameServer()
 	/*for (size_t i = 0; i < ais.size(); ++i) {
 		demoRecorder->SetSkirmishAIStats(i, ais[i].lastStats);
 	}*/
-	/*for (int i = 0; i < numTeams; ++i) {
+	for (int i = 0; i < numTeams; ++i) {
 		record->SetTeamStats(i, teamHandler->Team(i)->statHistory);
-	}*/ //TODO add
+	}
 #endif // DEDICATED
 }
 
