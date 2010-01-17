@@ -222,6 +222,9 @@ bool UpdateClientNet()
 				{
 					// send myPlayerName to let the server know you finished loading
 					net->Send(CBaseNetProtocol::Get().SendPlayerName(gu->myPlayerNum, settings.myPlayerName));
+					// register for interesting messages
+					net->Send(CBaseNetProtocol::Get().SendRegisterNetMsg(gu->myPlayerNum, NETMSG_TEAMSTAT));
+					net->Send(CBaseNetProtocol::Get().SendRegisterNetMsg(gu->myPlayerNum, NETMSG_TEAM));
 				}
 
 				break;
@@ -487,4 +490,3 @@ void GameOver()
 	}
 	gameOver = true;
 }
-

@@ -88,7 +88,10 @@ enum NETMSG {
 	NETMSG_AI_CREATED       = 70, // /* uchar messageSize */, uchar myPlayerNum, uint whichSkirmishAI, uchar team, std::string name (ends with \0)
 	NETMSG_AI_STATE_CHANGED = 71, // uchar myPlayerNum, uint whichSkirmishAI, uchar newState
 
-	NETMSG_REQUEST_TEAMSTAT = 72  // uchar teamNum, ushort statFrameNum
+	NETMSG_REQUEST_TEAMSTAT = 72, // uchar teamNum, ushort statFrameNum
+
+	NETMSG_REGISTER_NETMSG	= 73, // uchar myPlayerNum, uchar NETMSG
+	NETMSG_UNREGISTER_NETMSG= 74  // uchar myPlayerNum, uchar NETMSG
 };
 
 // action to do with NETMSG_TEAM
@@ -177,6 +180,9 @@ public:
 	                              const uchar newState);
 
 	PacketType SendSetAllied(uchar myPlayerNum, uchar whichAllyTeam, uchar state);
+
+	PacketType SendRegisterNetMsg( uchar myPlayerNum, NETMSG msgID );
+	PacketType SendUnRegisterNetMsg( uchar myPlayerNum, NETMSG msgID );
 
 #ifdef SYNCDEBUG
 	PacketType SendSdCheckrequest(int frameNum);
