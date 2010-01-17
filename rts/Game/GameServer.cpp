@@ -1796,12 +1796,23 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 					if ( requestSize > 0 ) {
 						//find players to request team stats from
 						std::vector<GameParticipant> requestlist = players;
+						// skip players that registered for team stats message
+						PlayersToForwardMsgvec playersToSkip;
+						MsgToForwardMap::iterator playersToSkipIter = relayingMessagesMap.find( NETMSG_TEAMSTAT );
+						if ( playersToSkipIter != relayingMessagesMap.end() ) {
+							playersToSkip = playersToSkipIter->second;
+						}
 						// sort by ping
 						std::sort( requestlist.begin(), requestlist.end(), ComparePings );
 						size_t activeTeams = teamHandler->ActiveTeams();
 						for( unsigned teamNum = 0; teamNum < activeTeams; teamNum++ ){
 							//request stat frame
-							requestlist[teamNum%requestSize].SendData(CBaseNetProtocol::Get().SendRequestTeamStat(teamNum,currentTeamStatFrame));
+							unsigned int playerToRequest = teamNum%requestSize;
+							if ( playersToSkip.find( playerToRequest ) != playersToSkip.end() ) {
+								teamNum--;
+								continue;
+							}
+							requestlist[].SendData(CBaseNetProtocol::Get().SendRequestTeamStat(teamNum,currentTeamStatFrame));
 						}
 					}
 				}
