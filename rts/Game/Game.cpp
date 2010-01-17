@@ -4321,6 +4321,25 @@ void CGame::ClientReadNet()
 				AddTraffic(-1, packetCode, dataLength);
 				break;
 			}
+
+			case NETMSG_REQUEST_TEAMSTAT: {
+				const unsigned char teamNum = inbuf[1];
+				const unsigned int statFrameNum= inbuf[2];
+				if ((teamNum >= teamHandler->ActiveTeams()) || (teamNum < 0)) {
+					logOutput.Print("Invalid teamNum number (%i) in NETMSG_REQUEST_TEAMSTAT", teamNum);
+					break;
+				}
+				const uint currentStatFrameNum = gs->frameNum / ( GAME_SPEED * CTeam::statsPeriod );
+				if ( statFrameNum != currentStatFrameNum  ) {
+					logOutput.Print("Network packet order is broken in NETMSG_REQUEST_TEAMSTAT");
+					break;
+				}
+				netcode::PackPacket* buf = new netcode::PackPacket(5 + sizeof(CTeam::Statistics), NETMSG_TEAMSTAT);
+				*buf << (uint8_t)teamNum << (uint32_t)currentStatFrameNum << teamHandler->Team(teamNum)->currentStats;
+				net->Send(buf);
+				break;
+			}
+
 			default: {
 #ifdef SYNCDEBUG
 				if (!CSyncDebugger::GetInstance()->ClientReceived(inbuf))
@@ -4515,9 +4534,6 @@ void CGame::GameEnd()
 			}
 			for (int i = 0; i < numTeams; ++i) {
 				record->SetTeamStats(i, teamHandler->Team(i)->statHistory);
-				netcode::PackPacket* buf = new netcode::PackPacket(2 + sizeof(CTeam::Statistics), NETMSG_TEAMSTAT);
-				*buf << (uint8_t)teamHandler->Team(i)->teamNum << teamHandler->Team(i)->currentStats;
-				net->Send(buf);
 			}
 		}
 	}

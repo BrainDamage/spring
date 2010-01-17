@@ -191,10 +191,10 @@ PacketType CBaseNetProtocol::SendSendPlayerStat()
 	return PacketType(new PackPacket(1, NETMSG_SENDPLAYERSTAT));
 }
 
-PacketType CBaseNetProtocol::SendRequestTeamStat( uchar teamNum, ushort teamStatFrameCount )
+PacketType CBaseNetProtocol::SendRequestTeamStat( uchar teamNum, uint teamStatFrameCount )
 {
-	PackPacket* packet = new netcode::PackPacket( 4, NETMSG_REQUEST_TEAMSTAT);
-	*packet << (uint8_t)teamNum << (uint16_t)teamStatFrameCount;
+	PackPacket* packet = new netcode::PackPacket( 6, NETMSG_REQUEST_TEAMSTAT);
+	*packet << (uint8_t)teamNum << (uint32_t)teamStatFrameCount;
 	return PacketType(packet);
 }
 

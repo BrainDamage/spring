@@ -1812,7 +1812,7 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 								teamNum--;
 								continue;
 							}
-							requestlist[].SendData(CBaseNetProtocol::Get().SendRequestTeamStat(teamNum,currentTeamStatFrame));
+							requestlist[playerToRequest].SendData(CBaseNetProtocol::Get().SendRequestTeamStat(teamNum,currentTeamStatFrame));
 						}
 					}
 				}
