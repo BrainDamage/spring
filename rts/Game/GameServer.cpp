@@ -1323,7 +1323,7 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 			MsgToForwardMap::iterator itor = relayingMessagesMap.find( msg );
 
 			if ( itor != relayingMessagesMap.end() ) { // one entry already exists in the map
-				PlayersToForwardMsgvec &toForward; = itor->second;
+				PlayersToForwardMsgvec &toForward = itor->second;
 				if ( toForward.find( player ) == toForward.end() ) {
 					toForward.insert( player );
 				}
@@ -1809,10 +1809,10 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 						//find players to request team stats from
 						std::vector<GameParticipant> requestlist = players;
 						// skip players that registered for team stats message
-						PlayersToForwardMsgvec playersToSkip;
+						PlayersToForwardMsgvec* playersToSkip = 0;
 						MsgToForwardMap::iterator playersToSkipIter = relayingMessagesMap.find( NETMSG_TEAMSTAT );
 						if ( playersToSkipIter != relayingMessagesMap.end() ) {
-							playersToSkip = playersToSkipIter->second;
+							playersToSkip = &playersToSkipIter->second;
 						}
 						// sort by ping
 						std::sort( requestlist.begin(), requestlist.end(), ComparePings );
@@ -1820,9 +1820,11 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 						for( unsigned teamNum = 0; teamNum < numTeams; teamNum++ ){
 							//request stat frame
 							unsigned int playerToRequest = teamNum%requestSize;
-							if ( playersToSkip.find( playerToRequest ) != playersToSkip.end() ) {
-								teamNum--;
-								continue;
+							if ( playersToSkip ) {
+								if ( playersToSkip->find( playerToRequest ) != playersToSkip->end() ) {
+									teamNum--;
+									continue;
+								}
 							}
 							requestlist[playerToRequest].SendData(CBaseNetProtocol::Get().SendRequestTeamStat(teamNum,currentTeamStatFrame));
 						}
