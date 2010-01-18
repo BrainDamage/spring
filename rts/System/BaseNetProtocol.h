@@ -11,6 +11,7 @@ namespace netcode
 	class RawPacket;
 }
 class PlayerStatistics;
+class TeamStatistics;
 
 const unsigned char NETWORK_VERSION = 1;
 
@@ -145,6 +146,7 @@ public:
 	PacketType SendSendPlayerStat();
 	PacketType SendRequestTeamStat( uchar teamNum, uint teamStatFrameCount );
 	PacketType SendPlayerStat(uchar myPlayerNum, const PlayerStatistics& currentStats);
+	PacketType SendPlayerStat(uchar teamNum, uint statFrameNum, const TeamStatistics& currentStats );
 	PacketType SendGameOver();
 	PacketType SendMapErase(uchar myPlayerNum, short x, short z);
 	PacketType SendMapDrawLine(uchar myPlayerNum, short x1, short z1, short x2, short z2, bool);
