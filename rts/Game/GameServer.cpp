@@ -1299,8 +1299,8 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 			if (hostif)
 				hostif->Send(packet->data, packet->length);
 			#ifdef DEDICATED
-				const unsigned char teamNum = static_cast<unsigned char>(inbuf[1]);
-				const unsigned int statFrameNum = static_cast<unsigned int>(inbuf[2]);
+				const unsigned char teamNum = *((unsigned char*)&inbuf[1]);
+				const unsigned int statFrameNum = *((unsigned int*)&inbuf[2]);
 				const CTeam::Statistics newStats = *(CTeam::Statistics*)&inbuf[6];
 				if ( teamNum < 0 || teamNum > setup->teamStartingData.size() ) {
 					logOutput.Print("Invalid teamNum number (%i) in NETMSG_TEAMSTAT", teamNum);

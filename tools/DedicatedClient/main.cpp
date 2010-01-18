@@ -415,8 +415,8 @@ bool UpdateClientNet()
 
 			case NETMSG_TEAMSTAT:
 			{
-				int team=inbuf[1];
-				int frameCount = static_cast<unsigned int>(inbuf[2]);
+				const unsigned char teamNum = *((unsigned char*)&inbuf[1]);
+				const unsigned int statFrameNum = *((unsigned int*)&inbuf[2]);
 				if( team > gameSetup->teamStartingData.size() ){
 					logOutput.Print("Got invalid team num %i in teamstat msg",team);
 					break;

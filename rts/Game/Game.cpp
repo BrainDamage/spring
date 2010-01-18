@@ -4323,8 +4323,8 @@ void CGame::ClientReadNet()
 			}
 
 			case NETMSG_REQUEST_TEAMSTAT: {
-				const unsigned char teamNum = static_cast<unsigned char>(inbuf[1]);
-				const unsigned int statFrameNum= static_cast<unsigned int>(inbuf[2]);
+				const unsigned char teamNum = *((unsigned char*)&inbuf[1]);
+				const unsigned int statFrameNum = *((unsigned int*)&inbuf[2]);
 				if ((teamNum >= gameSetup->teamStartingData.size()) || (teamNum < 0)) {
 					logOutput.Print("Invalid teamNum number (%i) in NETMSG_REQUEST_TEAMSTAT", teamNum);
 					break;
