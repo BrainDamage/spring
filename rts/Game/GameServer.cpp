@@ -1306,14 +1306,13 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 					logOutput.Print("Invalid teamNum number (%i) in NETMSG_TEAMSTAT", teamNum);
 					break;
 				}
-				TeamStatsStruct teamInfo = teamStats[teamNum];
+				TeamStatsStruct& teamInfo = teamStats[teamNum];
 				if ( statFrameNum < teamInfo.lastStatSave ) {
 					logOutput.Print("Invalid statFrameNum number (%i) in NETMSG_TEAMSTAT", statFrameNum);
 					break;
 				}
 				teamInfo.lastStatSave = statFrameNum;
 				teamInfo.statHistory.push_back( newStats );
-				teamStats[teamNum] = teamInfo; // overwrite old value
 			#endif
 			break;
 		}
@@ -1322,15 +1321,18 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 			const unsigned char player = inbuf[1];
 			const unsigned char msg = inbuf[2];
 			MsgToForwardMap::iterator itor = relayingMessagesMap.find( msg );
-			PlayersToForwardMsgvec toForward;
+
 			if ( itor != relayingMessagesMap.end() ) { // one entry already exists in the map
-				toForward = itor->second;
+				PlayersToForwardMsgvec &toForward; = itor->second;
+				if ( toForward.find( player ) == toForward.end() ) {
+					toForward.insert( player );
+				}
 			}
-			if ( toForward.find( player ) == toForward.end() ) {
-				break;
+			else {
+				PlayersToForwardMsgvec toForward;
+				toForward.insert( player );
+				relayingMessagesMap[msg] = toForward;
 			}
-			toForward.insert( player );
-			relayingMessagesMap[msg] = toForward; // overwrite eny existing entry
 			break;
 		}
 
@@ -1338,20 +1340,15 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 			const unsigned char player = inbuf[1];
 			const unsigned char msg = inbuf[2];
 			MsgToForwardMap::iterator itor = relayingMessagesMap.find( msg );
-			PlayersToForwardMsgvec toForward;
 			if ( itor == relayingMessagesMap.end() ) { // no entry already exists in the map
 				break;
 			}
-			toForward = itor->second;
+			PlayersToForwardMsgvec& toForward = itor->second;
 			if ( toForward.find( player ) != toForward.end() ) {
-				break;
-			}
-			toForward.erase( player );
-			if ( toForward.size() > 0 ) {
-				relayingMessagesMap[msg] = toForward; // overwrite eny existing entry
-			}
-			else {
-				relayingMessagesMap.erase( itor );
+				toForward.erase( player );
+				if ( toForward.size() == 0 ) {
+					relayingMessagesMap.erase( itor );
+				}
 			}
 			break;
 		}
