@@ -4334,7 +4334,7 @@ void CGame::ClientReadNet()
 					logOutput.Print("Network packet order is broken in NETMSG_REQUEST_TEAMSTAT");
 					break;
 				}
-				netcode::PackPacket* buf = new netcode::PackPacket(5 + sizeof(CTeam::Statistics), NETMSG_TEAMSTAT);
+				netcode::PackPacket* buf = new netcode::PackPacket(6 + sizeof(CTeam::Statistics), NETMSG_TEAMSTAT);
 				*buf << (uint8_t)teamNum << (uint32_t)currentStatFrameNum << teamHandler->Team(teamNum)->currentStats;
 				net->Send(buf);
 				break;
