@@ -4,7 +4,6 @@ remove_definitions(-DSTREFLOP_SSE)
 AUX_SOURCE_DIRECTORY(../../rts/System/Net/ netfiles)
 INCLUDE_DIRECTORIES(../../rts/System/Net/ ../../rts/System/)
 INCLUDE_DIRECTORIES(../../rts/)
-include_directories(${GLEW_INCLUDE_DIR})
 
 
 SET(system_files
