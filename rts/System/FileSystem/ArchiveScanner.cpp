@@ -237,6 +237,15 @@ void CArchiveScanner::ScanDirs(const vector<string>& scanDirs, bool doChecksum)
 	}
 }
 
+void CArchiveScanner::AddArchive(CArchiveBase* ar, const std::string& name)
+{
+	ArchiveInfo ai;
+	ai.checksum = GetCRC(ar);
+	ai.modified = time(0);
+	ai.replaced = "";
+	
+	archiveInfo[name] = ai;
+}
 
 void CArchiveScanner::Scan(const string& curPath, bool doChecksum)
 {
@@ -525,20 +534,12 @@ IFileFilter* CArchiveScanner::CreateIgnoreFilter(CArchiveBase* ar)
 	return ignore;
 }
 
-
 /** Get CRC of the data in the specified archive.
     Returns 0 if file could not be opened. */
-unsigned int CArchiveScanner::GetCRC(const string& arcName)
+unsigned int CArchiveScanner::GetCRC(CArchiveBase* ar)
 {
 	CRC crc;
-	CArchiveBase* ar;
 	std::list<string> files;
-
-	// Try to open an archive
-	ar = CArchiveFactory::OpenArchive(arcName);
-	if (!ar) {
-		return 0; // It wasn't an archive
-	}
 
 	// Load ignore list.
 	IFileFilter* ignore = CreateIgnoreFilter(ar);
@@ -564,8 +565,7 @@ unsigned int CArchiveScanner::GetCRC(const string& arcName)
 	}
 
 	delete ignore;
-	delete ar;
-
+	
 	unsigned int digest = crc.GetDigest();
 
 	// A value of 0 is used to indicate no crc.. so never return that
@@ -574,7 +574,25 @@ unsigned int CArchiveScanner::GetCRC(const string& arcName)
 		return 4711;
 	} else {
 		return digest;
+	}	
+}
+
+//Wrapper around the other GetCRC to open the archive and close it afterwards
+unsigned int CArchiveScanner::GetCRC(const string& arcName)
+{
+	CArchiveBase* ar;
+
+	// Try to open an archive
+	ar = CArchiveFactory::OpenArchive(arcName);
+	if (!ar) {
+		return 0; // It wasn't an archive
 	}
+
+	unsigned int digest = GetCRC(ar);
+
+	delete ar;
+
+	return digest;
 }
 
 

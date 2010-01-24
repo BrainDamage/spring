@@ -69,6 +69,12 @@ bool CVFSHandler::AddArchive(const std::string& arName, bool override, const std
 	return true;
 }
 
+bool CVFSHandler::AddArchive(CArchiveMemory* am, bool override, const std::string& type)
+{
+	archives[am->getName()] = am;
+	return AddArchive(am->getName(), override, type);
+}
+
 bool CVFSHandler::AddMapArchiveWithDeps(const std::string& mapName, bool override, const std::string& type)
 {
 	const std::vector<std::string> ars = archiveScanner->GetArchivesForMap(mapName);
@@ -81,6 +87,12 @@ bool CVFSHandler::AddMapArchiveWithDeps(const std::string& mapName, bool overrid
 			throw content_error("Couldn't load archive '" + *it + "' for map '" + mapName + "'.");
 	}
 	return true;
+}
+
+bool CVFSHandler::AddMapArchiveWithDeps(CArchiveMemory* am, bool override, const std::string& type)
+{
+	archives[am->getName()] = am;
+	return AddMapArchiveWithDeps(am->getName(), override, type);
 }
 
 bool CVFSHandler::RemoveArchive(const std::string& arName)

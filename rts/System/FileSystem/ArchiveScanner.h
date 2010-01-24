@@ -47,6 +47,7 @@ public:
 	std::string GetFilename();
 
 	void ScanDirs(const std::vector<std::string>& dirs, bool checksum = false);
+	void AddArchive(CArchiveBase* ar, const std::string& name);
 
 	void ReadCacheData(const std::string& filename);
 	void WriteCacheData(const std::string& filename);
@@ -79,7 +80,6 @@ protected:
 		std::string replaced;					// If not empty, use that archive instead
 	};
 
-protected:
 	void PreScan(const std::string& curPath);
 	void Scan(const std::string& curPath, bool checksum = false);
 	void ScanArchive(const std::string& fullName, bool checksum = false);
@@ -91,6 +91,7 @@ protected:
 	std::map<std::string, ArchiveInfo> archiveInfo;
 	ModData GetModData(const LuaTable& modTable);
 	IFileFilter* CreateIgnoreFilter(CArchiveBase* ar);
+	unsigned int GetCRC(CArchiveBase* ar);
 	unsigned int GetCRC(const std::string& filename);
 	bool isDirty;
 	std::string parse_tdf_path;
