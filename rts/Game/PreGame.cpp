@@ -170,7 +170,7 @@ void CPreGame::StartServer(const std::string& setupscript)
 
 	// We must map the map into VFS this early, because server needs the start positions.
 	// Take care that MapInfo isn't loaded here, as map options aren't available to it yet.
-	LoadMap(setup->mapName);
+	LoadMap(setup);
 
 	// Loading the start positions executes the map's Lua.
 	// This means start positions can NOT be influenced by map options.
@@ -343,13 +343,53 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 	assert(gameServer);
 }
 
-void CPreGame::LoadMap(const std::string& mapName)
+void CPreGame::LoadMap(const CGameSetup* setup)
 {
 	static bool alreadyLoaded = false;
 
 	if (!alreadyLoaded)
 	{
-		vfsHandler->AddMapArchiveWithDeps(mapName, false);
+		if(!setup->mapgenSeed)
+		{
+			vfsHandler->AddMapArchiveWithDeps(setup->mapName, false);
+		} else {
+			CArchiveMemory* am = new CArchiveMemory(setup->mapName);
+
+			char* buf;
+			int size;
+			std::ifstream s;
+			std::string name = setup->mapName.substr(0, setup->mapName.size() - 4);
+
+			s.open(("maps/mapses/" + name + ".smd").c_str(), std::ios_base::in | std::ios_base::binary);
+			s.seekg(0, std::ios_base::end);
+			size = s.tellg();
+			s.seekg(0, std::ios_base::beg);
+			buf = new char[size];
+			s.read(buf, size);
+			am->AddFile("maps/" + name + ".smd", buf, size);
+			s.close();
+
+			s.open(("maps/mapses/" + name + ".smf").c_str(), std::ios_base::in | std::ios_base::binary);
+			s.seekg(0, std::ios_base::end);
+			size = s.tellg();
+			s.seekg(0, std::ios_base::beg);
+			buf = new char[size];
+			s.read(buf, size);
+			am->AddFile("maps/" + name + ".smf", buf, size);
+			s.close();
+
+			s.open(("maps/mapses/" + name + ".smt").c_str(), std::ios_base::in | std::ios_base::binary);
+			s.seekg(0, std::ios_base::end);
+			size = s.tellg();
+			s.seekg(0, std::ios_base::beg);
+			buf = new char[size];
+			s.read(buf, size);
+			am->AddFile("maps/" + name + ".smt", buf, size);
+			s.close();
+
+			archiveScanner->AddArchive(am, "maps/" + setup->mapName);
+			vfsHandler->AddMapArchiveWithDeps(am, false);
+		}
 		alreadyLoaded = true;
 	}
 }
@@ -407,7 +447,7 @@ void CPreGame::GameDataReceived(boost::shared_ptr<const netcode::RawPacket> pack
 		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
 		LogObject() << "Recording demo " << net->GetDemoRecorder()->GetName() << "\n";
 	}
-	LoadMap(gameSetup->mapName);
+	LoadMap(gameSetup);
 	archiveScanner->CheckMap(gameSetup->mapName, gameData->GetMapChecksum());
 
 	// This MUST be loaded this late, since this executes map Lua code which

@@ -94,6 +94,7 @@ public:
 
 	int startMetal;
 	int startEnergy;
+	int mapgenSeed;
 
 	int gameMode;
 	int noHelperAIs;

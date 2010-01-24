@@ -382,6 +382,7 @@ bool CGameSetup::Init(const std::string& buf)
 
 	modName     = file.SGetValueDef("",  "GAME\\Gametype");
 	mapName     = file.SGetValueDef("",  "GAME\\MapName");
+	
 	luaGaiaStr  = file.SGetValueDef("1", "GAME\\ModOptions\\LuaGaia");
 	if (luaGaiaStr == "0")
 		useLuaGaia = false;
@@ -391,6 +392,8 @@ bool CGameSetup::Init(const std::string& buf)
 	saveName    = file.SGetValueDef("",  "GAME\\Savefile");
 	demoName    = file.SGetValueDef("",  "GAME\\Demofile");
 	hostDemo    = !demoName.empty();
+
+	file.GetDef(mapgenSeed, "0", "GAME\\MapgenSeed");
 
 	file.GetDef(gameMode,         "0", "GAME\\ModOptions\\GameMode");
 	file.GetDef(noHelperAIs,      "0", "GAME\\ModOptions\\NoHelperAIs");
