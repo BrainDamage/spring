@@ -29,40 +29,25 @@
 #include "FileSystem.h"
 #include "mmgr.h"
 #include "Exceptions.h"
+#include "maindefines.h" // for sPS, cPS, cPD
 #include "Platform/Misc.h"
 
-/**
- * @brief construct a data directory object
- *
- * Appends a slash to the end of the path if there isn't one already.
- */
 DataDir::DataDir(const std::string& p) : path(p), writable(false)
 {
-#ifndef _WIN32
-	if (path.empty())
-		path = "./";
-	if (path[path.size() - 1] != '/')
-		path += '/';
-#else
-	if (path.empty())
-		path = ".\\";
-	if (path[path.size() - 1] != '\\')
-		path += '\\';
-#endif
+	// sPS/cPS (depending on OS): "\\" & '\\' or "/" & '/'
+
+	// make sure the path ends with a (back-)slash
+	if (path.empty()) {
+		path = "."sPS;
+	} else if (path[path.size() - 1] != cPS) {
+		path += cPS;
+	}
 }
 
-/**
- * @brief construct a data directory locater
- *
- * Does not locate data directories, use LocateDataDirs() for that.
- */
 DataDirLocater::DataDirLocater() : writedir(NULL)
 {
 }
 
-/**
- * @brief substitute environment variables with their values
- */
 std::string DataDirLocater::SubstEnvVars(const std::string& in) const
 {
 	bool escape = false;
@@ -99,41 +84,43 @@ std::string DataDirLocater::SubstEnvVars(const std::string& in) const
 	return out.str();
 }
 
-/**
- * @brief Adds the directories in the colon separated string to the datadir handler.
- */
 void DataDirLocater::AddDirs(const std::string& in)
 {
 	size_t prev_colon = 0, colon;
-#ifndef _WIN32
-	while ((colon = in.find(':', prev_colon)) != std::string::npos) {
-#else
-	while ((colon = in.find(';', prev_colon)) != std::string::npos) {
-#endif
-		const std::string newPath = in.substr(prev_colon, colon - prev_colon);
-		if (!newPath.empty())
-		{
-			datadirs.push_back(newPath);
-#ifdef DEBUG
-			logOutput.Print("Adding %s to directories" , newPath.c_str());
-#endif
-		}
+	while ((colon = in.find(cPD, prev_colon)) != std::string::npos) { // cPD (depending on OS): ';' or ':'
+		AddDir(in.substr(prev_colon, colon - prev_colon));
 		prev_colon = colon + 1;
 	}
-	const std::string newPath = in.substr(prev_colon);
-	if (!newPath.empty())
-	{
-		datadirs.push_back(newPath);
+	AddDir(in.substr(prev_colon));
+}
+
+void DataDirLocater::AddDir(const std::string& dir)
+{
+	if (!dir.empty()) {
+		// to make use of ensure-slash-at-end,
+		// we create a DataDir here already
+		const DataDir newDataDir(dir);
+		bool alreadyAdded = false;
+
+		std::vector<DataDir>::const_iterator ddi;
+		for (ddi = datadirs.begin(); ddi != datadirs.end(); ++ddi) {
+			if (newDataDir.path == ddi->path) {
+				alreadyAdded = true;
+				break;
+			}
+		}
+
+		if (!alreadyAdded) {
+			datadirs.push_back(newDataDir);
 #ifdef DEBUG
-		logOutput.Print("Adding %s to directories" , newPath.c_str());
+			logOutput.Print("Adding %s to directories", newDataDir.path.c_str());
+		} else {
+			logOutput.Print("Skipping already added directory %s", newDataDir.path.c_str());
 #endif
+		}
 	}
 }
 
-/**
- * @brief Figure out permissions we have for a single data directory d.
- * @returns whether we have permissions to read the data directory.
- */
 bool DataDirLocater::DeterminePermissions(DataDir* d)
 {
 #ifndef _WIN32
@@ -173,9 +160,6 @@ bool DataDirLocater::DeterminePermissions(DataDir* d)
 	return false;
 }
 
-/**
- * @brief Figure out permissions we have for the data directories.
- */
 void DataDirLocater::DeterminePermissions()
 {
 	std::vector<DataDir> newDatadirs;
@@ -195,56 +179,6 @@ void DataDirLocater::DeterminePermissions()
 	datadirs = newDatadirs;
 }
 
-/**
- * @brief locate spring data directories
- *
- * Attempts to locate a writeable data dir, and then tries to
- * chdir to it.
- * As the writeable data dir will usually be the current dir already under windows,
- * the chdir will have no effect.
- *
- * The first dir added will be the writeable data dir.
- *
- * How the dirs get assembled
- * --------------------------
- * (descending priority -> first entry is searched first)
- *
- * Windows:
- * - SPRING_DATADIR env-variable (semi-colon separated list, like PATH)
- * - ./springsettings.cfg:SpringData=C:\data (semi-colon separated list)
- * - path to the current work-dir/module (either spring.exe or unitsync.dll)
- * - "C:/.../My Documents/My Games/Spring/"
- * - "C:/.../My Documents/Spring/"
- * - "C:/.../All Users/Applications/Spring/"
- * - SPRING_DATADIR compiler flag (semi-colon separated list)
- *
- * Max OS X:
- * - SPRING_DATADIR env-variable (colon separated list, like PATH)
- * - ~/.springrc:SpringData=/path/to/data (colon separated list)
- * - path to the current work-dir/module (either spring(binary) or libunitsync.dylib)
- * - {module-path}/data/
- * - {module-path}/lib/
- * - SPRING_DATADIR compiler flag (colon separated list)
- *
- * Unixes:
- * - SPRING_DATADIR env-variable (colon separated list, like PATH)
- * - ~/.springrc:SpringData=/path/to/data (colon separated list)
- * - "$HOME/.spring"
- * - from file '/etc/spring/datadir', preserving order (new-line separated list)
- * - SPRING_DATADIR compiler flag (colon separated list)
- *   This is set by the build system, and will usually contain dirs like:
- *   * /usr/share/games/spring/
- *   * /usr/lib/
- *   * /usr/lib64/
- *   * /usr/share/lib/
- *
- * All of the above methods support environment variable substitution, eg.
- * '$HOME/myspringdatadir' will be converted by spring to something like
- * '/home/username/myspringdatadir'.
- *
- * If we end up with no data-dir that points to an existing path,
- * we asume the current working directory is the data directory.
- */
 void DataDirLocater::LocateDataDirs()
 {
 	// Prepare the data-dirs defined in different places
@@ -268,15 +202,11 @@ void DataDirLocater::LocateDataDirs()
 	dd_compilerFlag = SubstEnvVars(SPRING_DATADIR);
 #endif
 
-
-
-#if       defined(WIN32) || defined(MACOSX_BUNDLE)
 #if       defined(UNITSYNC)
 	const std::string dd_curWorkDir = Platform::GetModulePath();
 #else  // defined(UNITSYNC)
 	const std::string dd_curWorkDir = Platform::GetProcessExecutablePath();
 #endif // defined(UNITSYNC)
-#endif // defined(WIN32) || defined(MACOSX_BUNDLE)
 
 #if    defined(WIN32)
 	// fetch my documents path
@@ -337,13 +267,15 @@ void DataDirLocater::LocateDataDirs()
 #ifdef WIN32
 	// All MS Windows variants
 
-	AddDirs(dd_env);           // from ENV{SPRING_DATADIR}
-	AddDirs(dd_config);        // from ./springsettings.cfg:SpringData=...
-	AddDirs(dd_curWorkDir);    // "./"
-	AddDirs(dd_myDocsMyGames); // "C:/.../My Documents/My Games/Spring/"
-	AddDirs(dd_myDocs);        // "C:/.../My Documents/Spring/"
-	AddDirs(dd_appData);       // "C:/.../All Users/Applications/Spring/"
-	AddDirs(dd_compilerFlag);  // from -DSPRING_DATADIR
+	AddDirs(dd_env);            // from ENV{SPRING_DATADIR}
+	AddDirs(dd_config);         // from ./springsettings.cfg:SpringData=...
+	if (IsPortableMode()) {
+		AddDirs(dd_curWorkDir); // "./"
+	}
+	AddDirs(dd_myDocsMyGames);  // "C:/.../My Documents/My Games/Spring/"
+	AddDirs(dd_myDocs);         // "C:/.../My Documents/Spring/"
+	AddDirs(dd_appData);        // "C:/.../All Users/Applications/Spring/"
+	AddDirs(dd_compilerFlag);   // from -DSPRING_DATADIR
 
 #elif defined(MACOSX_BUNDLE)
 	// Mac OS X
@@ -352,7 +284,7 @@ void DataDirLocater::LocateDataDirs()
 	AddDirs(dd_config); // ~/springrc:SpringData=...
 
 	// Maps and mods are supposed to be located in spring's executable location on Mac, but unitsync
-	// cannot find them since it does not know spring binary path. I have no idea but to force users 
+	// cannot find them since it does not know spring binary path. I have no idea but to force users
 	// to locate lobby executables in the same as spring's dir and add its location to search dirs.
 	#ifdef UNITSYNC
 	AddDirs(dd_curWorkDir);     // "./"
@@ -362,16 +294,21 @@ void DataDirLocater::LocateDataDirs()
 	// sould be added instead of SPRING_DATADIR definition.
 	AddDirs(dd_curWorkDirData); // "./data/"
 	AddDirs(dd_curWorkDirLib);  // "./lib/"
-	AddDirs(dd_compilerFlag);  // from -DSPRING_DATADIR
+	AddDirs(dd_compilerFlag);   // from -DSPRING_DATADIR
 
 #else
 	// Linux, FreeBSD, Solaris
 
-	AddDirs(dd_env);          // ENV{SPRING_DATADIR}
-	AddDirs(dd_config);       // ~/springrc:SpringData=...
-	AddDirs(dd_home);         // "~/.spring/"
-	AddDirs(dd_etc);          // from /etc/spring/datadir
-	AddDirs(dd_compilerFlag); // from -DSPRING_DATADIR
+	AddDirs(dd_env);            // ENV{SPRING_DATADIR}
+	AddDirs(dd_config);         // ~/springrc:SpringData=...
+	if (IsPortableMode()) {
+		// always using this would be unclean, because spring and unitsync
+		// would end up with different sets of data-dirs
+		AddDirs(dd_curWorkDir); // "./"
+	}
+	AddDirs(dd_home);           // "~/.spring/"
+	AddDirs(dd_etc);            // from /etc/spring/datadir
+	AddDirs(dd_compilerFlag);   // from -DSPRING_DATADIR
 #endif
 
 
@@ -411,4 +348,38 @@ void DataDirLocater::LocateDataDirs()
 			logOutput.Print("Using read-only data directory: %s",  d->path.c_str());
 		}
 	}
+}
+
+bool DataDirLocater::IsPortableMode() {
+
+	bool portableMode = false;
+
+#if       defined(UNITSYNC)
+	const std::string dirUnitsync = Platform::GetModulePath();
+
+#if       defined(WIN32)
+	std::string fileExe = dirUnitsync + "\\spring.exe";
+#else
+	std::string fileExe = dirUnitsync + "/spring";
+#endif // defined(WIN32)
+	if (FileSystemHandler::FileExists(fileExe)) {
+		portableMode = true;
+	}
+
+#else  // !defined(UNITSYNC)
+	const std::string dirExe = Platform::GetProcessExecutablePath();
+
+#if       defined(WIN32)
+	std::string fileUnitsync = dirExe + "\\unitsync.dll";
+#elif     defined(MACOSX_BUNDLE)
+	std::string fileUnitsync = dirExe + "/libunitsync.dylib";
+#else
+	std::string fileUnitsync = dirExe + "/libunitsync.so";
+#endif // defined(WIN32)
+	if (FileSystemHandler::FileExists(fileUnitsync)) {
+		portableMode = true;
+	}
+#endif // defined(UNITSYNC)
+
+	return portableMode;
 }

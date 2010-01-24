@@ -260,18 +260,19 @@ EXPORT(int) Init(bool isServer, int id)
 {
 	try {
 		if (!logOutputInitialised)
-		{
 			logOutput.SetFilename("unitsync.log");
+		if (!configHandler)
+			ConfigHandler::Instantiate("");
+		FileSystemHandler::Initialize(false);
+
+		if (!logOutputInitialised)
+		{
 			logOutput.Initialize();
 			logOutputInitialised = true;
 		}
 		logOutput.Print(LOG_UNITSYNC, "loaded, %s\n", SpringVersion::GetFull().c_str());
 
 		_UnInit();
-
-		if (!configHandler)
-			ConfigHandler::Instantiate("");
-		FileSystemHandler::Initialize(false);
 
 		std::vector<string> filesToCheck;
 		filesToCheck.push_back("base/springcontent.sdz");
@@ -492,7 +493,7 @@ EXPORT(unsigned int) GetArchiveChecksum(const char* arname)
 		CheckNullOrEmpty(arname);
 
 		logOutput.Print(LOG_UNITSYNC, "archive checksum: %s\n", arname);
-		return archiveScanner->GetArchiveChecksum(arname);
+		return archiveScanner->GetSingleArchiveChecksum(arname);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -599,8 +600,8 @@ static int _GetMapInfoEx(const char* name, MapInfo* outInfo, int version)
 
 	logOutput.Print(LOG_UNITSYNC, "get map info: %s", name);
 
-	const string mapName = name;
-	ScopedMapLoader mapLoader(mapName);
+	ScopedMapLoader mapLoader(name);
+	const string mapName = archiveScanner->MapNameToMapFile(name);
 
 	string err("");
 
@@ -615,7 +616,7 @@ static int _GetMapInfoEx(const char* name, MapInfo* outInfo, int version)
 		const string extension = mapName.substr(mapName.length() - 3);
 		if (extension == "smf") {
 			try {
-				CSmfMapFile file(name);
+				CSmfMapFile file(mapName);
 				const SMFHeader& mh = file.GetHeader();
 
 				outInfo->width  = mh.mapx * SQUARE_SIZE;
@@ -828,7 +829,7 @@ EXPORT(int) GetMapArchiveCount(const char* mapName)
 		CheckInit();
 		CheckNullOrEmpty(mapName);
 
-		mapArchives = archiveScanner->GetArchivesForMap(mapName);
+		mapArchives = archiveScanner->GetArchives(mapName);
 		return mapArchives.size();
 	}
 	UNITSYNC_CATCH_BLOCKS;
@@ -870,7 +871,7 @@ EXPORT(unsigned int) GetMapChecksum(int index)
 		CheckInit();
 		CheckBounds(index, mapNames.size());
 
-		return archiveScanner->GetMapChecksum(mapNames[index]);
+		return archiveScanner->GetArchiveCompleteChecksum(mapNames[index]);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -888,7 +889,7 @@ EXPORT(unsigned int) GetMapChecksumFromName(const char* mapName)
 	try {
 		CheckInit();
 
-		return archiveScanner->GetMapChecksum(mapName);
+		return archiveScanner->GetArchiveCompleteChecksum(mapName);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -1027,8 +1028,8 @@ EXPORT(void*) GetMinimap(const char* filename, int miplevel)
 		if (miplevel < 0 || miplevel > 8)
 			throw std::out_of_range("Miplevel must be between 0 and 8 (inclusive) in GetMinimap.");
 
-		const string mapName = filename;
-		ScopedMapLoader mapLoader(mapName);
+		ScopedMapLoader mapLoader(filename);
+		const string mapName = archiveScanner->MapNameToMapFile(filename);
 
 		const string extension = mapName.substr(mapName.length() - 3);
 
@@ -1066,7 +1067,7 @@ EXPORT(int) GetInfoMapSize(const char* filename, const char* name, int* width, i
 		CheckNull(height);
 
 		ScopedMapLoader mapLoader(filename);
-		CSmfMapFile file(filename);
+		CSmfMapFile file(archiveScanner->MapNameToMapFile(filename));
 		MapBitmapInfo bmInfo = file.GetInfoMapSize(name);
 
 		*width = bmInfo.width;
@@ -1109,7 +1110,7 @@ EXPORT(int) GetInfoMap(const char* filename, const char* name, void* data, int t
 
 		string n = name;
 		ScopedMapLoader mapLoader(filename);
-		CSmfMapFile file(filename);
+		CSmfMapFile file(archiveScanner->MapNameToMapFile(filename));
 		int actualType = (n == "height" ? bm_grayscale_16 : bm_grayscale_8);
 
 		if (actualType == typeHint) {
@@ -1148,7 +1149,7 @@ EXPORT(int) GetInfoMap(const char* filename, const char* name, void* data, int t
 //////////////////////////
 //////////////////////////
 
-vector<CArchiveScanner::ModData> modData;
+vector<CArchiveScanner::ArchiveData> modData;
 
 
 /**
@@ -1431,7 +1432,7 @@ EXPORT(unsigned int) GetPrimaryModChecksum(int index)
 		CheckInit();
 		CheckBounds(index, modData.size());
 
-		return archiveScanner->GetModChecksum(GetPrimaryModArchive(index));
+		return archiveScanner->GetArchiveCompleteChecksum(GetPrimaryModArchive(index));
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -1449,7 +1450,7 @@ EXPORT(unsigned int) GetPrimaryModChecksumFromName(const char* name)
 	try {
 		CheckInit();
 
-		return archiveScanner->GetModChecksum(archiveScanner->ModNameToModArchive(name));
+		return archiveScanner->GetArchiveCompleteChecksum(archiveScanner->ArchiveFromName(name));
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
