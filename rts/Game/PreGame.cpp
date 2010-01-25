@@ -33,6 +33,7 @@
 #include "Sound/Sound.h"
 #include "Sound/Music.h"
 #include "Map/MapInfo.h"
+#include "Map/Generated/MapGenerator.h"
 #include "ConfigHandler.h"
 #include "FileSystem/FileSystem.h"
 #include "Rendering/glFont.h"
@@ -354,41 +355,14 @@ void CPreGame::LoadMap(const CGameSetup* setup)
 		{
 			vfsHandler->AddMapArchiveWithDeps(setup->mapName, false);
 		} else {
-			CArchiveMemory* am = new CArchiveMemory(setup->mapName);
+			CMapGenerator* mg = new CMapGenerator();
 
-			char* buf;
-			int size;
-			std::ifstream s;
-			std::string name = setup->mapName.substr(0, setup->mapName.size() - 4);
+			mg->Seed(setup->mapgenSeed);
+			mg->Generate();
 
-			s.open(("maps/mapses/" + name + ".smd").c_str(), std::ios_base::in | std::ios_base::binary);
-			s.seekg(0, std::ios_base::end);
-			size = s.tellg();
-			s.seekg(0, std::ios_base::beg);
-			buf = new char[size];
-			s.read(buf, size);
-			am->AddFile("maps/" + name + ".smd", buf, size);
-			s.close();
+			CArchiveMemory* am = mg->CreateArchive("myarchive.sd7");
 
-			s.open(("maps/mapses/" + name + ".smf").c_str(), std::ios_base::in | std::ios_base::binary);
-			s.seekg(0, std::ios_base::end);
-			size = s.tellg();
-			s.seekg(0, std::ios_base::beg);
-			buf = new char[size];
-			s.read(buf, size);
-			am->AddFile("maps/" + name + ".smf", buf, size);
-			s.close();
-
-			s.open(("maps/mapses/" + name + ".smt").c_str(), std::ios_base::in | std::ios_base::binary);
-			s.seekg(0, std::ios_base::end);
-			size = s.tellg();
-			s.seekg(0, std::ios_base::beg);
-			buf = new char[size];
-			s.read(buf, size);
-			am->AddFile("maps/" + name + ".smt", buf, size);
-			s.close();
-
-			archiveScanner->AddArchive(am, "maps/" + setup->mapName);
+			archiveScanner->AddArchive(am);
 			vfsHandler->AddMapArchiveWithDeps(am, false);
 		}
 		alreadyLoaded = true;
