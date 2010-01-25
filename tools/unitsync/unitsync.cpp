@@ -260,9 +260,9 @@ EXPORT(int) Init(bool isServer, int id)
 {
 	try {
 		if (!logOutputInitialised)
-			logOutput.SetFilename("unitsync.log");
+			logOutput.SetFileName("unitsync.log");
 		if (!configHandler)
-			ConfigHandler::Instantiate("");
+			ConfigHandler::Instantiate(); // use the default config file
 		FileSystemHandler::Initialize(false);
 
 		if (!logOutputInitialised)
