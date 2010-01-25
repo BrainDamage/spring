@@ -1,8 +1,9 @@
 #include "ArchiveMemory.h"
+#include "Util.h"
 
-CArchiveMemory::CArchiveMemory(const std::string& _name) : CArchiveBase(_name)
+CArchiveMemory::CArchiveMemory(const std::string& name) : CArchiveBase(name)
 {
-	name = _name;
+
 }
 
 CArchiveMemory::~CArchiveMemory()
@@ -22,7 +23,7 @@ int CArchiveMemory::OpenFile(const std::string& fileName)
 {
 	for(int x = 0; x < files.size(); x++)
 	{
-		if(files[x].name == fileName) 
+		if(StringToLower(files[x].name) == fileName) 
 		{
 			files[x].offset = 0;
 			return files[x].handle;
@@ -35,11 +36,11 @@ int CArchiveMemory::ReadFile(int handle, void* buffer, int numBytes)
 {
 	MemoryFile& mf = getByHandle(handle);
 	
-	int bytesLeft = mf.size - mf.offset - 1;
+	int bytesLeft = mf.size - mf.offset;
 	int bytesToRead = std::min(numBytes, bytesLeft);
 	if(bytesToRead > 0)
 	{
-		memcpy(buffer, mf.buffer, bytesToRead);
+		memcpy(buffer, mf.buffer + mf.offset, bytesToRead);
 		mf.offset += bytesToRead;
 		return bytesToRead;
 	}
@@ -85,10 +86,12 @@ int CArchiveMemory::FileSize(int handle)
 
 int CArchiveMemory::FindFiles(int cur, std::string* name, int* size)
 {
-	*name = files[cur].name;
-	*size = files[cur].size;
-	if(cur < files.size() - 1)
+	if(cur < files.size())
+	{
+		*name = files[cur].name;
+		*size = files[cur].size;
 		return cur + 1;
+	}
 	return 0;
 }
 

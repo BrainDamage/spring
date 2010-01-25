@@ -33,13 +33,9 @@ public:
 
 	void AddFile(const std::string& name, char* buffer, int size);
 
-	inline const std::string& getName() const
-	{ return name; }
-
 private:
 	MemoryFile& getByHandle(int handle);
 
-	std::string name;
 	std::vector<MemoryFile> files;
 };
 
