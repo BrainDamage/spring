@@ -19,6 +19,7 @@
 #include "FileHandler.h"
 #include "FileSystem/FileSystem.h"
 #include "FileSystem/FileSystemHandler.h"
+#include "Platform/Misc.h"
 #include "Util.h"
 #include "Exceptions.h"
 
@@ -142,14 +143,40 @@ void CArchiveScanner::ScanDirs(const vector<string>& scanDirs, bool doChecksum)
 	}
 }
 
-void CArchiveScanner::AddArchive(CArchiveBase* ar, const std::string& name)
+/** Add an opened archive to the list of known archives **/
+bool CArchiveScanner::AddArchive(CArchiveBase* ar)
 {
+	std::string fullName = ar->GetArchiveName();
+	filesystem.FixSlashes(fullName);
+
+	#if defined(UNITSYNC)
+		fullName = Platform::GetModulePath() + fullName;
+	#else //UNITSYNC
+		fullName = Platform::GetProcessExecutablePath() + fullName;
+	#endif //UNITSYNC
+
+	for(int x = 0; x < fullName.size(); x++)
+		if(fullName[x] == ' ') fullName[x] = '_';
+
+	const string fn    = filesystem.GetFilename(fullName);
+	const string fpath = filesystem.GetDirectory(fullName);
+	const string lcfn    = StringToLower(fn);
+	const string lcfpath = StringToLower(fpath);
+
 	ArchiveInfo ai;
 	ai.checksum = GetCRC(ar);
 	ai.modified = time(0);
 	ai.replaced = "";
-	
-	archiveInfo[name] = ai;
+	ai.path = fpath;
+	ai.origName = fn;
+	ai.updated = true;
+
+	if(CreateArchiveData(ar, ai))
+	{
+		archiveInfo[lcfn] = ai;
+		return true;
+	}
+	return false;
 }
 
 void CArchiveScanner::Scan(const string& curPath, bool doChecksum)
@@ -279,68 +306,19 @@ void CArchiveScanner::ScanArchive(const string& fullName, bool doChecksum)
 		{
 			ArchiveInfo ai;
 
-			string name;
-			int size;
-
-			std::string mapfile;
-			bool hasModinfo = false;
-			bool hasMapinfo = false;
-			for (int cur = 0; (cur = ar->FindFiles(cur, &name, &size)); /* no-op */)
+			if(!CreateArchiveData(ar, ai))
 			{
-				const string lowerName = StringToLower(name);
-				const string ext = lowerName.substr(lowerName.find_last_of('.') + 1);
-
-				if ((ext == "smf") || (ext == "sm3"))
-				{
-					mapfile = name;
-				}
-				else if (lowerName == "modinfo.lua")
-				{
-					hasModinfo = true;
-				}
-				else if (lowerName == "mapinfo.lua")
-				{
-					hasMapinfo = true;
-				}
-			}
-
-			if (hasMapinfo || !mapfile.empty())
-			{ // its a map
-				if (hasMapinfo)
-				{
-					ScanArchiveLua(ar, "mapinfo.lua", ai);
-				}
-				else if (hasModinfo) // backwards-compat for modinfo.lua in maps
-				{
-					ScanArchiveLua(ar, "modinfo.lua", ai);
-				}
-				if (ai.archiveData.name.empty())
-					ai.archiveData.name = filesystem.GetFilename(mapfile);
-				if (ai.archiveData.mapfile.empty())
-					ai.archiveData.mapfile = mapfile;
-				AddDependency(ai.archiveData.dependencies, "maphelper.sdz");
-				ai.archiveData.modType = modtype::map;
-				
-			}
-			else if (hasModinfo)
-			{ // mod
-				ScanArchiveLua(ar, "modinfo.lua", ai);
-				if (ai.archiveData.modType == modtype::primary)
-					AddDependency(ai.archiveData.dependencies, "Spring content v1");
-			}
-			else
-			{ // error
-			LogObject() << "Failed to read archive, files missing: " << fullName;
+				LogObject() << "Failed to read archive, files missing: " << fullName;
 				delete ar;
 				return;
 			}
+
+			delete ar;
 
 			ai.path = fpath;
 			ai.modified = info.st_mtime;
 			ai.origName = fn;
 			ai.updated = true;
-
-			delete ar;
 
 			// Optionally calculate a checksum for the file
 			// To prevent reading all files in all directory (.sdd) archives
@@ -401,6 +379,65 @@ IFileFilter* CArchiveScanner::CreateIgnoreFilter(CArchiveBase* ar)
 		delete[] buf;
 	}
 	return ignore;
+}
+
+bool CArchiveScanner::CreateArchiveData(CArchiveBase* ar, ArchiveInfo& ai)
+{
+	string name;
+	int size;
+
+	std::string mapfile;
+	bool hasModinfo = false;
+	bool hasMapinfo = false;
+	for (int cur = 0; (cur = ar->FindFiles(cur, &name, &size)); /* no-op */)
+	{
+		const string lowerName = StringToLower(name);
+		const string ext = lowerName.substr(lowerName.find_last_of('.') + 1);
+
+		if ((ext == "smf") || (ext == "sm3"))
+		{
+			mapfile = name;
+		}
+		else if (lowerName == "modinfo.lua")
+		{
+			hasModinfo = true;
+		}
+		else if (lowerName == "mapinfo.lua")
+		{
+			hasMapinfo = true;
+		}
+	}
+
+	if (hasMapinfo || !mapfile.empty())
+	{ // its a map
+		if (hasMapinfo)
+		{
+			ScanArchiveLua(ar, "mapinfo.lua", ai);
+		}
+		else if (hasModinfo) // backwards-compat for modinfo.lua in maps
+		{
+			ScanArchiveLua(ar, "modinfo.lua", ai);
+		}
+		if (ai.archiveData.name.empty())
+			ai.archiveData.name = filesystem.GetFilename(mapfile);
+		if (ai.archiveData.mapfile.empty())
+			ai.archiveData.mapfile = mapfile;
+		AddDependency(ai.archiveData.dependencies, "maphelper.sdz");
+		ai.archiveData.modType = modtype::map;
+		
+	}
+	else if (hasModinfo)
+	{ // mod
+		ScanArchiveLua(ar, "modinfo.lua", ai);
+		if (ai.archiveData.modType == modtype::primary)
+			AddDependency(ai.archiveData.dependencies, "Spring content v1");
+	}
+	else
+	{ // error
+		return false;
+	}
+
+	return true;
 }
 
 /** Get CRC of the data in the specified archive.

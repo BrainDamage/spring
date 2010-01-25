@@ -55,8 +55,8 @@ public:
 	std::vector<std::string> GetArchives(const std::string& root, int depth = 0) const;
 	std::vector<std::string> GetMaps() const;
 
-	/// Add an archive to the list of known archives
-	void AddArchive(CArchiveBase* ar, const std::string& name);
+	/// Add an opened archive to the list of known archives
+	bool AddArchive(CArchiveBase* ar);
 	/// checksum of the given archive (without dependencies)
 	unsigned int GetSingleArchiveChecksum(const std::string& name) const;
 	/// Calculate checksum of the given archive and all its dependencies
@@ -89,6 +89,8 @@ private:
 	void ScanArchive(const std::string& fullName, bool checksum = false);
 	/// scan mapinfo / modinfo lua files
 	bool ScanArchiveLua(CArchiveBase* ar, const std::string& fileName, ArchiveInfo& ai);
+
+	bool CreateArchiveData(CArchiveBase* ar, ArchiveInfo& ai);
 
 	void ReadCacheData(const std::string& filename);
 	void WriteCacheData(const std::string& filename);

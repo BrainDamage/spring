@@ -69,10 +69,10 @@ bool CVFSHandler::AddArchive(const std::string& arName, bool override, const std
 	return true;
 }
 
-bool CVFSHandler::AddArchive(CArchiveMemory* am, bool override, const std::string& type)
+bool CVFSHandler::AddArchive(CArchiveBase* am, bool override, const std::string& type)
 {
-	archives[am->getName()] = am;
-	return AddArchive(am->getName(), override, type);
+	archives[am->GetArchiveName()] = am;
+	return AddArchive(am->GetArchiveName(), override, type);
 }
 
 bool CVFSHandler::AddMapArchiveWithDeps(const std::string& mapName, bool override, const std::string& type)
@@ -91,8 +91,11 @@ bool CVFSHandler::AddMapArchiveWithDeps(const std::string& mapName, bool overrid
 
 bool CVFSHandler::AddMapArchiveWithDeps(CArchiveMemory* am, bool override, const std::string& type)
 {
-	archives[am->getName()] = am;
-	return AddMapArchiveWithDeps(am->getName(), override, type);
+	//std::string name = archiveScanner->NameFromArchive(am->GetArchiveName());
+	//CArchiveScanner::ArchiveData& ad = archiveScanner->GetArchiveData(name);
+	std::string path = archiveScanner->GetArchivePath(am->GetArchiveName());
+	archives[path + am->GetArchiveName()] = am;
+	return AddMapArchiveWithDeps(am->GetArchiveName(), override, type);
 }
 
 bool CVFSHandler::RemoveArchive(const std::string& arName)

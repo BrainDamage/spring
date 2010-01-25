@@ -25,14 +25,10 @@ public:
 	 * Override determines whether if conflicts overwrites
 	 * an existing entry in the virtual filesystem or not
 	 */
-	bool AddArchive(const std::string& arName, bool override,
-	                const std::string& type = "");
-	bool AddArchive(CArchiveMemory* arName, bool override,
-	                const std::string& type = "");
-	bool AddMapArchiveWithDeps(const std::string& mapName, bool override,
-					const std::string& type = "");
-	bool AddMapArchiveWithDeps(CArchiveMemory* arName, bool override,
-					const std::string& type = "");
+	bool AddArchive(const std::string& arName, bool override, const std::string& type = "");
+	bool AddArchive(CArchiveBase* ar, bool override, const std::string& type = "");
+	bool AddMapArchiveWithDeps(const std::string& mapName, bool override, const std::string& type = "");
+	bool AddMapArchiveWithDeps(CArchiveMemory* arName, bool override, const std::string& type = "");
 
 	/**
 	 * Returns true if the archive is not loaded,
