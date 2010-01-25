@@ -3631,10 +3631,6 @@
 			Name="System"
 			>
 			<File
-				RelativePath="..\..\System\FileSystem\ArchiveMemory.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\System\AutohostInterface.cpp"
 				>
 				<FileConfiguration
@@ -4379,6 +4375,10 @@
 				</File>
 				<File
 					RelativePath="..\..\System\FileSystem\ArchiveMemory.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\System\FileSystem\ArchiveMemory.h"
 					>
 				</File>
 				<File
