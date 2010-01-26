@@ -205,7 +205,7 @@ PacketType CBaseNetProtocol::SendPlayerStat(uchar myPlayerNum, const PlayerStati
 	return PacketType(packet);
 }
 
-PacketType CBaseNetProtocol::SendPlayerStat(uchar teamNum, uint statFrameNum, const TeamStatistics& currentStats )
+PacketType CBaseNetProtocol::SendTeamStat(uchar teamNum, uint statFrameNum, const TeamStatistics& currentStats )
 {
 	PackPacket* packet = new netcode::PackPacket(6 + sizeof(TeamStatistics), NETMSG_TEAMSTAT);
 	*packet << (uint8_t)teamNum << (uint32_t)statFrameNum << currentStats;

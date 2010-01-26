@@ -4335,7 +4335,7 @@ void CGame::ClientReadNet()
 					break;
 				}
 
-				net->Send(CBaseNetProtocol::Get().SendPlayerStat( teamNum, statFrameNum, teamHandler->Team(teamNum)->statHistory.back() ));
+				net->Send(CBaseNetProtocol::Get().SendTeamStat( teamNum, statFrameNum, teamHandler->Team(teamNum)->statHistory.back() ));
 				break;
 			}
 
