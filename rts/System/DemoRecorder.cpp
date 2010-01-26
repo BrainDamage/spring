@@ -125,12 +125,12 @@ void CDemoRecorder::SetName(const std::string& mapname, const std::string& modna
 		}
 	}
 	#else
-	std::ifstream ifs(buf.str());
+	std::ifstream ifs(buf.str().c_str());
 	if (ifs.is_open()) {
 		for (int a = 0; a < 9999; ++a) {
 			buf.clear();
 			buf << demoName.str() << "_" << a << ".sdf";
-			std::ifstream ifs(buf);
+			std::ifstream ifs(buf.str().c_str());
 			if (!ifs.is_open())
 				break;
 		}

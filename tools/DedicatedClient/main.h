@@ -33,6 +33,12 @@ int winner;
 int serverframenum;
 unsigned int gameStartTime;
 CDemoReader* demoReader;
+// copypasta from globalUnsynced
+float modGameTime;
+int myPlayerNum;
+int myTeam;
+int myAllyTeam;
+bool spectating;
 
 bool Update();
 bool UpdateClientNet();

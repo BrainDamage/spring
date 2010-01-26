@@ -235,7 +235,7 @@ bool UpdateClientNet()
 			case NETMSG_KEYFRAME:
 			{
 				serverframenum = *(int*)(inbuf+1);
-				gu->modGameTime = serverframenum/(float)GAME_SPEED;
+				modGameTime = serverframenum/(float)GAME_SPEED;
 				if (!isReplay)
 				{
 					net->Send(CBaseNetProtocol::Get().SendKeyFrame(serverframenum));
@@ -246,7 +246,7 @@ bool UpdateClientNet()
 			{
 				serverframenum++;
 				//logOutput.Print("Frame %d", serverframenum);
-				gu->modGameTime = serverframenum/(float)GAME_SPEED;
+				modGameTime = serverframenum/(float)GAME_SPEED;
 				if (!isReplay)
 				{
 					net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));

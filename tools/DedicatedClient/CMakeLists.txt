@@ -15,18 +15,19 @@ SET(system_files
 	../../rts/System/NetProtocol
 	../../rts/System/TimeUtil
 	../../rts/System/BaseNetProtocol
+	../../rts/System/GlobalUnsynced
 	../../rts/System/Demo
 	../../rts/System/DemoRecorder
 	../../rts/System/DemoReader
-	../../rts/System/GlobalUnsynced
 	../../rts/Game/GameSetup
 	../../rts/Game/GameData
     ../../rts/Game/ClientSetup
 	../../rts/Game/PlayerBase
 	../../rts/Game/GameVersion
+	../../rts/Game/PlayerStatistics
 	../../rts/Sim/Misc/TeamBase
 	../../rts/Sim/Misc/AllyTeam
-	../../rts/Rendering/Textures/TAPalette)
+	../../rts/Sim/Misc/TeamStatistics)
 IF (WIN32)
 	SET(system_files
 		${system_files}
