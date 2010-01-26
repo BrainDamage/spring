@@ -12,6 +12,9 @@
 #include "Game/GameSetup.h"
 #include "Game/ClientSetup.h"
 #include "Game/GameData.h"
+#include "Game/PlayerStatistics.h"
+
+#include "Sim/Misc/GlobalConstants.h"
 
 #include "main.h"
 
@@ -401,7 +404,7 @@ bool UpdateClientNet()
 					logOutput.Print("Got invalid player num %i in playerstat msg",player);
 					break;
 				}
-				PlayerStatistics playerstats = *(CPlayer::Statistics*)&inbuf[2];
+				PlayerStatistics playerstats = *(PlayerStatistics*)&inbuf[2];
 				if (gameOver && !isReplay)
 				{
 					CDemoRecorder* record = net->GetDemoRecorder();
@@ -417,19 +420,18 @@ bool UpdateClientNet()
 			{
 				const unsigned char teamNum = *((unsigned char*)&inbuf[1]);
 				const unsigned int statFrameNum = *((unsigned int*)&inbuf[2]);
-				if( team > gameSetup->teamStartingData.size() ){
-					logOutput.Print("Got invalid team num %i in teamstat msg",team);
+				if( teamNum > gameSetup->teamStartingData.size() ){
+					logOutput.Print("Got invalid team num %i in teamstat msg",teamNum);
 					break;
 				}
-				TeamStatistics stathistory = teams_stats[team];
-				if ( frameCount < stathistory.size() )
+				TeamStatisticsList& stathistory = teams_stats[teamNum];
+				if ( statFrameNum < stathistory.size() )
 				{
-					logOutput.Print("Recieved duplicated stat frame %d for team %d",frameCount, team);
+					logOutput.Print("Recieved duplicated stat frame %d for team %d",statFrameNum, teamNum);
 					break;
 				}
-				CTeam::Statistics statframe = *(CTeam::Statistics*)&inbuf[6];
+				TeamStatistics statframe = *(TeamStatistics*)&inbuf[6];
 				stathistory.push_back(statframe);
-				teams_stats[team] = stathistory;
 				break;
 			}
 
@@ -466,7 +468,7 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 
 	if (net && net->GetDemoRecorder())
 	{
-		net->GetDemoRecorder()->SetName(gameSetup->mapName);
+		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
 		LogObject() << "Recording demo " << net->GetDemoRecorder()->GetName() << "\n";
 	}
 }

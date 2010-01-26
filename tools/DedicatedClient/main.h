@@ -1,6 +1,7 @@
 #include <map>
 #include <string>
 #include <list>
+#include "Sim/Misc/TeamStatistics.h"
 
 ClientSetup settings;
 boost::scoped_ptr<const GameData> gameData;
@@ -17,9 +18,9 @@ typedef std::map<int,int> ActiveTeamsToAllyMap; // teamid -> allyid
 typedef ActiveTeamsToAllyMap::iterator ActiveTeamsToAllyMapIter;
 typedef std::map<int,int> ActiveAllyTeamsMap; // allyteamid -> numplayers
 typedef ActiveAllyTeamsMap::iterator ActiveAllyTeamsMapIter;
-typedef std::list<CTeam::Statistics> TeamStatistics;
-typedef TeamStatistics::iterator TeamStatisticsIter;
-typedef std::vector<TeamStatistics> TeamStatisticsVector;
+typedef std::list<TeamStatistics> TeamStatisticsList;
+typedef TeamStatisticsList::iterator TeamStatisticsListIter;
+typedef std::vector<TeamStatisticsList> TeamStatisticsVector;
 typedef TeamStatisticsVector::iterator TeamStatisticsVectorIter;
 std::vector<PlayerBase> playerData;
 ActivePlayersMap active_players;
