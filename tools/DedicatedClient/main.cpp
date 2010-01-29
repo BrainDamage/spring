@@ -468,6 +468,8 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 						{
 							logOutput.Print("modoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
 						}
+						logOutput.Print("modname=%s",gameSetup->modName.c_str());
+						logOutput.Print("mapname=%s",gameSetup->mapName.c_str());
 					logOutput.Print("ENDOPTIONS");
 					logOutput.Print("BEGINRESTRICTIONS");
 						std::map<std::string, int> restrictedUnits = gameSetup->restrictedUnits;
