@@ -251,19 +251,17 @@ bool UpdateClientNet()
 			}
 			case NETMSG_GAMEID:
 			{
-				const unsigned char* p = &inbuf[1];
+				const char * p= (char*)&inbuf[1];
+				const unsigned char * u= (unsigned char*)&inbuf[1];
+				gameID = std::string( p, 20 );
 				if (!isReplay)
 				{
 					CDemoRecorder* record = net->GetDemoRecorder();
 					if (record != NULL)
 					{
-						record->SetGameID(p);
+						record->SetGameID(u);
 					}
 				}
-				logOutput.Print(
-				  "GameID %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-				  p[ 0], p[ 1], p[ 2], p[ 3], p[ 4], p[ 5], p[ 6], p[ 7],
-				  p[ 8], p[ 9], p[10], p[11], p[12], p[13], p[14], p[15]);
 				break;
 			}
 
@@ -468,6 +466,10 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 				{
 					logOutput.Print("modoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
 				}
+				logOutput.Print(
+				  "gameid=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+				  gameID[ 0], gameID[ 1], gameID[ 2], gameID[ 3], gameID[ 4], gameID[ 5], gameID[ 6], gameID[ 7],
+				  gameID[ 8], gameID[ 9], gameID[10], gameID[11], gameID[12], gameID[13], gameID[14], gameID[15]);
 			logOutput.Print("ENDOPTIONS");
 			logOutput.Print("BEGINRESTRICTIONS");
 				std::map<std::string, int> restrictedUnits = gameSetup->restrictedUnits;
