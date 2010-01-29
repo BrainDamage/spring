@@ -40,19 +40,16 @@ int main(int argc, char *argv[])
 	{
 #endif
 	SDL_Init(SDL_INIT_TIMER);
-	std::cout << "If you find any errors, report them to mantis or the forums." << std::endl << std::endl;
 	if (argc > 1)
 	{
 		const std::string script(argv[1]);
 		if ( script.rfind(".txt") != std::string::npos )
 		{
 			isReplay = false;
-			std::cout << "Loading script from file: " << script << std::endl;
 		}
 		else if ( script.rfind(".sdf") != std::string::npos )
 		{
 			isReplay = true;
-			std::cout << "Loading demo file: " << script << std::endl;
 		}
 		else
 		{
@@ -85,7 +82,6 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 		}
-		std::cout << "Starting client..." << std::endl;
 		// Create the client
 		gu = new CGlobalUnsyncedStuff();
 		gameOver = false;
@@ -125,7 +121,6 @@ int main(int argc, char *argv[])
 #else
 			sleep(1);	// if so, wait 1  second
 #endif
-		logOutput.Print("Quitting");
 	}
 	else
 	{
@@ -171,17 +166,15 @@ void TeamDied( int team )
 		if ( itor->second == team )
 		{
 			tempcopy.erase(itor->first);
-			logOutput.Print("Player %d died", itor->first );
 		}
 	}
 	players_to_teams = tempcopy;
 	teams_to_ally.erase(team);
 	active_teams.erase(team);
-	logOutput.Print("team %d died", team );
+	logOutput.Print("TEAMDIED %d %d", serverframenum,team );
 	active_allyteams[ally] = active_allyteams[ally] - 1;
 	if ( active_allyteams.count(ally) == 0 )
 	{
-		logOutput.Print("ally %d died", ally );
 		active_allyteams.erase(ally);
 	}
 }
@@ -192,7 +185,6 @@ bool UpdateClientNet()
 	{
 		if (!net->Active())
 		{
-			logOutput.Print("Server not reachable");
 			return false;
 		}
 	}
@@ -200,7 +192,6 @@ bool UpdateClientNet()
 	{
 		if (demoReader->ReachedEnd())
 		{
-			logOutput.Print("End of demo reached");
 			return false;
 		}
 	}
@@ -219,7 +210,6 @@ bool UpdateClientNet()
 			case NETMSG_SETPLAYERNUM: // this is sent afterwards to let us know which playernum we have
 			{
 				gu->SetMyPlayer(inbuf[1]);
-				logOutput.Print("User number %i (team %i, allyteam %i)", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
 
 				if (!isReplay)
 				{
@@ -245,7 +235,6 @@ bool UpdateClientNet()
 			case NETMSG_NEWFRAME:
 			{
 				serverframenum++;
-				//logOutput.Print("Frame %d", serverframenum);
 				modGameTime = serverframenum/(float)GAME_SPEED;
 				if (!isReplay)
 				{
@@ -255,7 +244,6 @@ bool UpdateClientNet()
 			}
 			case NETMSG_QUIT:
 			{
-				logOutput.Print("Server shutdown");
 				GameOver();
 				return false;
 				break;
@@ -272,7 +260,7 @@ bool UpdateClientNet()
 					}
 				}
 				logOutput.Print(
-				  "GameID: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+				  "GameID %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
 				  p[ 0], p[ 1], p[ 2], p[ 3], p[ 4], p[ 5], p[ 6], p[ 7],
 				  p[ 8], p[ 9], p[10], p[11], p[12], p[13], p[14], p[15]);
 				break;
@@ -283,25 +271,11 @@ bool UpdateClientNet()
 				int player = inbuf[1];
 				if (!active_players.count(player))
 				{
-					logOutput.Print("Got invalid player num (%i) in NETMSG_PLAYERLEFT", player);
 					break;
 				}
 				const char *type = gameSetup->playerStartingData[player].GetType();
 				std::string playername = active_players[player].c_str();
-				switch (inbuf[2])
-				{
-					case 1:
-						logOutput.Print("%s %s left", type, playername.c_str());
-						break;
-					case 2:
-						logOutput.Print("%s %s has been kicked", type, playername.c_str());
-						break;
-					case 0:
-						logOutput.Print("%s %s dropped (connection lost)", type, playername.c_str());
-						break;
-					default:
-						logOutput.Print("%s %s left the game (reason unknown: %i)", type, playername.c_str(), inbuf[2]);
-				}
+				logOutput.Print("DISCONNECT %d %s %s", serverframenum, type, playername.c_str());
 				active_players.erase(player);
 				break;
 			}
@@ -309,7 +283,7 @@ bool UpdateClientNet()
 			{
 				int player = inbuf[2];
 				active_players[player] = (char*)(&inbuf[3]);
-				logOutput.Print("Player %s connected as id %d", active_players[player].c_str(), player );
+				logOutput.Print("CONNECTED %s", active_players[player].c_str());
 				break;
 			}
 
@@ -344,21 +318,17 @@ bool UpdateClientNet()
 							active_teams[fromTeam] = active_teams[fromTeam] - 1;
 							if ( active_teams[fromTeam] == 0 ) // remove team from allyteam if empty
 							{
-								logOutput.Print("team %d died", fromTeam );
 								active_teams.erase(fromTeam);
 								teams_to_ally.erase(fromTeam);
 								active_allyteams[fromAlly] = active_allyteams[fromAlly] - 1;
 								if ( active_allyteams.count(fromAlly) == 0 )
 								{
-									logOutput.Print("ally %d died", fromAlly );
 									active_allyteams.erase(fromAlly);
 								}
 							}
-							logOutput.Print("Player %d changed team %d ally %d to team %d ally %d", player, fromTeam, fromAlly, newTeam, newAlly );
 						}
 						else
 						{
-							logOutput.Print("Player %d joined team %d ally %d", player, newTeam, newAlly );
 						}
 						players_to_teams[player] = newTeam;
 						if ( teams_to_ally[newTeam] != newAlly )
@@ -382,18 +352,16 @@ bool UpdateClientNet()
 				unsigned timeToStart = *(unsigned*)(inbuf+1);
 				if (timeToStart < 1)
 				{
-					logOutput.Print("Game started");
+					logOutput.Print("GAMESTART");
 					hasStartedPlaying = true;
 				}
-				else logOutput.Print("Starting game in %d", timeToStart);
 				break;
 			}
 
 			case NETMSG_GAMEOVER:
 			{
-				logOutput.Print("Game over");
-				for ( ActivePlayersToTeamMapIter itor = players_to_teams.begin(); itor != players_to_teams.end(); itor++  ) logOutput.Print( "player %d team %d", itor->first, itor->second );
-				for ( ActiveTeamsToAllyMapIter itor = teams_to_ally.begin(); itor != teams_to_ally.end(); itor++  ) logOutput.Print( "team %d ally %d", itor->first, itor->second );
+				logOutput.Print("GAMEOVER %d", serverframenum);
+				logOutput.Print("ENDGAME");
 				GameOver();
 			}
 
@@ -401,7 +369,6 @@ bool UpdateClientNet()
 			{
 				int player=inbuf[1];
 				if(!active_players.count(player)){
-					logOutput.Print("Got invalid player num %i in playerstat msg",player);
 					break;
 				}
 				PlayerStatistics playerstats = *(PlayerStatistics*)&inbuf[2];
@@ -421,27 +388,17 @@ bool UpdateClientNet()
 				const unsigned char teamNum = *((unsigned char*)&inbuf[1]);
 				const unsigned int statFrameNum = *((unsigned int*)&inbuf[2]);
 				if( teamNum > gameSetup->teamStartingData.size() ){
-					logOutput.Print("Got invalid team num %i in teamstat msg",teamNum);
 					break;
 				}
 				TeamStatisticsList& stathistory = teams_stats[teamNum];
 				if ( statFrameNum < stathistory.size() )
 				{
-					logOutput.Print("Recieved duplicated stat frame %d for team %d",statFrameNum, teamNum);
 					break;
 				}
 				TeamStatistics statframe = *(TeamStatistics*)&inbuf[6];
 				stathistory.push_back(statframe);
 				break;
 			}
-
-			/*
-			default:
-			{
-				logOutput.Print("Unknown net-msg recieved : %i", int(packet->data[0]));
-				break;
-			}
-			*/
 		}
 	}
 	return true;
@@ -460,6 +417,55 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 		//CPlayer::UpdateControlledTeams();
 		playerData = gameSetup->playerStartingData; // copy contents
 		teams_stats.resize( gameSetup->teamStartingData.size() ); // allocate speace in team stats for all teams in script
+		std::vector<SkirmishAIData> skirmishAI = gameSetup->GetSkirmishAIs();
+		logOutput.Print("BEGINSETUP");
+			logOutput.Print("BEGINTEAMS");
+				for ( std::vector<PlayerBase>::iterator itor = playerData.begin(); itor != playerData.end(); itor++ )
+				{
+					if ( itor->spectator ) continue;
+					logOutput.Print("%s=%d",itor->name.c_str(),itor->team);
+				}
+				for ( std::vector<SkirmishAIData>::iterator itor = skirmishAI.begin(); itor != skirmishAI.end(); itor++ )
+				{
+					logOutput.Print("%s=%d",itor->name.c_str(),itor->team);
+				}
+			logOutput.Print("ENDTEAMS");
+			logOutput.Print("BEGINAIS");
+				for ( std::vector<SkirmishAIData>::iterator itor = skirmishAI.begin(); itor != skirmishAI.end(); itor++ )
+				{
+					logOutput.Print("%s=%s %s",itor->name.c_str(),itor->shortName.c_str(),itor->version.c_str());
+				}
+			logOutput.Print("ENDAIS");
+				std::vector<TeamBase> teamStartingData = gameSetup->teamStartingData;
+				logOutput.Print("BEGINALLYTEAMS");
+				int teamCounter = 0;
+				for ( std::vector<TeamBase>::iterator itor = teamStartingData.begin(); itor != teamStartingData.end(); itor++ )
+				{
+					logOutput.Print("%d=%d",teamCounter,itor->teamAllyteam);
+					teamCounter++;
+				}
+			logOutput.Print("ENDALLYTEAMS");
+			logOutput.Print("BEGINOPTIONS");
+				std::map<std::string, std::string> mapOptions = gameSetup->mapOptions;
+				std::map<std::string, std::string> modOptions = gameSetup->modOptions;
+				for ( std::map<std::string, std::string>::iterator itor = mapOptions.begin(); itor != mapOptions.end(); itor++ )
+				{
+					logOutput.Print("mapoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
+				}
+				for ( std::map<std::string, std::string>::iterator itor = modOptions.begin(); itor != modOptions.end(); itor++ )
+				{
+					logOutput.Print("modoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
+				}
+			logOutput.Print("ENDOPTIONS");
+			logOutput.Print("BEGINRESTRICTIONS");
+				std::map<std::string, int> restrictedUnits = gameSetup->restrictedUnits;
+				for ( std::map<std::string, int>::iterator itor = restrictedUnits.begin(); itor != restrictedUnits.end(); itor++ )
+				{
+					logOutput.Print("%s=%d",itor->first.c_str(),itor->second);
+				}
+			logOutput.Print("ENDRESTRICTIONS");
+		logOutput.Print("ENDSETUP");
+		logOutput.Print("BEGINGAME");
 	}
 	else
 	{
@@ -469,7 +475,6 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 	if (net && net->GetDemoRecorder())
 	{
 		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
-		LogObject() << "Recording demo " << net->GetDemoRecorder()->GetName() << "\n";
 	}
 }
 
@@ -482,7 +487,6 @@ void GameOver()
 		CDemoRecorder* record = net->GetDemoRecorder();
 		int gamelenght = serverframenum / GAME_SPEED;
 		int wallclocklenght = (SDL_GetTicks()-gameStartTime)/1000;
-		logOutput.Print("Game lenght: %d Wall clock lenght: %d", gamelenght, wallclocklenght );
 		record->SetTime( gamelenght, wallclocklenght);
 		record->InitializeStats(active_players.size(), teams_stats.size(), winner);
 		for ( size_t team = 0; team < teams_stats.size(); team++ )
