@@ -13,6 +13,7 @@
 #include "Game/ClientSetup.h"
 #include "Game/GameData.h"
 #include "Game/PlayerStatistics.h"
+#include "Game/Server/MsgStrings.h"
 
 #include "Sim/Misc/GlobalConstants.h"
 
@@ -286,7 +287,18 @@ bool UpdateClientNet()
 				logOutput.Print("CONNECTED %s", active_players[player].c_str());
 				break;
 			}
-
+			case NETMSG_SYSTEMMSG:
+			{
+				std::string text=(char*)(&inbuf[4]);
+				int frame = -1;
+				char playernames[200];
+				int hash = -1;
+				if ( sscanf( text.c_str(), playernames, frame, hash ) == 3 )
+				{
+					logOutput.Print("DESYNC %d %x %s", frame, hash, playernames);
+				}
+				break;
+			}
 			case NETMSG_TEAM:
 			{
 				int player = inbuf[1];
