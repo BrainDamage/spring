@@ -251,17 +251,68 @@ bool UpdateClientNet()
 			}
 			case NETMSG_GAMEID:
 			{
-				const char * p= (char*)&inbuf[1];
-				const unsigned char * u= (unsigned char*)&inbuf[1];
-				gameID = std::string( p, 20 );
+				const unsigned char * gameID= (unsigned char*)&inbuf[1];
 				if (!isReplay)
 				{
 					CDemoRecorder* record = net->GetDemoRecorder();
 					if (record != NULL)
 					{
-						record->SetGameID(u);
+						record->SetGameID(gameID);
 					}
 				}
+				std::vector<SkirmishAIData> skirmishAI = gameSetup->GetSkirmishAIs();
+				logOutput.Print("BEGINSETUP");
+					logOutput.Print("BEGINTEAMS");
+						for ( std::vector<PlayerBase>::iterator itor = playerData.begin(); itor != playerData.end(); itor++ )
+						{
+							if ( itor->spectator ) continue;
+							logOutput.Print("%s=%d",itor->name.c_str(),itor->team);
+						}
+						for ( std::vector<SkirmishAIData>::iterator itor = skirmishAI.begin(); itor != skirmishAI.end(); itor++ )
+						{
+							logOutput.Print("%s=%d",itor->name.c_str(),itor->team);
+						}
+					logOutput.Print("ENDTEAMS");
+					logOutput.Print("BEGINAIS");
+						for ( std::vector<SkirmishAIData>::iterator itor = skirmishAI.begin(); itor != skirmishAI.end(); itor++ )
+						{
+							logOutput.Print("%s=%s %s",itor->name.c_str(),itor->shortName.c_str(),itor->version.c_str());
+						}
+					logOutput.Print("ENDAIS");
+						std::vector<TeamBase> teamStartingData = gameSetup->teamStartingData;
+						logOutput.Print("BEGINALLYTEAMS");
+						int teamCounter = 0;
+						for ( std::vector<TeamBase>::iterator itor = teamStartingData.begin(); itor != teamStartingData.end(); itor++ )
+						{
+							logOutput.Print("%d=%d",teamCounter,itor->teamAllyteam);
+							teamCounter++;
+						}
+					logOutput.Print("ENDALLYTEAMS");
+					logOutput.Print("BEGINOPTIONS");
+						std::map<std::string, std::string> mapOptions = gameSetup->mapOptions;
+						std::map<std::string, std::string> modOptions = gameSetup->modOptions;
+						for ( std::map<std::string, std::string>::iterator itor = mapOptions.begin(); itor != mapOptions.end(); itor++ )
+						{
+							logOutput.Print("mapoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
+						}
+						for ( std::map<std::string, std::string>::iterator itor = modOptions.begin(); itor != modOptions.end(); itor++ )
+						{
+							logOutput.Print("modoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
+						}
+						logOutput.Print(
+						  "gameid=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+						  gameID[ 0], gameID[ 1], gameID[ 2], gameID[ 3], gameID[ 4], gameID[ 5], gameID[ 6], gameID[ 7],
+						  gameID[ 8], gameID[ 9], gameID[10], gameID[11], gameID[12], gameID[13], gameID[14], gameID[15]);
+					logOutput.Print("ENDOPTIONS");
+					logOutput.Print("BEGINRESTRICTIONS");
+						std::map<std::string, int> restrictedUnits = gameSetup->restrictedUnits;
+						for ( std::map<std::string, int>::iterator itor = restrictedUnits.begin(); itor != restrictedUnits.end(); itor++ )
+						{
+							logOutput.Print("%s=%d",itor->first.c_str(),itor->second);
+						}
+					logOutput.Print("ENDRESTRICTIONS");
+				logOutput.Print("ENDSETUP");
+				logOutput.Print("BEGINGAME");
 				break;
 			}
 
@@ -427,59 +478,6 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 		//CPlayer::UpdateControlledTeams();
 		playerData = gameSetup->playerStartingData; // copy contents
 		teams_stats.resize( gameSetup->teamStartingData.size() ); // allocate speace in team stats for all teams in script
-		std::vector<SkirmishAIData> skirmishAI = gameSetup->GetSkirmishAIs();
-		logOutput.Print("BEGINSETUP");
-			logOutput.Print("BEGINTEAMS");
-				for ( std::vector<PlayerBase>::iterator itor = playerData.begin(); itor != playerData.end(); itor++ )
-				{
-					if ( itor->spectator ) continue;
-					logOutput.Print("%s=%d",itor->name.c_str(),itor->team);
-				}
-				for ( std::vector<SkirmishAIData>::iterator itor = skirmishAI.begin(); itor != skirmishAI.end(); itor++ )
-				{
-					logOutput.Print("%s=%d",itor->name.c_str(),itor->team);
-				}
-			logOutput.Print("ENDTEAMS");
-			logOutput.Print("BEGINAIS");
-				for ( std::vector<SkirmishAIData>::iterator itor = skirmishAI.begin(); itor != skirmishAI.end(); itor++ )
-				{
-					logOutput.Print("%s=%s %s",itor->name.c_str(),itor->shortName.c_str(),itor->version.c_str());
-				}
-			logOutput.Print("ENDAIS");
-				std::vector<TeamBase> teamStartingData = gameSetup->teamStartingData;
-				logOutput.Print("BEGINALLYTEAMS");
-				int teamCounter = 0;
-				for ( std::vector<TeamBase>::iterator itor = teamStartingData.begin(); itor != teamStartingData.end(); itor++ )
-				{
-					logOutput.Print("%d=%d",teamCounter,itor->teamAllyteam);
-					teamCounter++;
-				}
-			logOutput.Print("ENDALLYTEAMS");
-			logOutput.Print("BEGINOPTIONS");
-				std::map<std::string, std::string> mapOptions = gameSetup->mapOptions;
-				std::map<std::string, std::string> modOptions = gameSetup->modOptions;
-				for ( std::map<std::string, std::string>::iterator itor = mapOptions.begin(); itor != mapOptions.end(); itor++ )
-				{
-					logOutput.Print("mapoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
-				}
-				for ( std::map<std::string, std::string>::iterator itor = modOptions.begin(); itor != modOptions.end(); itor++ )
-				{
-					logOutput.Print("modoptions/%s=%s",itor->first.c_str(),itor->second.c_str());
-				}
-				logOutput.Print(
-				  "gameid=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-				  gameID[ 0], gameID[ 1], gameID[ 2], gameID[ 3], gameID[ 4], gameID[ 5], gameID[ 6], gameID[ 7],
-				  gameID[ 8], gameID[ 9], gameID[10], gameID[11], gameID[12], gameID[13], gameID[14], gameID[15]);
-			logOutput.Print("ENDOPTIONS");
-			logOutput.Print("BEGINRESTRICTIONS");
-				std::map<std::string, int> restrictedUnits = gameSetup->restrictedUnits;
-				for ( std::map<std::string, int>::iterator itor = restrictedUnits.begin(); itor != restrictedUnits.end(); itor++ )
-				{
-					logOutput.Print("%s=%d",itor->first.c_str(),itor->second);
-				}
-			logOutput.Print("ENDRESTRICTIONS");
-		logOutput.Print("ENDSETUP");
-		logOutput.Print("BEGINGAME");
 	}
 	else
 	{

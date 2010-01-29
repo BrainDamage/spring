@@ -33,7 +33,6 @@ int winner;
 int serverframenum;
 unsigned int gameStartTime;
 CDemoReader* demoReader;
-std::string gameID;
 // copypasta from globalUnsynced
 float modGameTime;
 int myPlayerNum;
