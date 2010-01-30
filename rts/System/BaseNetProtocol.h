@@ -11,7 +11,6 @@ namespace netcode
 	class RawPacket;
 }
 class PlayerStatistics;
-class TeamStatistics;
 
 const unsigned char NETWORK_VERSION = 1;
 
@@ -84,12 +83,12 @@ enum NETMSG {
 	                              // std::string mod, int modChecksum, int randomSeed (each string ends with \0)
 	NETMSG_ALLIANCE         = 53, // uchar myPlayerNum, uchar otherAllyTeam, uchar allianceState (0 = not allied / 1 = allied)
 	NETMSG_CCOMMAND         = 54, // /* short! messageSize */, int! myPlayerNum, std::string command, std::string extra (each string ends with \0)
-	NETMSG_TEAMSTAT         = 60, // uchar teamNum, uint statFrameNum, CTeam::Statistics
+	NETMSG_TEAMSTAT         = 60,
 
 	NETMSG_AI_CREATED       = 70, // /* uchar messageSize */, uchar myPlayerNum, uint whichSkirmishAI, uchar team, std::string name (ends with \0)
 	NETMSG_AI_STATE_CHANGED = 71, // uchar myPlayerNum, uint whichSkirmishAI, uchar newState
 
-	NETMSG_REQUEST_TEAMSTAT = 72, // uchar teamNum, uint statFrameNum
+	NETMSG_REQUEST_TEAMSTAT = 72, // uchar teamNum, ushort statFrameNum
 
 	NETMSG_REGISTER_NETMSG	= 73, // uchar myPlayerNum, uchar NETMSG
 	NETMSG_UNREGISTER_NETMSG= 74  // uchar myPlayerNum, uchar NETMSG
@@ -144,9 +143,7 @@ public:
 	PacketType SendShare(uchar myPlayerNum, uchar shareTeam, uchar bShareUnits, float shareMetal, float shareEnergy);
 	PacketType SendSetShare(uchar myPlayerNum, uchar myTeam, float metalShareFraction, float energyShareFraction);
 	PacketType SendSendPlayerStat();
-	PacketType SendRequestTeamStat( uchar teamNum, uint teamStatFrameCount );
 	PacketType SendPlayerStat(uchar myPlayerNum, const PlayerStatistics& currentStats);
-	PacketType SendTeamStat(uchar teamNum, uint statFrameNum, const TeamStatistics& currentStats );
 	PacketType SendGameOver();
 	PacketType SendMapErase(uchar myPlayerNum, short x, short z);
 	PacketType SendMapDrawLine(uchar myPlayerNum, short x1, short z1, short x2, short z2, bool);
