@@ -443,7 +443,7 @@ void CGameServer::CheckSync()
 			{
 				if (!players[a].link)
 					continue;
-			
+
 				std::map<int, unsigned>::const_iterator it = players[a].syncResponse.find(*f);
 				if (it != players[a].syncResponse.end())
 				{
@@ -2039,4 +2039,3 @@ size_t CGameServer::ReserveNextAvailableSkirmishAIId() {
 void CGameServer::FreeSkirmishAIId(const size_t skirmishAIId) {
 	usedSkirmishAIIds.remove(skirmishAIId);
 }
-
