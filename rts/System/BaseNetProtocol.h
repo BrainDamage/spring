@@ -89,7 +89,7 @@ enum NETMSG {
 	NETMSG_AI_CREATED       = 70, // /* uchar messageSize */, uchar myPlayerNum, uint whichSkirmishAI, uchar team, std::string name (ends with \0)
 	NETMSG_AI_STATE_CHANGED = 71, // uchar myPlayerNum, uint whichSkirmishAI, uchar newState
 
-	NETMSG_REQUEST_TEAMSTAT = 72, // uchar teamNum, ushort statFrameNum
+	NETMSG_REQUEST_TEAMSTAT = 72, // uchar teamNum, uint statFrameNum
 
 	NETMSG_REGISTER_NETMSG	= 73, // uchar myPlayerNum, uchar NETMSG
 	NETMSG_UNREGISTER_NETMSG= 74  // uchar myPlayerNum, uchar NETMSG
