@@ -18,7 +18,9 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "Game/GameVersion.h"
 #include "ConfigHandler.h"
+#ifndef DEDICATED_CLIENT
 #include "FileSystem/FileSystemHandler.h"
+#endif
 #include "mmgr.h"
 
 #include <string>
@@ -154,7 +156,11 @@ void CLogOutput::SetFileName(std::string fname)
 
 std::string CLogOutput::CreateFilePath(const std::string& fileName)
 {
+#ifndef DEDICATED_CLIENT
 	return FileSystemHandler::GetCwd() + (char)FileSystemHandler::GetNativePathSeparator() + fileName;
+#else
+	return fileName;
+#endif
 }
 
 
@@ -170,7 +176,7 @@ bool CLogOutput::IsLogFileRotating() const
 
 void CLogOutput::RotateLogFile() const
 {
-
+#ifndef DEDICATED_CLIENT
 	if (IsLogFileRotating()) {
 		if (FileSystemHandler::FileExists(filePath)) {
 			// logArchiveDir: /absolute/writeable/data/dir/log/
@@ -192,6 +198,7 @@ void CLogOutput::RotateLogFile() const
 			}
 		}
 	}
+#endif
 }
 
 void CLogOutput::Initialize()
