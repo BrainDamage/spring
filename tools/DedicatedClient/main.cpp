@@ -158,6 +158,7 @@ boost::shared_ptr<const netcode::RawPacket> GetData()
 
 void TeamDied( int team )
 {
+	if ( active_teams.count(team) == 0 ) return; // drop duplicate messages
 	if ( teams_to_ally.count(team) == 0 ) teams_to_ally[team] = gameSetup->teamStartingData[team].teamAllyteam;
 	const int ally = teams_to_ally[team];
 	// make all players in the team be spectators
