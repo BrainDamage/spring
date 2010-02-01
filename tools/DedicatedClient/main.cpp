@@ -285,6 +285,10 @@ bool UpdateClientNet()
 			{
 				int player = inbuf[2];
 				active_players[player] = (char*)(&inbuf[3]);
+				if ( gameSetup->playerStartingData[player].spectator ) // ignore spectators
+				{
+					break;
+				}
 				logOutput.Print("CONNECTED %s", active_players[player].c_str());
 				break;
 			}
