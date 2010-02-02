@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 		gameOver = false;
 		winner = -1;
 		hasStartedPlaying = false;
-		serverframenum = 0;
+		serverframenum = -1;
 		net = 0;
 		demoReader = 0;
 		if (!isReplay)
@@ -226,11 +226,10 @@ bool UpdateClientNet()
 			}
 			case NETMSG_KEYFRAME:
 			{
-				serverframenum = *(int*)(inbuf+1);
-				modGameTime = serverframenum/(float)GAME_SPEED;
+				int keyframenum = *(int*)(inbuf+1);
 				if (!isReplay)
 				{
-					net->Send(CBaseNetProtocol::Get().SendKeyFrame(serverframenum));
+					net->Send(CBaseNetProtocol::Get().SendKeyFrame(keyframenum));
 				}
 				break;
 			}
@@ -275,9 +274,14 @@ bool UpdateClientNet()
 				{
 					break;
 				}
-				const char *type = gameSetup->playerStartingData[player].GetType();
+				bool spectator = gameSetup->playerStartingData[player].spectator;
+				if ( spectator )
+				{
+					break;
+				}
 				std::string playername = active_players[player].c_str();
-				logOutput.Print("DISCONNECT %d %s %s", serverframenum, type, playername.c_str());
+				int type = inbuf[2];
+				logOutput.Print("DISCONNECT %d %d %s", serverframenum, type, playername.c_str());
 				active_players.erase(player);
 				break;
 			}
