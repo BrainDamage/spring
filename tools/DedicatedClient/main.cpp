@@ -231,7 +231,7 @@ bool UpdateClientNet()
 				{
 					net->Send(CBaseNetProtocol::Get().SendKeyFrame(keyframenum));
 				}
-				break;
+				// don't break here and continue to NEWFRAME
 			}
 			case NETMSG_NEWFRAME:
 			{
