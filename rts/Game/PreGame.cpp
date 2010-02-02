@@ -357,13 +357,15 @@ void CPreGame::LoadMap(const CGameSetup* setup)
 		} else {
 			CMapGenerator* mg = new CMapGenerator();
 
-			mg->Seed(setup->mapgenSeed);
+			mg->SetSeed(setup->mapgenSeed);
 			mg->Generate();
 
 			CArchiveMemory* am = mg->CreateArchive("myarchive.sd7");
 
 			archiveScanner->AddArchive(am);
 			vfsHandler->AddMapArchiveWithDeps(am, false);
+
+			delete mg;
 		}
 		alreadyLoaded = true;
 	}
