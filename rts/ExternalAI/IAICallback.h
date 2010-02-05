@@ -2,6 +2,7 @@
 #define IAICALLBACK_H
 
 #include <vector>
+#include <map>
 #include <deque>
 #include "float3.h"
 #include "Sim/Units/CommandAI/Command.h"
@@ -49,7 +50,7 @@ struct UnitResourceInfo
 struct PointMarker
 {
 	float3 pos;
-	unsigned char* color;
+	const unsigned char* color;
 	// don't store this pointer anywhere, it may become
 	// invalid at any time after GetMapPoints()
 	const char* label;
@@ -58,7 +59,7 @@ struct PointMarker
 struct LineMarker {
 	float3 pos;
 	float3 pos2;
-	unsigned char* color;
+	const unsigned char* color;
 };
 
 // HandleCommand structs:
@@ -454,6 +455,9 @@ public:
 	// 3. the return data is subject to lua garbage collection,
 	//    copy it if you wish to continue using it
 	virtual const char* CallLuaRules(const char* data, int inSize = -1, int* outSize = NULL) = 0;
+
+	virtual std::map<std::string, std::string> GetMyInfo() = 0;
+	virtual std::map<std::string, std::string> GetMyOptionValues() = 0;
 
 	// use virtual instead of pure virtual,
 	// because pure virtual is not well supported
