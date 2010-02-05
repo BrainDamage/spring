@@ -19,7 +19,7 @@ public:
 	{ return gridSize; }
 
 	inline float GetHeight(int x, int y)
-	{ return heightMap[y * gridSize.x + x]; }
+	{ return heightMap[y * (gridSize.x + 1) + x]; }
 
 	inline float* GetHeights()
 	{ return heightMap; }
@@ -34,7 +34,7 @@ protected:
 	void CreateMaps();
 
 	inline void SetHeight(int x, int y, float f)
-	{ heightMap[y * gridSize.x + x] = f; }
+	{ heightMap[y * (gridSize.x + 1) + x] = f; }
 
 	std::vector<int2> startPositions;
 

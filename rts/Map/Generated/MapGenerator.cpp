@@ -93,7 +93,7 @@ CMapGenerator::FileBuffer CMapGenerator::CreateSMF()
 	smfHeader.texelPerSquare = 8;
 	smfHeader.tilesize = 32;
 	smfHeader.minHeight = -100;
-	smfHeader.maxHeight = 0xFFFF; //So its pretty much 1:1
+	smfHeader.maxHeight = 0x1000;
 	
 	int numTiles = 2087; //32 * 32 * (mapSize.x  / 2) * (mapSize.y / 2);
 	const char smtFileName[] = "duck.smt";
@@ -144,12 +144,27 @@ CMapGenerator::FileBuffer CMapGenerator::CreateSMF()
 
 	//--- Update Ptrs and write to buffer ---
 	memset(vegmapPtr, 0, vegmapSize);
+
+	float heightMin = smfHeader.minHeight;
+	float heightMax = smfHeader.maxHeight;
+	float heightMul = (float)0xFFFF / (smfHeader.maxHeight - smfHeader.minHeight);
 	for(int x = 0; x < heightmapDimensions; x++)
-		heightmapPtr[x] = (short)generator->GetHeights()[x];
+	{
+		float h = generator->GetHeights()[x];
+		if(h < heightMin) h = heightMin;
+		if(h > heightMax) h = heightMax;
+		h -= heightMin;
+		h *= heightMul;
+		heightmapPtr[x] = (short)h;
+	}
+
 	memset(typemapPtr, 0, typemapSize); 
+
 	memset(tilemapPtr, 0, tilemapSize);
+
 	memset(metalmapPtr, 0, metalmapSize); 
 
+	//--- Write to final buffer ---
 	b.size = smfHeader.featurePtr + sizeof(smfFeature);
 	b.buffer = new char[b.size];
 
