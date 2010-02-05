@@ -37,7 +37,6 @@
 #include "ConfigHandler.h"
 #include "FileSystem/FileSystem.h"
 #include "Rendering/glFont.h"
-#include "StartScripts/ScriptHandler.h"
 #include "UI/InfoConsole.h"
 #include "aGui/Gui.h"
 #include "Exceptions.h"
@@ -85,6 +84,8 @@ void CPreGame::LoadSetupscript(const std::string& script)
 void CPreGame::LoadDemo(const std::string& demo)
 {
 	assert(settings->isHost);
+	if (!configHandler->Get("DemoFromDemo", false))
+		net->DisableDemoRecording();
 	ReadDataFromDemo(demo);
 }
 
@@ -220,6 +221,10 @@ void CPreGame::UpdateClientNet()
 				gu->SetMyPlayer(packet->data[1]);
 				logOutput.Print("User number %i (team %i, allyteam %i)", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
 
+				// When calling this function, mod archives have to be loaded
+				// and gu->myPlayerNum has to be set.
+				skirmishAIHandler.LoadPreGame();
+
 				const CTeam* team = teamHandler->Team(gu->myTeam);
 				assert(team);
 				std::string mapStartPic(mapInfo->GetStringValue("Startpic"));
@@ -274,7 +279,6 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 			TdfParser script(data->GetSetup().c_str(), data->GetSetup().size());
 			TdfParser::TdfSection* tgame = script.GetRootSection()->sections["game"];
 
-			tgame->AddPair("ScriptName", demoScript->scriptName);
 			tgame->AddPair("MapName", demoScript->mapName);
 			tgame->AddPair("Gametype", demoScript->modName);
 			tgame->AddPair("Demofile", demoName);
@@ -286,7 +290,6 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 					it->second->AddPair("isfromdemo", 1);
 				}
 			}
-
 
 			// add local spectator (and assert we didn't already have MAX_PLAYERS players)
 			int myPlayerNum;
@@ -390,8 +393,6 @@ void CPreGame::LoadMod(const std::string& modName)
 			}
 		}
 		alreadyLoaded = true;
-		// This loads the Lua AIs from the mod archives LuaAI.lua
-		skirmishAIHandler.LoadPreGame();
 	}
 }
 
@@ -433,14 +434,6 @@ void CPreGame::GameDataReceived(boost::shared_ptr<const netcode::RawPacket> pack
 	if (!mapInfo) {
 		mapInfo = new CMapInfo(gameSetup->MapFile());
 	}
-
-	const std::string mapWantedScript(mapInfo->GetStringValue("script"));
-	if (!mapWantedScript.empty()) {
-		temp->scriptName = mapWantedScript;
-	}
-
-	LogObject() << "Using script " << gameSetup->scriptName << "\n";
-	CScriptHandler::SelectScript(gameSetup->scriptName);
 
 	LogObject() << "Using mod " << gameSetup->modName << "\n";
 	LoadMod(gameSetup->modName);

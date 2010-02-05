@@ -71,7 +71,7 @@
 #include "Rendering/Env/BaseTreeDrawer.h"
 #include "Rendering/Env/BaseWater.h"
 #include "Rendering/Env/CubeMapHandler.h"
-#include "Rendering/FartextureHandler.h"
+#include "Rendering/FarTextureHandler.h"
 #include "Rendering/glFont.h"
 #include "Rendering/Screenshot.h"
 #include "Rendering/GroundDecalHandler.h"
@@ -119,8 +119,6 @@
 #include "Sim/Units/UnitLoader.h"
 #include "Sim/Units/UnitTracker.h"
 #include "Sim/Units/CommandAI/LineDrawer.h"
-#include "StartScripts/Script.h"
-#include "StartScripts/ScriptHandler.h"
 #include "Sync/SyncedPrimitiveIO.h"
 #include "Util.h"
 #include "Exceptions.h"
@@ -242,7 +240,7 @@ CR_REG_METADATA(CGame,(
 
 
 CGame::CGame(std::string mapname, std::string modName, CLoadSaveHandler *saveFile):
-	drawMode(notDrawing),
+	gameDrawMode(gameNotDrawing),
 	defsParser(NULL),
 	oldframenum(0),
 	fps(0),
@@ -261,8 +259,6 @@ CGame::CGame(std::string mapname, std::string modName, CLoadSaveHandler *saveFil
 	drawSky(true),
 	drawWater(true),
 	drawGround(true),
-
-	script(NULL),
 
 	creatingVideo(false),
 
@@ -459,10 +455,10 @@ CGame::CGame(std::string mapname, std::string modName, CLoadSaveHandler *saveFil
 
 	uh = new CUnitHandler();
 	unitDrawer = new CUnitDrawer();
-	fartextureHandler = new CFartextureHandler();
+	farTextureHandler = new CFarTextureHandler();
 	modelParser = new C3DModelLoader();
 
-	featureHandler->LoadFeaturesFromMap(saveFile || CScriptHandler::Instance().chosenScript->loadGame);
+	featureHandler->LoadFeaturesFromMap(saveFile);
 	pathManager = new CPathManager();
 
 #ifdef SYNCCHECK
@@ -518,8 +514,6 @@ CGame::CGame(std::string mapname, std::string modName, CLoadSaveHandler *saveFil
 	lastMoveUpdate = lastframe;
 	lastUpdateRaw = lastframe;
 	updateDeltaSeconds = 0.0f;
-	script = CScriptHandler::Instance().chosenScript;
-	assert(script);
 	eventHandler.GamePreload();
 
 	glFogfv(GL_FOG_COLOR, mapInfo->atmosphere.fogColor);
@@ -636,7 +630,7 @@ CGame::~CGame()
 	SafeDelete(archiveScanner);
 	SafeDelete(modelParser);
 	SafeDelete(iconHandler);
-	SafeDelete(fartextureHandler);
+	SafeDelete(farTextureHandler);
 	SafeDelete(texturehandler3DO);
 	SafeDelete(texturehandlerS3O);
 	SafeDelete(camera);
@@ -3038,7 +3032,7 @@ bool CGame::Draw() {
 	if(!skipping)
 		UpdateUI(true);
 
-	SetDrawMode(normalDraw);
+	SetDrawMode(gameNormalDraw);
 
  	if (luaUI)    { luaUI->CheckStack(); }
 	if (luaGaia)  { luaGaia->CheckStack(); }
@@ -3069,7 +3063,7 @@ bool CGame::Draw() {
 	mouse->EmptyMsgQueUpdate();
 	guihandler->Update();
 	lineDrawer.UpdateLineStipple();
-	fartextureHandler->CreateFarTextures();
+	farTextureHandler->CreateFarTextures();
 
 	LuaUnsyncedCtrl::ClearUnitCommandQueues();
 	eventHandler.Update();
@@ -3084,10 +3078,6 @@ bool CGame::Draw() {
 		unitTracker.SetCam();
 	}
 
-	if (playing && (hideInterface || script->wantCameraControl)) {
-		script->SetCamera();
-	}
-
 	if (doDrawWorld) {
 		{
 			SCOPED_TIMER("ExtraTexture");
@@ -3099,9 +3089,9 @@ bool CGame::Draw() {
 			if (shadowHandler->drawShadows &&
 				(gd->drawMode != CBaseGroundDrawer::drawLos)) {
 				// NOTE: shadows don't work in LOS mode, gain a few fps (until it's fixed)
-				SetDrawMode(shadowDraw);
+				SetDrawMode(gameShadowDraw);
 				shadowHandler->CreateShadows();
-				SetDrawMode(normalDraw);
+				SetDrawMode(gameNormalDraw);
 			}
 
 			cubeMapHandler->UpdateReflectionTexture();
@@ -3339,7 +3329,7 @@ bool CGame::Draw() {
 	}
 #endif
 
-	SetDrawMode(notDrawing);
+	SetDrawMode(gameNotDrawing);
 
 	return true;
 }
@@ -3423,7 +3413,49 @@ void CGame::StartPlaying()
 //	grouphandler->team = gu->myTeam;
 	CLuaUI::UpdateTeams();
 
-	script->GameStart();
+	// setup the teams
+	for (int a = 0; a < teamHandler->ActiveTeams(); ++a) {
+		CTeam* team = teamHandler->Team(a);
+
+		if (team->gaia) {
+			continue;
+		}
+
+		if (gameSetup->startPosType == CGameSetup::StartPos_ChooseInGame
+				&& (team->startPos.x < 0 || team->startPos.z < 0
+				|| (team->startPos.x <= 0 && team->startPos.z <= 0))) {
+			// if the player didn't choose a start position, choose one for him
+			// it should be near the center of his startbox
+			const int allyTeam = teamHandler->AllyTeam(a);
+			const float xmin = (gs->mapx * SQUARE_SIZE) * gameSetup->allyStartingData[allyTeam].startRectLeft;
+			const float zmin = (gs->mapy * SQUARE_SIZE) * gameSetup->allyStartingData[allyTeam].startRectTop;
+			const float xmax = (gs->mapx * SQUARE_SIZE) * gameSetup->allyStartingData[allyTeam].startRectRight;
+			const float zmax = (gs->mapy * SQUARE_SIZE) * gameSetup->allyStartingData[allyTeam].startRectBottom;
+			const float xcenter = (xmin + xmax) / 2;
+			const float zcenter = (zmin + zmax) / 2;
+			assert(xcenter >= 0 && xcenter < gs->mapx*SQUARE_SIZE);
+			assert(zcenter >= 0 && zcenter < gs->mapy*SQUARE_SIZE);
+			team->startPos.x = (a - teamHandler->ActiveTeams()) * 4 * SQUARE_SIZE + xcenter;
+			team->startPos.z = (a - teamHandler->ActiveTeams()) * 4 * SQUARE_SIZE + zcenter;
+		}
+
+		// create a Skirmish AI if required
+		// TODO: is this needed?
+		if (!gameSetup->hostDemo) {
+			const CSkirmishAIHandler::ids_t localSkirmAIs =
+					skirmishAIHandler.GetSkirmishAIsInTeam(a, gu->myPlayerNum);
+			for (CSkirmishAIHandler::ids_t::const_iterator ai =
+					localSkirmAIs.begin(); ai != localSkirmAIs.end(); ++ai) {
+				skirmishAIHandler.CreateLocalSkirmishAI(*ai);
+			}
+		}
+
+		if (a == gu->myTeam) {
+			minimap->AddNotification(team->startPos, float3(1.0f, 1.0f, 1.0f), 1.0f);
+			game->infoConsole->SetLastMsgPos(team->startPos);
+		}
+	}
+
 	eventHandler.GameStart();
 }
 
@@ -3444,8 +3476,6 @@ void CGame::SimFrame() {
 	if(!(gs->frameNum & 31))
 		m_validateAllAllocUnits();
 #endif
-
-	script->Update();
 
 	if (luaUI)    { luaUI->GameFrame(gs->frameNum); }
 	if (luaGaia)  { luaGaia->GameFrame(gs->frameNum); }
@@ -3729,7 +3759,8 @@ void CGame::ClientReadNet()
 					           *(float*)&inbuf[12]);
 					if (!luaRules || luaRules->AllowStartPosition(player, pos)) {
 						teamHandler->Team(team)->StartposMessage(pos);
-						if (inbuf[3] != 2) {
+						if (inbuf[3] != 2 && player != SERVER_PLAYER)
+						{
 							playerHandler->Player(player)->readyToStart = !!inbuf[3];
 						}
 						if (pos.y != -500) // no marker marker when no pos set yet
@@ -3774,6 +3805,7 @@ void CGame::ClientReadNet()
 					// error
 					LogObject() << "Error: Keyframe difference: " << gs->frameNum - (serverframenum - 1);
 				}
+				/* Fall through */
 			}
 			case NETMSG_NEWFRAME: {
 				timeLeft -= 1.0f;
@@ -4589,7 +4621,6 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 		return;
 	}
 
-	CScriptHandler::Instance().chosenScript->GotChatMsg(msg.msg, msg.fromPlayer);
 	string s = msg.msg;
 
 	if (!s.empty()) {

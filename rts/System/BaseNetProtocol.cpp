@@ -355,6 +355,21 @@ PacketType CBaseNetProtocol::SendSetAllied(uchar myPlayerNum, uchar whichAllyTea
 	return PacketType(packet);
 }
 
+PacketType CBaseNetProtocol::SendRegisterNetMsg( uchar myPlayerNum, NETMSG msgID )
+{
+	PackPacket* packet = new PackPacket(3, NETMSG_REGISTER_NETMSG);
+	*packet << myPlayerNum << (uchar)msgID;
+	return PacketType(packet);
+}
+
+PacketType CBaseNetProtocol::SendUnRegisterNetMsg( uchar myPlayerNum, NETMSG msgID )
+{
+	PackPacket* packet = new PackPacket(3, NETMSG_UNREGISTER_NETMSG);
+	*packet << myPlayerNum << (uchar)msgID;
+	return PacketType(packet);
+}
+
+
 #ifdef SYNCDEBUG
 PacketType CBaseNetProtocol::SendSdCheckrequest(int frameNum)
 {
@@ -447,6 +462,9 @@ CBaseNetProtocol::CBaseNetProtocol()
 	proto->AddType(NETMSG_ALLIANCE, 4);
 	proto->AddType(NETMSG_CCOMMAND, -2);
 	proto->AddType(NETMSG_TEAMSTAT, 2 + sizeof(CTeam::Statistics));
+	proto->AddType(NETMSG_REQUEST_TEAMSTAT, 4 );
+	proto->AddType(NETMSG_REGISTER_NETMSG, 3 );
+	proto->AddType(NETMSG_UNREGISTER_NETMSG, 3);
 
 	proto->AddType(NETMSG_AI_CREATED, -1);
 	proto->AddType(NETMSG_AI_STATE_CHANGED, 7);

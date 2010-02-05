@@ -27,10 +27,6 @@ using std::vector;
 
 CLogSubsystem LOG_ARCHIVESCANNER("ArchiveScanner");
 
-// fix for windows
-#ifndef S_ISDIR
-#define S_ISDIR(x) (((x) & 0170000) == 0040000) /* directory */
-#endif
 
 /*
  * The archive scanner is used to find stuff in archives that are needed before building the virtual
@@ -194,9 +190,7 @@ void CArchiveScanner::Scan(const string& curPath, bool doChecksum)
 			fullName = fullName.substr(0, fullName.size() - 1);
 		}
 
-		const string fn    = filesystem.GetFilename(fullName);
 		const string fpath = filesystem.GetDirectory(fullName);
-		const string lcfn    = StringToLower(fn);
 		const string lcfpath = StringToLower(fpath);
 
 		// Exclude archivefiles found inside directory archives (.sdd)
@@ -260,13 +254,11 @@ void AddDependency(vector<string>& deps, const std::string& dependency)
 void CArchiveScanner::ScanArchive(const string& fullName, bool doChecksum)
 {
 	struct stat info;
-
 	stat(fullName.c_str(), &info);
 
 	const string fn    = filesystem.GetFilename(fullName);
 	const string fpath = filesystem.GetDirectory(fullName);
 	const string lcfn    = StringToLower(fn);
-	const string lcfpath = StringToLower(fpath);
 
 	// Determine whether to rely on the cached info or not
 	bool cached = false;
@@ -307,6 +299,49 @@ void CArchiveScanner::ScanArchive(const string& fullName, bool doChecksum)
 
 			if(!CreateArchiveData(ar, ai))
 			{
+				const string lowerName = StringToLower(name);
+				const string ext = filesystem.GetExtension(lowerName);
+
+				if ((ext == "smf") || (ext == "sm3"))
+				{
+					mapfile = name;
+				}
+				else if (lowerName == "modinfo.lua")
+				{
+					hasModinfo = true;
+				}
+				else if (lowerName == "mapinfo.lua")
+				{
+					hasMapinfo = true;
+				}
+			}
+
+			if (hasMapinfo || !mapfile.empty())
+			{ // its a map
+				if (hasMapinfo)
+				{
+					ScanArchiveLua(ar, "mapinfo.lua", ai);
+				}
+				else if (hasModinfo) // backwards-compat for modinfo.lua in maps
+				{
+					ScanArchiveLua(ar, "modinfo.lua", ai);
+				}
+				if (ai.archiveData.name.empty())
+					ai.archiveData.name = filesystem.GetBasename(mapfile);
+				if (ai.archiveData.mapfile.empty())
+					ai.archiveData.mapfile = mapfile;
+				AddDependency(ai.archiveData.dependencies, "maphelper.sdz");
+				ai.archiveData.modType = modtype::map;
+				
+			}
+			else if (hasModinfo)
+			{ // mod
+				ScanArchiveLua(ar, "modinfo.lua", ai);
+				if (ai.archiveData.modType == modtype::primary)
+					AddDependency(ai.archiveData.dependencies, "Spring content v1");
+			}
+			else
+			{ // error
 				LogObject() << "Failed to read archive, files missing: " << fullName;
 				delete ar;
 				return;
@@ -589,12 +624,15 @@ void CArchiveScanner::WriteCacheData(const string& filename)
 
 	// First delete all outdated information
 	for (std::map<string, ArchiveInfo>::iterator i = archiveInfo.begin(); i != archiveInfo.end(); ) {
-		std::map<string, ArchiveInfo>::iterator next = i;
-		next++;
 		if (!i->second.updated) {
-			archiveInfo.erase(i);
+#ifdef _MSC_VER
+			i = archiveInfo.erase(i);
+#else
+			archiveInfo.erase(i++);
+#endif
 		}
-		i = next;
+		else
+			++i;
 	}
 
 	fprintf(out, "local archiveCache = {\n\n");
