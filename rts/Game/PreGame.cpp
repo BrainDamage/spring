@@ -357,7 +357,7 @@ void CPreGame::LoadMap(const CGameSetup* setup)
 		} else {
 			CMapGenerator* mg = new CMapGenerator();
 
-			mg->SetSeed(setup->mapgenSeed);
+			mg->SetSeed(time(0)); //setup->mapgenSeed);
 			mg->Generate();
 
 			CArchiveMemory* am = mg->CreateArchive("myarchive.sd7");
