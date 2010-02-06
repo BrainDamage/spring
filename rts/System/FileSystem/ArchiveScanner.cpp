@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <ctime>
 
 #include "mmgr.h"
 
@@ -299,49 +300,6 @@ void CArchiveScanner::ScanArchive(const string& fullName, bool doChecksum)
 
 			if(!CreateArchiveData(ar, ai))
 			{
-				const string lowerName = StringToLower(name);
-				const string ext = filesystem.GetExtension(lowerName);
-
-				if ((ext == "smf") || (ext == "sm3"))
-				{
-					mapfile = name;
-				}
-				else if (lowerName == "modinfo.lua")
-				{
-					hasModinfo = true;
-				}
-				else if (lowerName == "mapinfo.lua")
-				{
-					hasMapinfo = true;
-				}
-			}
-
-			if (hasMapinfo || !mapfile.empty())
-			{ // its a map
-				if (hasMapinfo)
-				{
-					ScanArchiveLua(ar, "mapinfo.lua", ai);
-				}
-				else if (hasModinfo) // backwards-compat for modinfo.lua in maps
-				{
-					ScanArchiveLua(ar, "modinfo.lua", ai);
-				}
-				if (ai.archiveData.name.empty())
-					ai.archiveData.name = filesystem.GetBasename(mapfile);
-				if (ai.archiveData.mapfile.empty())
-					ai.archiveData.mapfile = mapfile;
-				AddDependency(ai.archiveData.dependencies, "maphelper.sdz");
-				ai.archiveData.modType = modtype::map;
-				
-			}
-			else if (hasModinfo)
-			{ // mod
-				ScanArchiveLua(ar, "modinfo.lua", ai);
-				if (ai.archiveData.modType == modtype::primary)
-					AddDependency(ai.archiveData.dependencies, "Spring content v1");
-			}
-			else
-			{ // error
 				LogObject() << "Failed to read archive, files missing: " << fullName;
 				delete ar;
 				return;
@@ -426,7 +384,7 @@ bool CArchiveScanner::CreateArchiveData(CArchiveBase* ar, ArchiveInfo& ai)
 	for (int cur = 0; (cur = ar->FindFiles(cur, &name, &size)); /* no-op */)
 	{
 		const string lowerName = StringToLower(name);
-		const string ext = lowerName.substr(lowerName.find_last_of('.') + 1);
+		const string ext = filesystem.GetExtension(lowerName);
 
 		if ((ext == "smf") || (ext == "sm3"))
 		{
@@ -453,7 +411,7 @@ bool CArchiveScanner::CreateArchiveData(CArchiveBase* ar, ArchiveInfo& ai)
 			ScanArchiveLua(ar, "modinfo.lua", ai);
 		}
 		if (ai.archiveData.name.empty())
-			ai.archiveData.name = filesystem.GetFilename(mapfile);
+			ai.archiveData.name = filesystem.GetBasename(mapfile);
 		if (ai.archiveData.mapfile.empty())
 			ai.archiveData.mapfile = mapfile;
 		AddDependency(ai.archiveData.dependencies, "maphelper.sdz");
