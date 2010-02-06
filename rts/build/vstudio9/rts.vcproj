@@ -6495,6 +6495,14 @@
 				Name="Generated"
 				>
 				<File
+					RelativePath="..\..\Map\Generated\AdvGenerator.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\Map\Generated\AdvGenerator.h"
+					>
+				</File>
+				<File
 					RelativePath="..\..\Map\Generated\MapGenerator.cpp"
 					>
 				</File>
@@ -12971,6 +12979,14 @@
 			</File>
 			<File
 				RelativePath="..\..\Menu\LobbyConnection.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Menu\ScriptHandler.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Menu\ScriptHandler.h"
 				>
 			</File>
 			<File
