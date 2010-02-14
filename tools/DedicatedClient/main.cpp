@@ -489,7 +489,6 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 						}
 					logOutput.Print("ENDRESTRICTIONS");
 				logOutput.Print("ENDSETUP");
-				logOutput.Print("BEGINGAME");
 	}
 	else
 	{
@@ -502,7 +501,12 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 		demoRecorder->WriteSetupText(gameData->GetSetup());
 		const netcode::RawPacket* ret = gameData->Pack();
 		demoRecorder->SaveToDemo(ret->data, ret->length, modGameTime);
+		logOutput.Print("BEGINDEMO");
+			logOutput.Print("demopath=%s",demoRecorder->GetName().c_str());
+		logOutput.Print("ENDDEMO");
 	}
+
+	logOutput.Print("BEGINGAME");
 }
 
 
