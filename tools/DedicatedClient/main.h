@@ -33,6 +33,7 @@ int winner;
 int serverframenum;
 unsigned int gameStartTime;
 CDemoReader* demoReader;
+boost::scoped_ptr<CDemoRecorder> demoRecorder;
 // copypasta from globalUnsynced
 float modGameTime;
 int myPlayerNum;

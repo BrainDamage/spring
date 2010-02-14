@@ -202,6 +202,12 @@ bool UpdateClientNet()
 	while ((packet = GetData()))
 	{
 		const unsigned char* inbuf = packet->data;
+
+		if ( demoRecorder && inbuf[0] != NETMSG_TEAMSTAT )
+		{
+			demoRecorder->SaveToDemo(packet->data, packet->length, modGameTime);
+		}
+
 		switch (inbuf[0])
 		{
 			case NETMSG_GAMEDATA: // server first sends this to let us know about teams, allyteams etc.
@@ -252,13 +258,9 @@ bool UpdateClientNet()
 			case NETMSG_GAMEID:
 			{
 				const unsigned char * gameID= (unsigned char*)&inbuf[1];
-				if (!isReplay)
+				if (demoRecorder)
 				{
-					CDemoRecorder* record = net->GetDemoRecorder();
-					if (record != NULL)
-					{
-						record->SetGameID(gameID);
-					}
+					demoRecorder->SetGameID(gameID);
 				}
 				logOutput.Print(
 				  "GAMEID %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
@@ -393,12 +395,11 @@ bool UpdateClientNet()
 					break;
 				}
 				PlayerStatistics playerstats = *(PlayerStatistics*)&inbuf[2];
-				if (gameOver && !isReplay)
+				if (gameOver)
 				{
-					CDemoRecorder* record = net->GetDemoRecorder();
-					if (record != NULL)
+					if (demoRecorder)
 					{
-						record->SetPlayerStats(player, playerstats);
+						demoRecorder->SetPlayerStats(player, playerstats);
 					}
 				}
 				break;
@@ -494,10 +495,13 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 	{
 		throw content_error("Server sent us incorrect script");
 	}
-
-	if (net && net->GetDemoRecorder())
+	if (!isReplay)
 	{
-		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
+		demoRecorder.reset(new CDemoRecorder());
+		demoRecorder->SetName(gameSetup->mapName, gameSetup->modName);
+		demoRecorder->WriteSetupText(gameData->GetSetup());
+		const netcode::RawPacket* ret = gameData->Pack();
+		demoRecorder->SaveToDemo(ret->data, ret->length, modGameTime);
 	}
 }
 
@@ -505,16 +509,15 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 void GameOver()
 {
 	if (gameOver) return;
-	if (net && net->GetDemoRecorder())
+	if (demoRecorder)
 	{
-		CDemoRecorder* record = net->GetDemoRecorder();
 		int gamelenght = serverframenum / GAME_SPEED;
 		int wallclocklenght = (SDL_GetTicks()-gameStartTime)/1000;
-		record->SetTime( gamelenght, wallclocklenght);
-		record->InitializeStats(active_players.size(), teams_stats.size(), winner);
+		demoRecorder->SetTime( gamelenght, wallclocklenght);
+		demoRecorder->InitializeStats(active_players.size(), teams_stats.size(), winner);
 		for ( size_t team = 0; team < teams_stats.size(); team++ )
 		{
-			record->SetTeamStats( team, teams_stats[team] );
+			demoRecorder->SetTeamStats( team, teams_stats[team] );
 		}
 	}
 	gameOver = true;
