@@ -105,22 +105,22 @@ void CDemoRecorder::SetName(const std::string& mapname, const std::string& modna
 	// Returns the current local time as "JJJJMMDD_HHmmSS", eg: "20091231_115959"
 	const std::string curTime = CTimeUtil::GetCurrentTimeStr();
 
-	std::ostringstream demoName;
-	demoName << "demos/" << curTime << "_";
+	std::ostringstream newName;
+	newName << "demos/" << curTime << "_";
 	//if (!modname.empty())
-	//	demoName << modname << "_";
-	demoName << mapname.substr(0, mapname.find_first_of(".")) << "_" << SpringVersion::Get();
+	//	newName << modname << "_";
+	newName << mapname.substr(0, mapname.find_first_of(".")) << "_" << SpringVersion::Get();
 
 	std::ostringstream buf;
-	buf << demoName.str() << ".sdf";
+	buf << newName.str() << ".sdf";
 	#ifndef DEDICATED_CLIENT
 	CFileHandler ifs(buf.str());
 	if (ifs.FileExists()) {
 		for (int a = 0; a < 9; ++a) {
-			buf.clear();
-			buf << demoName.str() << "_" << a << ".sdf";
-			CFileHandler ifs(buf.str());
-			if (!ifs.FileExists())
+			buf.str("");
+			buf << newName.str() << "_" << a << ".sdf";
+			CFileHandler ifs2(buf.str());
+			if (!ifs2.FileExists())
 				break;
 		}
 	}
@@ -128,10 +128,10 @@ void CDemoRecorder::SetName(const std::string& mapname, const std::string& modna
 	std::ifstream ifs(buf.str().c_str());
 	if (ifs.is_open()) {
 		for (int a = 0; a < 9999; ++a) {
-			buf.clear();
-			buf << demoName.str() << "_" << a << ".sdf";
-			std::ifstream ifs(buf.str().c_str());
-			if (!ifs.is_open())
+			buf.str("");
+			buf << newName.str() << "_" << a << ".sdf";
+			std::ifstream ifs2(buf.str().c_str());
+			if (!ifs2.is_open())
 				break;
 		}
 	}
