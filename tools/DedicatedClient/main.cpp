@@ -383,8 +383,6 @@ bool UpdateClientNet()
 
 			case NETMSG_GAMEOVER:
 			{
-				logOutput.Print("GAMEOVER %d", serverframenum);
-				logOutput.Print("ENDGAME");
 				GameOver();
 			}
 
@@ -513,6 +511,8 @@ void GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 void GameOver()
 {
 	if (gameOver) return;
+	logOutput.Print("GAMEOVER %d", serverframenum);
+	logOutput.Print("ENDGAME");
 	if (demoRecorder)
 	{
 		int gamelenght = serverframenum / GAME_SPEED;
