@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
 #else
 			sleep(1);	// if so, wait 1  second
 #endif
+		logOutput.Print("ENDGAME");
 	}
 	else
 	{
@@ -512,7 +513,6 @@ void GameOver()
 {
 	if (gameOver) return;
 	logOutput.Print("GAMEOVER %d", serverframenum);
-	logOutput.Print("ENDGAME");
 	if (demoRecorder)
 	{
 		int gamelenght = serverframenum / GAME_SPEED;
