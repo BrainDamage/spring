@@ -100,12 +100,14 @@ CGlobalUnsyncedStuff::CGlobalUnsyncedStuff()
 	atiHacks = false;
 #ifndef DEDICATED_CLIENT
 	supportNPOTs = GLEW_ARB_texture_non_power_of_two;
+
 	{
-		std::string vendor = std::string((char*)glGetString(GL_VENDOR));
+		std::string vendor = std::string((char*) glGetString(GL_VENDOR));
 		StringToLowerInPlace(vendor);
-		bool isATi = (vendor.find("ati ") != string::npos);
-		if (isATi) {
-			std::string renderer = std::string((char*)glGetString(GL_RENDERER));
+		haveATI = (vendor.find("ati ") != string::npos);
+
+		if (haveATI) {
+			std::string renderer = std::string((char*) glGetString(GL_RENDERER));
 			StringToLowerInPlace(renderer);
 			supportNPOTs = (renderer.find(" x") == string::npos && renderer.find(" 9") == string::npos); //! x-series doesn't support NPOTs (but hd-series does)
 		}
@@ -119,6 +121,8 @@ CGlobalUnsyncedStuff::CGlobalUnsyncedStuff()
 CGlobalUnsyncedStuff::~CGlobalUnsyncedStuff()
 {
 }
+
+
 
 /**
  * @return unsynced random integer
