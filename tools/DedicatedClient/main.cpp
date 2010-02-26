@@ -118,9 +118,9 @@ int main(int argc, char *argv[])
 
 		while( Update() ) // don't quit as long as connection is active
 #ifdef _WIN32
-			Sleep(1000);
+			Sleep(1);
 #else
-			sleep(1);	// if so, wait 1  second
+			sleep(0.001);	// if so, wait 1 millisecond
 #endif
 		logOutput.Print("ENDGAME");
 	}
