@@ -119,12 +119,15 @@ int main(int argc, char *argv[])
 		gameStartTime = SDL_GetTicks();
 
 		while( Update() ) // don't quit as long as connection is active
+		{
 #ifdef _WIN32
 			Sleep(1);
 #else
 			usleep(1000);	// if so, wait 1 millisecond
 #endif
+		}
 		logOutput.Print("ENDGAME");
+
 	}
 	else
 	{
