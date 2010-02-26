@@ -195,6 +195,10 @@ bool UpdateClientNet()
 		{
 			return false;
 		}
+		if ( gameOver )
+		{
+			return false;
+		}
 	}
 	else
 	{
