@@ -32,6 +32,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <unistd.h>
 #endif
 
 int main(int argc, char *argv[])
@@ -120,7 +122,7 @@ int main(int argc, char *argv[])
 #ifdef _WIN32
 			Sleep(1);
 #else
-			sleep(0.001);	// if so, wait 1 millisecond
+			usleep(1000);	// if so, wait 1 millisecond
 #endif
 		logOutput.Print("ENDGAME");
 	}
