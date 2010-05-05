@@ -441,6 +441,8 @@ void CUnitDrawer::Draw(bool drawReflection, bool drawRefraction)
 	else
 #endif
 	{
+		//! note: unsorted list of 3DO and S3O units
+		//! this queues up S3O's and (cloaked) 3DO's
 		for (std::list<CUnit*>::iterator usi = uh->renderUnits.begin(); usi != uh->renderUnits.end(); ++usi) {
 			CUnit* unit = *usi;
 			DoDrawUnit(unit,drawReflection,drawRefraction, excludeUnit);
@@ -1129,7 +1131,7 @@ void CUnitDrawer::CleanUpUnitDrawing(void) const
 
 void CUnitDrawer::SetTeamColour(int team, float alpha) const
 {
-	if (advShading) {
+	if (advShading && !water->drawReflection) {
 		const unsigned char* col = teamHandler->Team(team)->color;
 
 		S3OCurShader->SetUniformTarget(GL_FRAGMENT_PROGRAM_ARB);
@@ -1149,6 +1151,7 @@ void CUnitDrawer::SetBasicTeamColour(int team, float alpha) const
 	const float texConstant[] = {col[0] / 255.0f, col[1] / 255.0f, col[2] / 255.0f, alpha};
 	const float matConstant[] = {1.0f, 1.0f, 1.0f, alpha};
 
+	glActiveTexture(GL_TEXTURE0);
 	glTexEnvfv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_COLOR, texConstant);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, matConstant);
 }
