@@ -254,7 +254,7 @@ bool UpdateClientNet()
 				modGameTime = serverframenum/(float)GAME_SPEED;
 				if (!isReplay)
 				{
-					net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
+					//net->Send(CBaseNetProtocol::Get().SendSyncResponse(serverframenum, 0));
 				}
 				break;
 			}
