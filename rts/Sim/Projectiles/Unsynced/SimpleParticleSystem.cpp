@@ -1,14 +1,16 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
-#include "Game/Camera.h"
-#include "Sim/Misc/GlobalConstants.h"
+#include "SimpleParticleSystem.h"
 #include "GenericParticleProjectile.h"
-#include "GlobalUnsynced.h"
+#include "Game/Camera.h"
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/VertexArray.h"
 #include "Rendering/Textures/ColorMap.h"
-#include "SimpleParticleSystem.h"
-#include "Sim/Projectiles/ProjectileHandler.h"
+#include "System/GlobalUnsynced.h"
+#include "System/float3.h"
 
 CR_BIND_DERIVED(CSimpleParticleSystem, CProjectile, );
 
@@ -52,19 +54,18 @@ CR_REG_METADATA_SUB(CSimpleParticleSystem, Particle,
 	CR_RESERVED(8)
 ));
 
-CSimpleParticleSystem::CSimpleParticleSystem(void)
+CSimpleParticleSystem::CSimpleParticleSystem()
 :	CProjectile()
 {
-	checkCol=false;
-	useAirLos=true;
-	particles=0;
-	emitMul = float3(1,1,1);
+	checkCol = false;
+	useAirLos = true;
+	particles = NULL;
+	emitMul = float3(1.0f, 1.0f, 1.0f);
 }
 
-CSimpleParticleSystem::~CSimpleParticleSystem(void)
+CSimpleParticleSystem::~CSimpleParticleSystem()
 {
-	if(particles)
-		delete [] particles;
+	delete[] particles;
 }
 
 void CSimpleParticleSystem::Draw()
@@ -89,7 +90,7 @@ void CSimpleParticleSystem::Draw()
 				dir1.SafeANormalize();
 
 				const float3 dir2(dif.cross(dir1));
-				const float3 interPos = p->pos + p->speed * gu->timeOffset;
+				const float3 interPos = p->pos + p->speed * globalRendering->timeOffset;
 				const float size = p->size;
 
 				unsigned char color[4];
@@ -109,7 +110,7 @@ void CSimpleParticleSystem::Draw()
 				unsigned char color[4];
 				colorMap->GetColor(color, p->life);
 
-				const float3 interPos = p->pos + p->speed * gu->timeOffset;
+				const float3 interPos = p->pos + p->speed * globalRendering->timeOffset;
 				const float3 cameraRight = camera->right * p->size;
 				const float3 cameraUp    = camera->up * p->size;
 
@@ -141,31 +142,31 @@ void CSimpleParticleSystem::Update()
 
 }
 
-void CSimpleParticleSystem::Init(const float3& explosionPos, CUnit *owner GML_PARG_C)
+void CSimpleParticleSystem::Init(const float3& explosionPos, CUnit* owner)
 {
-	CProjectile::Init(explosionPos, owner GML_PARG_P);
+	CProjectile::Init(explosionPos, owner);
 
 	particles = new Particle[numParticles];
 
 	float3 up = emitVector;
-	float3 right = up.cross(float3(up.y,up.z,-up.x));
+	float3 right = up.cross(float3(up.y, up.z, -up.x));
 	float3 forward = up.cross(right);
 
 	for(int i=0; i<numParticles; i++)
 	{
 
-		float az = gu->usRandFloat()*2*PI;
-		float ay = (emitRot + emitRotSpread*gu->usRandFloat())*(PI/180.0);
+		float az = gu->usRandFloat() * 2 * PI;
+		float ay = (emitRot + (emitRotSpread * gu->usRandFloat())) * (PI / 180.0);
 
-		particles[i].decayrate = 1.0f/(particleLife + gu->usRandFloat()*particleLifeSpread);
+		particles[i].decayrate = 1.0f / (particleLife + (gu->usRandFloat() * particleLifeSpread));
 		particles[i].life = 0;
 		particles[i].size = particleSize + gu->usRandFloat()*particleSizeSpread;
 		particles[i].pos = pos;
 
-		particles[i].speed = ((up*emitMul.y)*cos(ay)-((right*emitMul.x)*cos(az)-(forward*emitMul.z)*sin(az))*sin(ay)) * (particleSpeed + gu->usRandFloat()*particleSpeedSpread);
+		particles[i].speed = ((up * emitMul.y) * cos(ay) - ((right * emitMul.x) * cos(az) - (forward * emitMul.z) * sin(az)) * sin(ay)) * (particleSpeed + (gu->usRandFloat() * particleSpeedSpread));
 	}
 
-	drawRadius = (particleSpeed+particleSpeedSpread)*(particleLife*particleLifeSpread);
+	drawRadius = (particleSpeed + particleSpeedSpread) * (particleLife * particleLifeSpread);
 }
 
 
@@ -186,7 +187,7 @@ CSphereParticleSpawner::~CSphereParticleSpawner()
 {
 }
 
-void CSphereParticleSpawner::Init(const float3& explosionPos, CUnit* owner GML_PARG_C)
+void CSphereParticleSpawner::Init(const float3& explosionPos, CUnit* owner)
 {
 	float3 up = emitVector;
 	float3 right = up.cross(float3(up.y, up.z, -up.x));
@@ -196,7 +197,7 @@ void CSphereParticleSpawner::Init(const float3& explosionPos, CUnit* owner GML_P
 		float az = gu->usRandFloat() * 2 * PI;
 		float ay = (emitRot + emitRotSpread*gu->usRandFloat()) * (PI / 180.0);
 
-		float3 pspeed = ((up*emitMul.y)*cos(ay)-((right*emitMul.x)*cos(az)-(forward*emitMul.z)*sin(az))*sin(ay)) * (particleSpeed + gu->usRandFloat()*particleSpeedSpread);
+		float3 pspeed = ((up * emitMul.y) * cos(ay) - ((right * emitMul.x) * cos(az) - (forward * emitMul.z) * sin(az)) * sin(ay)) * (particleSpeed + (gu->usRandFloat() * particleSpeedSpread));
 
 		CGenericParticleProjectile* particle = new CGenericParticleProjectile(pos + explosionPos, pspeed, owner);
 

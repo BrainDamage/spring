@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -5,7 +7,7 @@
 
 #include "Game/Player.h"
 #include "Map/Ground.h"
-#include "Rendering/UnitModels/3DModel.h"
+#include "Rendering/Models/3DModel.h"
 #include "Sim/Misc/GeometricObjects.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/LosHandler.h"
@@ -68,7 +70,7 @@ CTAAirMoveType::CTAAirMoveType(CUnit* owner) :
 	flyState(FLY_CRUISING),
 	dontCheckCol(false),
 	bankingAllowed(true),
-
+	orgWantedHeight(0.0f),
 	circlingPos(ZeroVector),
 	goalDistance(1),
 	waitCounter(0),
@@ -328,8 +330,9 @@ void CTAAirMoveType::UpdateHovering()
 
 	// move towards goal position if it's not immediately
 	// behind us when we have more waypoints to get to
+	// *** this behavior interferes with the loading procedure of transports ***
 	if (aircraftState != AIRCRAFT_LANDING && owner->commandAI->HasMoreMoveCommands() &&
-		(l < 120) && (deltaDir.SqDistance(deltaVec) > 1.0f)) {
+		(l < 120) && (deltaDir.SqDistance(deltaVec) > 1.0f) && dynamic_cast<CTransportUnit*>(owner) == NULL) {
 		deltaDir = owner->frontdir;
 	}
 
@@ -704,7 +707,7 @@ void CTAAirMoveType::UpdateAirPhysics()
 	if (fabs(wh - h) > 2.0f) {
 		if (speed.y > ws) {
 			speed.y = std::max(ws, speed.y - accRate * 1.5f);
-		} else {
+		} else if(!owner->beingBuilt) {
 			// let them accelerate upward faster if close to ground
 			speed.y = std::min(ws, speed.y + accRate * (h < 20.0f? 2.0f: 0.7f));
 		}
@@ -759,7 +762,7 @@ void CTAAirMoveType::Update()
 
 	float3 lastSpeed = speed;
 
-	if (owner->stunned) {
+	if (owner->stunned  || owner->beingBuilt) {
 		wantedSpeed = ZeroVector;
 		UpdateAirPhysics();
 	} else {
@@ -954,16 +957,16 @@ void CTAAirMoveType::SlowUpdate(void)
 	UpdateMoveRate();
 
 	// Update LOS stuff
-	int newmapSquare = ground->GetSquare(owner->pos);
+	const int newmapSquare = ground->GetSquare(owner->pos);
 	if (newmapSquare != owner->mapSquare) {
-		owner->mapSquare = newmapSquare;
-		float oldlh = owner->losHeight;
-		float h = owner->pos.y - ground->GetApproximateHeight(owner->pos.x, owner->pos.z);
-		owner->losHeight = h + 5;
-		loshandler->MoveUnit(owner, false);
+		const float oldlh = owner->losHeight;
+		const float h = owner->pos.y - ground->GetApproximateHeight(owner->pos.x, owner->pos.z);
 
-		if (owner->hasRadarCapacity)
-			radarhandler->MoveUnit(owner);
+		owner->mapSquare = newmapSquare;
+		owner->losHeight = h + 5;
+
+		loshandler->MoveUnit(owner, false);
+		radarhandler->MoveUnit(owner);
 
 		owner->losHeight = oldlh;
 	}

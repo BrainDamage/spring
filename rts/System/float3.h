@@ -1,9 +1,5 @@
-/**
- * @file float3.h
- * @brief float3 header
- *
- * Declaration of float3 class
- */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef FLOAT3_H
 #define FLOAT3_H
 
@@ -90,18 +86,18 @@ public:
 	 */
 	inline ~float3() {}
 
-
 	/**
 	 * @brief operator =
 	 * @param f float[3] to assign
 	 *
 	 * Sets the float3 to the given float[3].
 	 */
-	inline void operator= (const float f[3]) {
-
+	inline float3& operator= (const float f[3]) {
 		x = f[0];
 		y = f[1];
 		z = f[2];
+
+		return *this;
 	}
 
 
@@ -606,17 +602,17 @@ public:
  * @brief upwards vector
  *
  * Defines constant upwards vector
- * (0,1,0)
+ * (0, 1, 0)
  */
-const float3 UpVector(0,1,0);
+const float3 UpVector(0.0f, 1.0f, 0.0f);
 
 /**
  * @brief zero vector
  *
  * Defines constant zero vector
- * (0,0,0)
+ * (0, 0, 0)
  */
-const float3 ZeroVector(0,0,0);
+const float3 ZeroVector(0.0f, 0.0f, 0.0f);
 
 
 #endif /* FLOAT3_H */

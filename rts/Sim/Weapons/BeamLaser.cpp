@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "BeamLaser.h"
 #include "Game/GameHelper.h"
@@ -29,6 +31,7 @@ CR_REG_METADATA(CBeamLaser,(
 CBeamLaser::CBeamLaser(CUnit* owner)
 : CWeapon(owner),
 	oldDir(ZeroVector),
+	damageMul(0),
 	lastFireFrame(0)
 {
 }
@@ -53,7 +56,7 @@ void CBeamLaser::Update(void)
 
 		if (!onlyForward) {
 			wantedDir = targetPos - weaponPos;
-			wantedDir.ANormalize();
+			wantedDir.Normalize();
 		}
 
 		if (!weaponDef->beamburst) {
@@ -122,7 +125,9 @@ bool CBeamLaser::TryTarget(const float3& pos, bool userTarget, CUnit* unit)
 			return false;
 	}
 
-	float spread = (accuracy + sprayAngle) * (1 - owner->limExperience * 0.7f);
+	const float spread =
+		(accuracy + sprayAngle) *
+		(1.0f - owner->limExperience * weaponDef->ownerExpAccWeight);
 
 	if (avoidFeature && helper->LineFeatureCol(weaponMuzzlePos, dir, length)) {
 		return false;
@@ -167,18 +172,18 @@ void CBeamLaser::FireImpl(void)
 	} else {
 		if (salvoLeft == salvoSize - 1) {
 			dir = targetPos - weaponMuzzlePos;
-			dir.ANormalize();
+			dir.Normalize();
 			oldDir = dir;
 		} else if (weaponDef->beamburst) {
-			dir = targetPos-weaponMuzzlePos;
-			dir.ANormalize();
+			dir = targetPos - weaponMuzzlePos;
+			dir.Normalize();
 		} else {
 			dir = oldDir;
 		}
 	}
 
-	dir += (salvoError) * (1 - owner->limExperience * 0.7f);
-	dir.ANormalize();
+	dir += ((salvoError) * (1.0f - owner->limExperience * weaponDef->ownerExpAccWeight));
+	dir.Normalize();
 
 	FireInternal(dir, false);
 }
@@ -202,8 +207,10 @@ void CBeamLaser::FireInternal(float3 dir, bool sweepFire)
 	float3 curPos = weaponMuzzlePos;
 	float3 hitPos;
 
-	dir += gs->randVector() * sprayAngle * (1 - owner->limExperience * 0.7f);
-	dir.ANormalize();
+	dir +=
+		((gs->randVector() * sprayAngle *
+		(1.0f - owner->limExperience * weaponDef->ownerExpAccWeight)));
+	dir.Normalize();
 
 	bool tryAgain = true;
 
@@ -212,7 +219,7 @@ void CBeamLaser::FireInternal(float3 dir, bool sweepFire)
 		// const float3 up(0, owner->radius*cylinderTargetting, 0);
 		// const float uplen = up.dot(dir);
 		const float uplen = owner->radius * cylinderTargetting * dir.y;
-		maxLength = streflop::sqrtf(maxLength * maxLength + uplen * uplen);
+		maxLength = math::sqrt(maxLength * maxLength + uplen * uplen);
 	}
 
 	// increase range if targetting edge of hitsphere
@@ -301,7 +308,7 @@ void CBeamLaser::FireInternal(float3 dir, bool sweepFire)
 	}
 
 	// make it possible to always hit with some minimal intensity (melee weapons have use for that)
-	const float intensity = std::max(minIntensity, 1.0f - (curLength) / (actualRange * 2));
+	const float hitIntensity = std::max(minIntensity, 1.0f - (curLength) / (actualRange * 2));
 
 	if (curLength < maxLength) {
 		// Dynamic Damage
@@ -324,8 +331,8 @@ void CBeamLaser::FireInternal(float3 dir, bool sweepFire)
 		helper->Explosion(
 			hitPos,
 			weaponDef->dynDamageExp > 0?
-				dynDamages * (intensity * damageMul):
-				weaponDef->damages * (intensity * damageMul),
+				dynDamages * (hitIntensity * damageMul):
+				weaponDef->damages * (hitIntensity * damageMul),
 			areaOfEffect,
 			weaponDef->edgeEffectiveness,
 			weaponDef->explosionSpeed,

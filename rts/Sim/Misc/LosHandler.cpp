@@ -1,11 +1,11 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LosHandler.cpp: implementation of the CLosHandler class.
-//
-//////////////////////////////////////////////////////////////////////
+#include "mmgr.h"
+
 #include <list>
 #include <cstdlib>
 #include <cstring>
-#include "mmgr.h"
 
 #include "LosHandler.h"
 
@@ -15,7 +15,6 @@
 #include "Map/ReadMap.h"
 #include "TimeProfiler.h"
 #include "LogOutput.h"
-#include "Platform/errorhandler.h"
 #include "creg/STL_Deque.h"
 #include "creg/STL_List.h"
 

@@ -32,6 +32,9 @@
 #include "System/Info.h"
 #include "System/Option.h"
 
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 // unitsync only:
 #include "LuaParserAPI.h"
@@ -140,7 +143,7 @@ class ScopedMapLoader {
 			}
 
 			vfsHandler = new CVFSHandler();
-			vfsHandler->AddMapArchiveWithDeps(mapName, false);
+			vfsHandler->AddArchiveWithDeps(mapName, false);
 		}
 
 		~ScopedMapLoader()
@@ -212,8 +215,12 @@ EXPORT(const char*) GetSpringVersion()
 }
 
 
+static void internal_deleteMapInfos();
+
 static void _UnInit()
 {
+	internal_deleteMapInfos();
+
 	lpClose();
 
 	FileSystemHandler::Cleanup();
@@ -447,12 +454,7 @@ EXPORT(void) AddAllArchives(const char* root)
 	try {
 		CheckInit();
 		CheckNullOrEmpty(root);
-
-		vector<string> ars = archiveScanner->GetArchives(root);
-		for (vector<string>::iterator i = ars.begin(); i != ars.end(); ++i) {
-			logOutput.Print(LOG_UNITSYNC, "adding archive: %s\n", i->c_str());
-			vfsHandler->AddArchive(*i, false);
-		}
+		vfsHandler->AddArchiveWithDeps(root, false);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 }
@@ -493,7 +495,7 @@ EXPORT(unsigned int) GetArchiveChecksum(const char* arname)
 		CheckNullOrEmpty(arname);
 
 		logOutput.Print(LOG_UNITSYNC, "archive checksum: %s\n", arname);
-		return archiveScanner->GetArchiveChecksum(arname);
+		return archiveScanner->GetSingleArchiveChecksum(arname);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -518,71 +520,6 @@ EXPORT(const char*) GetArchivePath(const char* arname)
 }
 
 
-// Updated on every call to GetMapCount
-static vector<string> mapNames;
-
-
-/**
- * @brief Get the number of maps available
- * @return Zero on error; the number of maps available on success
- *
- * Call this before any of the map functions which take a map index as parameter.
- * This function actually performs a relatively costly enumeration of all maps,
- * so you should resist from calling it repeatedly in a loop.  Rather use:
- *		@code
- *		int map_count = GetMapCount();
- *		for (int index = 0; index < map_count; ++index) {
- *			printf("map name: %s\n", GetMapName(index));
- *		}
- *		@endcode
- * Then:
- *		@code
- *		for (int index = 0; index < GetMapCount(); ++index) { ... }
- *		@endcode
- */
-EXPORT(int) GetMapCount()
-{
-	try {
-		CheckInit();
-
-		//vector<string> files = CFileHandler::FindFiles("{maps/*.smf,maps/*.sm3}");
-		vector<string> files = CFileHandler::FindFiles("maps/", "{*.smf,*.sm3}");
-		vector<string> ars = archiveScanner->GetMaps();
-
-		mapNames.clear();
-		for (vector<string>::iterator i = files.begin(); i != files.end(); ++i) {
-			string mn = *i;
-			mn = mn.substr(mn.find_last_of('/') + 1);
-			mapNames.push_back(mn);
-		}
-		for (vector<string>::iterator i = ars.begin(); i != ars.end(); ++i)
-			mapNames.push_back(*i);
-		sort(mapNames.begin(), mapNames.end());
-
-		return mapNames.size();
-	}
-	UNITSYNC_CATCH_BLOCKS;
-	return 0;
-}
-
-
-/**
- * @brief Get the name of a map
- * @return NULL on error; the name of the map (e.g. "SmallDivide.smf") on success
- */
-EXPORT(const char*) GetMapName(int index)
-{
-	try {
-		CheckInit();
-		CheckBounds(index, mapNames.size());
-
-		return GetStr(mapNames[index]);
-	}
-	UNITSYNC_CATCH_BLOCKS;
-	return NULL;
-}
-
-
 static void safe_strzcpy(char* dst, std::string src, size_t max)
 {
 	if (src.length() > max-1) {
@@ -600,8 +537,8 @@ static int _GetMapInfoEx(const char* name, MapInfo* outInfo, int version)
 
 	logOutput.Print(LOG_UNITSYNC, "get map info: %s", name);
 
-	const string mapName = name;
-	ScopedMapLoader mapLoader(mapName);
+	ScopedMapLoader mapLoader(name);
+	const string mapName = archiveScanner->MapNameToMapFile(name);
 
 	string err("");
 
@@ -616,7 +553,7 @@ static int _GetMapInfoEx(const char* name, MapInfo* outInfo, int version)
 		const string extension = mapName.substr(mapName.length() - 3);
 		if (extension == "smf") {
 			try {
-				CSmfMapFile file(name);
+				CSmfMapFile file(mapName);
 				const SMFHeader& mh = file.GetHeader();
 
 				outInfo->width  = mh.mapx * SQUARE_SIZE;
@@ -697,6 +634,7 @@ static int _GetMapInfoEx(const char* name, MapInfo* outInfo, int version)
  * @param outInfo pointer to structure which is filled with map info
  * @param version this determines which fields of the MapInfo structure are filled
  * @return Zero on error; non-zero on success
+ * @deprecated
  *
  * If version >= 1, then the author field is filled.
  *
@@ -737,6 +675,7 @@ EXPORT(int) GetMapInfoEx(const char* name, MapInfo* outInfo, int version)
  * @param outInfo pointer to structure which is filled with map info
  * @return Zero on error; non-zero on success
  * @see GetMapInfoEx
+ * @deprecated
  */
 EXPORT(int) GetMapInfo(const char* name, MapInfo* outInfo)
 {
@@ -748,6 +687,327 @@ EXPORT(int) GetMapInfo(const char* name, MapInfo* outInfo)
 }
 
 
+// Updated on every call to GetMapCount
+static vector<string> mapNames;
+
+
+/**
+ * @brief Get the number of maps available
+ * @return Zero on error; the number of maps available on success
+ *
+ * Call this before any of the map functions which take a map index as parameter.
+ * This function actually performs a relatively costly enumeration of all maps,
+ * so you should resist from calling it repeatedly in a loop.  Rather use:
+ *		@code
+ *		int map_count = GetMapCount();
+ *		for (int index = 0; index < map_count; ++index) {
+ *			printf("map name: %s\n", GetMapName(index));
+ *		}
+ *		@endcode
+ * Then:
+ *		@code
+ *		for (int index = 0; index < GetMapCount(); ++index) { ... }
+ *		@endcode
+ */
+EXPORT(int) GetMapCount()
+{
+	try {
+		CheckInit();
+
+		//vector<string> files = CFileHandler::FindFiles("{maps/*.smf,maps/*.sm3}");
+		vector<string> files = CFileHandler::FindFiles("maps/", "{*.smf,*.sm3}");
+		vector<string> ars = archiveScanner->GetMaps();
+
+		mapNames.clear();
+		for (vector<string>::iterator i = files.begin(); i != files.end(); ++i) {
+			string mn = *i;
+			mn = mn.substr(mn.find_last_of('/') + 1);
+			mapNames.push_back(mn);
+		}
+		for (vector<string>::iterator i = ars.begin(); i != ars.end(); ++i)
+			mapNames.push_back(*i);
+		sort(mapNames.begin(), mapNames.end());
+
+		return mapNames.size();
+	}
+	UNITSYNC_CATCH_BLOCKS;
+	return 0;
+}
+
+
+/**
+ * @brief Get the name of a map
+ * @return NULL on error; the name of the map (e.g. "SmallDivide.smf") on success
+ */
+EXPORT(const char*) GetMapName(int index)
+{
+	try {
+		CheckInit();
+		CheckBounds(index, mapNames.size());
+
+		return GetStr(mapNames[index]);
+	}
+	UNITSYNC_CATCH_BLOCKS;
+	return NULL;
+}
+
+
+static std::map<int, MapInfo> mapInfos;
+
+static MapInfo* internal_getMapInfo(int index) {
+
+	if (index >= mapNames.size()) {
+		SetLastError("invalid map index");
+	} else {
+		if (mapInfos.find(index) == mapInfos.end()) {
+			try {
+				MapInfo mi;
+				mi.description = new char[255];
+				mi.author  = new char[200];
+				if (_GetMapInfoEx(mapNames[index].c_str(), &mi, 1) != 0) {
+					mapInfos[index] = mi;
+					return &(mapInfos[index]);
+				} else {
+					delete [] mi.description;
+					delete [] mi.author;
+				}
+			}
+			UNITSYNC_CATCH_BLOCKS;
+		} else {
+			return &(mapInfos[index]);
+		}
+	}
+
+	return NULL;
+}
+
+static void internal_deleteMapInfos() {
+
+	while (!mapInfos.empty()) {
+		std::map<int, MapInfo>::iterator mi = mapInfos.begin();
+		delete [] mi->second.description;
+		delete [] mi->second.author;
+		mapInfos.erase(mi);
+	}
+}
+
+/**
+ * @brief Get the description of a map
+ * @return NULL on error; the description of the map
+ *         (e.g. "Lot of metal in middle") on success
+ */
+EXPORT(const char*) GetMapDescription(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->description;
+	}
+
+	return NULL;
+}
+
+/**
+ * @brief Get the name of the author of a map
+ * @return NULL on error; the name of the author of a map on success
+ */
+EXPORT(const char*) GetMapAuthor(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->author;
+	}
+
+	return NULL;
+}
+
+/**
+ * @brief Get the width of a map
+ * @return -1 on error; the width of a map
+ */
+EXPORT(int) GetMapWidth(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->width;
+	}
+
+	return -1;
+}
+
+/**
+ * @brief Get the height of a map
+ * @return -1 on error; the height of a map
+ */
+EXPORT(int) GetMapHeight(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->height;
+	}
+
+	return -1;
+}
+
+/**
+ * @brief Get the tidal speed of a map
+ * @return -1 on error; the tidal speed of the map on success
+ */
+EXPORT(int) GetMapTidalStrength(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->tidalStrength;
+	}
+
+	return -1;
+}
+
+/**
+ * @brief Get the minimum wind speed on a map
+ * @return -1 on error; the minimum wind speed on a map
+ */
+EXPORT(int) GetMapWindMin(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->minWind;
+	}
+
+	return -1;
+}
+
+/**
+ * @brief Get the maximum wind strenght on a map
+ * @return -1 on error; the maximum wind strenght on a map
+ */
+EXPORT(int) GetMapWindMax(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->maxWind;
+	}
+
+	return -1;
+}
+
+/**
+ * @brief Get the gravity of a map
+ * @return -1 on error; the gravity of the map on success
+ */
+EXPORT(int) GetMapGravity(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->gravity;
+	}
+
+	return -1;
+}
+
+/**
+ * @brief Get the number of resources supported available
+ * @return -1 on error; the number of resources supported available on success
+ */
+EXPORT(int) GetMapResourceCount(int index) {
+	return 1;
+}
+
+/**
+ * @brief Get the name of a map resource
+ * @return NULL on error; the name of a map resource (e.g. "Metal") on success
+ */
+EXPORT(const char*) GetMapResourceName(int index, int resourceIndex) {
+
+	if (resourceIndex == 0) {
+		return "Metal";
+	} else {
+		SetLastError("No valid map resource index");
+	}
+
+	return NULL;
+}
+
+/**
+ * @brief Get the scale factor of a resource map
+ * @return 0.0f on error; the scale factor of a resource map on success
+ */
+EXPORT(float) GetMapResourceMax(int index, int resourceIndex) {
+
+	if (resourceIndex == 0) {
+		const MapInfo* mapInfo = internal_getMapInfo(index);
+		if (mapInfo) {
+			return mapInfo->maxMetal;
+		}
+	} else {
+		SetLastError("No valid map resource index");
+	}
+
+	return 0.0f;
+}
+
+/**
+ * @brief Get the extractor radius for a map resource
+ * @return -1 on error; the extractor radius for a map resource on success
+ */
+EXPORT(int) GetMapResourceExtractorRadius(int index, int resourceIndex) {
+
+	if (resourceIndex == 0) {
+		const MapInfo* mapInfo = internal_getMapInfo(index);
+		if (mapInfo) {
+			return mapInfo->extractorRadius;
+		}
+	} else {
+		SetLastError("No valid map resource index");
+	}
+
+	return -1;
+}
+
+
+/**
+ * @brief Get the number of defined start positions for a map
+ * @return -1 on error; the number of defined start positions for a map
+ *         on success
+ */
+EXPORT(int) GetMapPosCount(int index) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->posCount;
+	}
+
+	return -1;
+}
+
+/**
+ * @brief Get the position on the x-axis for a start position on a map
+ * @return -1.0f on error; the position on the x-axis for a start position
+ *         on a map on success
+ */
+EXPORT(float) GetMapPosX(int index, int posIndex) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->positions[posIndex].x;
+	}
+
+	return -1.0f;
+}
+
+/**
+ * @brief Get the position on the z-axis for a start position on a map
+ * @return -1.0f on error; the position on the z-axis for a start position
+ *         on a map on success
+ */
+EXPORT(float) GetMapPosZ(int index, int posIndex) {
+
+	const MapInfo* mapInfo = internal_getMapInfo(index);
+	if (mapInfo) {
+		return mapInfo->positions[posIndex].z;
+	}
+
+	return -1.0f;
+}
 
 /**
  * @brief return the map's minimum height
@@ -829,7 +1089,7 @@ EXPORT(int) GetMapArchiveCount(const char* mapName)
 		CheckInit();
 		CheckNullOrEmpty(mapName);
 
-		mapArchives = archiveScanner->GetArchivesForMap(mapName);
+		mapArchives = archiveScanner->GetArchives(mapName);
 		return mapArchives.size();
 	}
 	UNITSYNC_CATCH_BLOCKS;
@@ -871,7 +1131,7 @@ EXPORT(unsigned int) GetMapChecksum(int index)
 		CheckInit();
 		CheckBounds(index, mapNames.size());
 
-		return archiveScanner->GetMapChecksum(mapNames[index]);
+		return archiveScanner->GetArchiveCompleteChecksum(mapNames[index]);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -889,7 +1149,7 @@ EXPORT(unsigned int) GetMapChecksumFromName(const char* mapName)
 	try {
 		CheckInit();
 
-		return archiveScanner->GetMapChecksum(mapName);
+		return archiveScanner->GetArchiveCompleteChecksum(mapName);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -906,9 +1166,9 @@ EXPORT(unsigned int) GetMapChecksumFromName(const char* mapName)
 #define PACKRGB(r, g, b) (((r<<11)&RM) | ((g << 5)&GM) | (b&BM) )
 
 // Used to return the image
-static char* imgbuf[1024*1024*2];
+static unsigned short imgbuf[1024*1024];
 
-static void* GetMinimapSM3(string mapName, int miplevel)
+static unsigned short* GetMinimapSM3(string mapName, int miplevel)
 {
 	MapParser mapParser(mapName);
 	const string minimapFile = mapParser.GetRoot().GetString("minimap", "");
@@ -927,11 +1187,10 @@ static void* GetMinimapSM3(string mapName, int miplevel)
 	if (1024 >> miplevel != bm.xsize || 1024 >> miplevel != bm.ysize)
 		bm = bm.CreateRescaled (1024 >> miplevel, 1024 >> miplevel);
 
-	unsigned short *dst = (unsigned short*)imgbuf;
-	unsigned char *src = bm.mem;
-	for (int y=0;y<bm.ysize;y++)
-		for (int x=0;x<bm.xsize;x++)
-		{
+	unsigned short* dst = (unsigned short*)imgbuf;
+	unsigned char* src = bm.mem;
+	for (int y=0; y < bm.ysize; y++) {
+		for (int x=0; x < bm.xsize; x++) {
 			*dst = 0;
 
 			*dst |= ((src[0]>>3) << 11) & RM;
@@ -941,19 +1200,19 @@ static void* GetMinimapSM3(string mapName, int miplevel)
 			dst ++;
 			src += 4;
 		}
+	}
 
 	return imgbuf;
 }
 
-static void* GetMinimapSMF(string mapName, int miplevel)
+static unsigned short* GetMinimapSMF(string mapName, int miplevel)
 {
 	CSmfMapFile in(mapName);
 	std::vector<uint8_t> buffer;
 	const int mipsize = in.ReadMinimap(buffer, miplevel);
 
 	// Do stuff
-	void* ret = (void*)imgbuf;
-	unsigned short* colors = (unsigned short*)ret;
+	unsigned short* colors = (unsigned short*)((void*)imgbuf);
 
 	unsigned char* temp = &buffer[0];
 
@@ -1002,7 +1261,8 @@ static void* GetMinimapSMF(string mapName, int miplevel)
 		}
 		temp += 8;
 	}
-	return (void*)ret;
+
+	return colors;
 }
 
 /**
@@ -1019,7 +1279,7 @@ static void* GetMinimapSMF(string mapName, int miplevel)
  * An example usage would be GetMinimap("SmallDivide.smf", 2).
  * This would return a 16 bit packed RGB-565 256x256 (= 1024/2^2) bitmap.
  */
-EXPORT(void*) GetMinimap(const char* filename, int miplevel)
+EXPORT(unsigned short*) GetMinimap(const char* filename, int miplevel)
 {
 	try {
 		CheckInit();
@@ -1028,12 +1288,12 @@ EXPORT(void*) GetMinimap(const char* filename, int miplevel)
 		if (miplevel < 0 || miplevel > 8)
 			throw std::out_of_range("Miplevel must be between 0 and 8 (inclusive) in GetMinimap.");
 
-		const string mapName = filename;
-		ScopedMapLoader mapLoader(mapName);
+		ScopedMapLoader mapLoader(filename);
+		const string mapName = archiveScanner->MapNameToMapFile(filename);
 
 		const string extension = mapName.substr(mapName.length() - 3);
 
-		void* ret = NULL;
+		unsigned short* ret = NULL;
 
 		if (extension == "smf") {
 			ret = GetMinimapSMF(mapName, miplevel);
@@ -1067,7 +1327,7 @@ EXPORT(int) GetInfoMapSize(const char* filename, const char* name, int* width, i
 		CheckNull(height);
 
 		ScopedMapLoader mapLoader(filename);
-		CSmfMapFile file(filename);
+		CSmfMapFile file(archiveScanner->MapNameToMapFile(filename));
 		MapBitmapInfo bmInfo = file.GetInfoMapSize(name);
 
 		*width = bmInfo.width;
@@ -1100,7 +1360,7 @@ EXPORT(int) GetInfoMapSize(const char* filename, const char* name, int* width, i
  * this function to convert from one format to another. Currently only the
  * conversion from 16 bpp to 8 bpp is implemented.
  */
-EXPORT(int) GetInfoMap(const char* filename, const char* name, void* data, int typeHint)
+EXPORT(int) GetInfoMap(const char* filename, const char* name, unsigned char* data, int typeHint)
 {
 	try {
 		CheckInit();
@@ -1110,7 +1370,7 @@ EXPORT(int) GetInfoMap(const char* filename, const char* name, void* data, int t
 
 		string n = name;
 		ScopedMapLoader mapLoader(filename);
-		CSmfMapFile file(filename);
+		CSmfMapFile file(archiveScanner->MapNameToMapFile(filename));
 		int actualType = (n == "height" ? bm_grayscale_16 : bm_grayscale_8);
 
 		if (actualType == typeHint) {
@@ -1130,7 +1390,7 @@ EXPORT(int) GetInfoMap(const char* filename, const char* name, void* data, int t
 
 			const unsigned short* inp = temp;
 			const unsigned short* inp_end = temp + size;
-			unsigned char* outp = (unsigned char*) data;
+			unsigned char* outp = data;
 			for (; inp < inp_end; ++inp, ++outp) {
 				*outp = *inp >> 8;
 			}
@@ -1149,7 +1409,7 @@ EXPORT(int) GetInfoMap(const char* filename, const char* name, void* data, int t
 //////////////////////////
 //////////////////////////
 
-vector<CArchiveScanner::ModData> modData;
+vector<CArchiveScanner::ArchiveData> modData;
 
 
 /**
@@ -1432,7 +1692,7 @@ EXPORT(unsigned int) GetPrimaryModChecksum(int index)
 		CheckInit();
 		CheckBounds(index, modData.size());
 
-		return archiveScanner->GetModChecksum(GetPrimaryModArchive(index));
+		return archiveScanner->GetArchiveCompleteChecksum(GetPrimaryModArchive(index));
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -1450,7 +1710,7 @@ EXPORT(unsigned int) GetPrimaryModChecksumFromName(const char* name)
 	try {
 		CheckInit();
 
-		return archiveScanner->GetModChecksum(archiveScanner->ModNameToModArchive(name));
+		return archiveScanner->GetArchiveCompleteChecksum(archiveScanner->ArchiveFromName(name));
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -2462,7 +2722,7 @@ EXPORT(void) CloseFileVFS(int handle)
  * @return -1 on error; the number of bytes read on success
  * (if this is less than length you reached the end of the file.)
  */
-EXPORT(int) ReadFileVFS(int handle, void* buf, int length)
+EXPORT(int) ReadFileVFS(int handle, unsigned char* buf, int length)
 {
 	try {
 		CheckFileHandle(handle);
@@ -2671,7 +2931,6 @@ EXPORT(void) CloseArchive(int archive)
 	UNITSYNC_CATCH_BLOCKS;
 }
 
-
 EXPORT(int) FindFilesArchive(int archive, int cur, char* nameBuf, int* size)
 {
 	try {
@@ -2683,13 +2942,16 @@ EXPORT(int) FindFilesArchive(int archive, int cur, char* nameBuf, int* size)
 
 		logOutput.Print(LOG_UNITSYNC, "findfilesarchive: %d\n", archive);
 
-		string name;
-		int s;
-
-		int ret = a->FindFiles(cur, &name, &s);
-		strcpy(nameBuf, name.c_str()); // FIXME: oops, buffer overflow
-		*size = s;
-		return ret;
+		if (cur < a->NumFiles())
+		{
+			string name;
+			int s;
+			a->FileInfo(cur, name, s);
+			strcpy(nameBuf, name.c_str()); // FIXME: oops, buffer overflow
+			*size = s;
+			return ++cur;
+		}
+		return 0;
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -2712,7 +2974,7 @@ EXPORT(int) OpenArchiveFile(int archive, const char* name)
 		CheckNullOrEmpty(name);
 
 		CArchiveBase* a = openArchives[archive];
-		return a->OpenFile(name);
+		return a->FindFile(name);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return 0;
@@ -2728,7 +2990,7 @@ EXPORT(int) OpenArchiveFile(int archive, const char* name)
  * @return -1 on error; the number of bytes read on success
  * (if this is less than numBytes you reached the end of the file.)
  */
-EXPORT(int) ReadArchiveFile(int archive, int handle, void* buffer, int numBytes)
+EXPORT(int) ReadArchiveFile(int archive, int handle, unsigned char* buffer, int numBytes)
 {
 	try {
 		CheckArchiveHandle(archive);
@@ -2736,7 +2998,11 @@ EXPORT(int) ReadArchiveFile(int archive, int handle, void* buffer, int numBytes)
 		CheckPositive(numBytes);
 
 		CArchiveBase* a = openArchives[archive];
-		return a->ReadFile(handle, buffer, numBytes);
+		std::vector<uint8_t> buf;
+		if (!a->GetFile(handle, buf))
+			return -1;
+		std::memcpy(buffer, &buf[0], std::min(buf.size(), (size_t)numBytes));
+		return std::min(buf.size(), (size_t)numBytes);
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return -1;
@@ -2751,10 +3017,7 @@ EXPORT(int) ReadArchiveFile(int archive, int handle, void* buffer, int numBytes)
 EXPORT(void) CloseArchiveFile(int archive, int handle)
 {
 	try {
-		CheckArchiveHandle(archive);
-
-		CArchiveBase* a = openArchives[archive];
-		a->CloseFile(handle);
+		// nuting
 	}
 	UNITSYNC_CATCH_BLOCKS;
 }
@@ -2772,7 +3035,10 @@ EXPORT(int) SizeArchiveFile(int archive, int handle)
 		CheckArchiveHandle(archive);
 
 		CArchiveBase* a = openArchives[archive];
-		return a->FileSize(handle);
+		string name;
+		int s;
+		a->FileInfo(handle, name, s);
+		return s;
 	}
 	UNITSYNC_CATCH_BLOCKS;
 	return -1;
@@ -2789,7 +3055,7 @@ const char *GetStr(string str)
 	//static char strBuf[STRBUF_SIZE];
 
 	if (str.length() + 1 > STRBUF_SIZE) {
-		sprintf(strBuf, "Increase STRBUF_SIZE (needs %d bytes)", str.length() + 1);
+		sprintf(strBuf, "Increase STRBUF_SIZE (needs "_STPF_" bytes)", str.length() + 1);
 	}
 	else {
 		strcpy(strBuf, str.c_str());

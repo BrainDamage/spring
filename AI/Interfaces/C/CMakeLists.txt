@@ -76,6 +76,10 @@ else  ("${AI_TYPES}" STREQUAL "ALL" OR "${AI_TYPES}" STREQUAL "NATIVE")
 	set(AI_TYPES_NATIVE FALSE)
 endif ("${AI_TYPES}" STREQUAL "ALL" OR "${AI_TYPES}" STREQUAL "NATIVE")
 
+if    (AI_TYPES_NATIVE AND myName MATCHES "${AI_EXCLUDE_REGEX}")
+	set(AI_TYPES_NATIVE FALSE)
+endif (AI_TYPES_NATIVE AND myName MATCHES "${AI_EXCLUDE_REGEX}")
+
 
 # Check dependencies of the interface are met
 if    (AI_TYPES_NATIVE)

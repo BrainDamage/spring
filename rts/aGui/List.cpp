@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "List.h"
 
@@ -5,6 +7,7 @@
 #include <SDL_mouse.h>
 #include <SDL_timer.h>
 
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/myGL.h"
 #include "Game/UI/MouseHandler.h"
 #include "Gui.h"
@@ -28,6 +31,8 @@ List::List(GuiElement* parent) :
 		clickedTime(SDL_GetTicks()),
 		place(0),
 		activeMousePress(false),
+		activeScrollbar(false),
+		scrollbarGrabPos(0.0f),
 		filteredItems(&items)
 {
 	borderSpacing = 0.005f;
@@ -121,11 +126,14 @@ void List::MouseMove(int x, int y, int dx,int dy, int button)
 
 void List::MouseRelease(int x, int y, int button)
 {
-	activeMousePress = false;
+	if(button & SDL_BUTTON_LEFT) {
+		activeMousePress = false;
+		activeScrollbar = false;
+	}
 }
 
 float List::ScaleFactor() {
-	return (float)std::max(1, gu->winSizeY) * (size[1] - 2.0f * borderSpacing);
+	return (float)std::max(1, globalRendering->winSizeY) * (size[1] - 2.0f * borderSpacing);
 }
 
 void List::UpdateTopIndex()
@@ -143,7 +151,7 @@ bool List::MouseUpdate(int x, int y)
 
 	GuiElement b;
 	b.SetPos(pos[0] + borderSpacing, pos[1] + size[1] - borderSpacing - itemHeight);
-	b.SetSize(size[0] - 2.0f * borderSpacing, itemHeight);
+	b.SetSize(size[0] - 2.0f * borderSpacing - ((scrollbar.GetSize()[0] < 0) ? 0 : (itemHeight + itemSpacing)), itemHeight);
 	
 	// Get list started up here
 	std::vector<std::string>::iterator ii = filteredItems->begin();
@@ -152,6 +160,9 @@ bool List::MouseUpdate(int x, int y)
 	while (nCurIndex < topIndex) { ii++; nCurIndex++; }
 
 	const int numDisplay = NumDisplay();
+
+	float sbX = b.GetPos()[0];
+	float sbY1 = b.GetPos()[1] + (itemHeight + itemSpacing);
 
 	for (/*ii = items.begin()*/; ii != filteredItems->end() && nDrawOffset < numDisplay; ii++)
 	{
@@ -170,6 +181,27 @@ bool List::MouseUpdate(int x, int y)
 		nCurIndex++; nDrawOffset++;
 		b.Move(0.0,  - (itemHeight + itemSpacing));
 	}
+
+	if(nDrawOffset < filteredItems->size()) {
+		if (scrollbar.MouseOver(mx, my)) {
+			activeScrollbar = true;
+			scrollbarGrabPos = my - scrollbar.GetPos()[1];
+		}
+		else {
+			float sbY2 = b.GetPos()[1] + (itemHeight + itemSpacing);
+			float sbHeight = sbY1 - sbY2;
+
+			b.SetPos(sbX + (size[0] - 2.0f * borderSpacing) - (itemHeight + itemSpacing), sbY2);
+			b.SetSize(itemHeight + itemSpacing, sbHeight);
+			if (b.MouseOver(mx, my)) {
+				if(my > scrollbar.GetPos()[1] + scrollbar.GetSize()[1])
+					topIndex = std::max(0, std::min(topIndex - NumDisplay(), (int)filteredItems->size() - NumDisplay()));
+				else if(my < scrollbar.GetPos()[1])
+					topIndex = std::max(0, std::min(topIndex + NumDisplay(), (int)filteredItems->size() - NumDisplay()));
+			}
+		}
+	}
+
 	return false;
 }
 
@@ -186,7 +218,7 @@ void List::DrawSelf()
 
 	GuiElement b;
 	b.SetPos(pos[0] + borderSpacing, pos[1] + size[1] - borderSpacing - itemHeight);
-	b.SetSize(size[0] - 2.0f * borderSpacing, itemHeight);
+	b.SetSize(size[0] - 2.0f * borderSpacing - ((scrollbar.GetSize()[0] < 0) ? 0 : (itemHeight + itemSpacing)), itemHeight);
 
 	// Get list started up here
 	std::vector<std::string>::iterator ii = filteredItems->begin();
@@ -200,6 +232,9 @@ void List::DrawSelf()
 	font->SetTextColor(1.0f, 1.0f, 1.0f, opacity); //default
 	font->SetOutlineColor(0.0f, 0.0f, 0.0f, opacity);
 	glLineWidth(1.0f);
+
+	float sbX = b.GetPos()[0];
+	float sbY1 = b.GetPos()[1] + (itemHeight + itemSpacing);
 
 	for (/*ii = items.begin()*/; ii != filteredItems->end() && nDrawOffset < numDisplay; ii++)
 	{
@@ -232,6 +267,39 @@ void List::DrawSelf()
 		nCurIndex++; nDrawOffset++;
 		b.Move(0.0,  - (itemHeight + itemSpacing));
 	}
+
+	//scrollbar
+	if(nDrawOffset < filteredItems->size()) {
+		float sbY2 = b.GetPos()[1] + (itemHeight + itemSpacing);
+		float sbHeight = sbY1 - sbY2;
+		float sbSize = ((float)nDrawOffset / (float)filteredItems->size()) * sbHeight;
+
+		if(activeScrollbar) {
+			topIndex = std::max(0, std::min((int)(((float)filteredItems->size() * ((sbY1 - sbSize) - (my - std::min(scrollbarGrabPos, sbSize))) / sbHeight) + 0.5f), 
+				(int)filteredItems->size() - numDisplay));
+		}
+
+		scrollbar.SetPos(sbX + (size[0] - 2.0f * borderSpacing) - (itemHeight + itemSpacing), 
+							sbY1 - sbSize - ((float)topIndex / (float)filteredItems->size()) * sbHeight);
+		scrollbar.SetSize((itemHeight + itemSpacing) , sbSize);
+
+		b.SetPos(scrollbar.GetPos()[0], sbY2);
+		b.SetSize(itemHeight + itemSpacing, sbHeight);
+
+		glColor4f(1,1,1,opacity/4.f);
+		b.DrawBox(GL_LINE_LOOP);
+
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glColor4f(0.8f,0.8f,0.8f,opacity);
+		scrollbar.DrawBox(GL_QUADS);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glColor4f(1,1,1,opacity/2.f);
+		glLineWidth(1.49f);
+		scrollbar.DrawBox(GL_LINE_LOOP);
+		glLineWidth(1.0f);
+	}
+	else
+		scrollbar.SetSize(-1,-1);
 	/**************
 	* End insert *
 	**************/
@@ -264,7 +332,7 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 		case SDL_MOUSEBUTTONUP: {
 			if (!hasFocus)
 				break;
-			if (MouseOver(ev.button.x, ev.button.y))
+			if (MouseOver(ev.button.x, ev.button.y) || activeScrollbar)
 			{
 				MouseRelease(ev.button.x, ev.button.y, ev.button.button);
 				return true;
@@ -274,7 +342,7 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 		case SDL_MOUSEMOTION: {
 			if (!hasFocus)
 				break;
-			if (MouseOver(ev.button.x, ev.button.y))
+			if (MouseOver(ev.button.x, ev.button.y) || activeScrollbar)
 			{
 				MouseMove(ev.motion.x, ev.motion.y, ev.motion.xrel, ev.motion.yrel, ev.motion.state);
 				return true;

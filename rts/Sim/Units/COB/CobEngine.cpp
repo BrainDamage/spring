@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -7,7 +9,6 @@
 #include "CobFile.h"
 #include "LogOutput.h"
 #include "FileSystem/FileHandler.h"
-#include "Platform/errorhandler.h"
 
 #ifndef _CONSOLE
 #include "TimeProfiler.h"

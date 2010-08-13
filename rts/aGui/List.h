@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LIST_H
 #define LIST_H
 
@@ -68,6 +70,10 @@ private:
 	float itemHeight;
 	bool hasFocus;
 	int topIndex;
+
+	GuiElement scrollbar;
+	bool activeScrollbar;
+	float scrollbarGrabPos;
 
 	// for filtering
 	std::string query;

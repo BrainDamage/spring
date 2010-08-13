@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include <string>
 #include <vector>
@@ -85,8 +87,8 @@ struct FontString {
 	FontString(bool b)	: msg(boolString(b))  { CalcDimensions(); }
 	FontString(float f)	: msg(floatString(f)) { CalcDimensions(); }
 	void CalcDimensions() {
-		width  = font->GetSize() * font->GetTextWidth(msg) * gu->pixelX;
-		height = font->GetSize() * font->GetLineHeight() * gu->pixelY;
+		width  = font->GetSize() * font->GetTextWidth(msg) * globalRendering->pixelX;
+		height = font->GetSize() * font->GetLineHeight() * globalRendering->pixelY;
 	}
 	string msg;
 	float width;
@@ -196,9 +198,6 @@ void CGameInfo::Draw()
 	labels.push_back("Limited DGun:");
 	values.push_back(gameSetup->limitDgun);
 
-	labels.push_back("Diminishing Metal:");
-	values.push_back(gameSetup->diminishingMMs);
-
 	labels.push_back("Map Size:");
 	sprintf(buf, "%ix%i", readmap->width / 64, readmap->height / 64);
 	values.push_back(buf);
@@ -215,9 +214,9 @@ void CGameInfo::Draw()
 	}
 
 	// in screen fractions
-	const float split = 10.0f / (float)gu->viewSizeX;
-	const float xBorder = 5.0f / (float)gu->viewSizeX;
-	const float yBorder = 5.0f / (float)gu->viewSizeY;
+	const float split = 10.0f / (float)globalRendering->viewSizeX;
+	const float xBorder = 5.0f / (float)globalRendering->viewSizeX;
+	const float yBorder = 5.0f / (float)globalRendering->viewSizeY;
 
 	float labelsWidth, labelsHeight;
 	float valuesWidth, valuesHeight;

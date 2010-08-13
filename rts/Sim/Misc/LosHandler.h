@@ -1,38 +1,54 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LOSHANDLER_H
 #define LOSHANDLER_H
-// LosHandler.h: interface for the CLosHandler class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <vector>
 #include <list>
 #include <deque>
 #include <boost/noncopyable.hpp>
-#include "MemPool.h"
 #include "Map/Ground.h"
 #include "Sim/Objects/WorldObject.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Misc/RadarHandler.h"
+#include "System/MemPool.h"
+#include "System/Vec2.h"
 #include <assert.h>
 
 
 struct LosInstance : public boost::noncopyable
 {
+private:
 	CR_DECLARE_STRUCT(LosInstance);
- 	std::vector<int> losSquares;
-	LosInstance() {} // default constructor for creg
+
+	/// default constructor for creg
+	LosInstance()
+		: losSize(0)
+		, airLosSize(0)
+		, refCount(0)
+		, allyteam(-1)
+		, baseSquare(0)
+		, hashNum(-1)
+		, baseHeight(0.0f)
+		, toBeDeleted(false)
+	{}
+
+public:
 	LosInstance(int lossize, int airLosSize, int allyteam, int2 basePos,
-	            int baseSquare, int2 baseAirPos, int hashNum, float baseHeight)
-		: losSize(lossize),
-			airLosSize(airLosSize),
-			refCount(1),
-			allyteam(allyteam),
-			basePos(basePos),
-			baseSquare(baseSquare),
-			baseAirPos(baseAirPos),
-			hashNum(hashNum),
-			baseHeight(baseHeight),
-			toBeDeleted(false) {}
+			int baseSquare, int2 baseAirPos, int hashNum, float baseHeight)
+		: losSize(lossize)
+		, airLosSize(airLosSize)
+		, refCount(1)
+		, allyteam(allyteam)
+		, basePos(basePos)
+		, baseSquare(baseSquare)
+		, baseAirPos(baseAirPos)
+		, hashNum(hashNum)
+		, baseHeight(baseHeight)
+		, toBeDeleted(false)
+	{}
+
+ 	std::vector<int> losSquares;
 	int losSize;
 	int airLosSize;
 	int refCount;
@@ -56,7 +72,7 @@ public:
 	void MoveUnit(CUnit* unit, bool redoCurrent);
 	void FreeInstance(LosInstance* instance);
 
-	bool InLos(const CWorldObject* object, int allyTeam) {
+	inline bool InLos(const CWorldObject* object, int allyTeam) {
 		if (object->alwaysVisible || gs->globalLOS) {
 			return true;
 		}
@@ -72,7 +88,7 @@ public:
 		}
 	}
 
-	bool InLos(const CUnit* unit, int allyTeam) {
+	inline bool InLos(const CUnit* unit, int allyTeam) {
 		// NOTE: units are treated differently than world objects in 2 ways:
 		//       1. they can be cloaked
 		//       2. when underwater, they only get LOS if they also have sonar
@@ -99,7 +115,7 @@ public:
 		}
 	}
 
-	bool InLos(float3 pos, int allyTeam) {
+	inline bool InLos(float3 pos, int allyTeam) {
 		if (gs->globalLOS) {
 			return true;
 		}
@@ -108,7 +124,7 @@ public:
 		return !!losMap[allyTeam].At(gx, gz);
 	}
 
-	bool InAirLos(float3 pos, int allyTeam) {
+	inline bool InAirLos(float3 pos, int allyTeam) {
 		if (gs->globalLOS) {
 			return true;
 		}

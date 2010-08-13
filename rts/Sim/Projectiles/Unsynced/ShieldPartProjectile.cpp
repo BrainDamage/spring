@@ -1,14 +1,16 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
 #include "ShieldPartProjectile.h"
+#include "Rendering/ProjectileDrawer.hpp"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/VertexArray.h"
-#include "Sim/Projectiles/ProjectileHandler.h"
 #include "Rendering/Textures/TextureAtlas.h"
-#include "GlobalUnsynced.h"
+#include "Sim/Projectiles/ProjectileHandler.h"
 
-CR_BIND_DERIVED(CShieldPartProjectile, CProjectile, (float3(0,0,0),0,0,0,float3(0,0,0),0,NULL,NULL));
+CR_BIND_DERIVED(CShieldPartProjectile, CProjectile, (ZeroVector, 0, 0, 0, ZeroVector, 0, NULL, NULL));
 
 CR_REG_METADATA(CShieldPartProjectile,(
 	CR_MEMBER(centerPos),
@@ -23,8 +25,8 @@ CR_REG_METADATA(CShieldPartProjectile,(
 
 CShieldPartProjectile::CShieldPartProjectile(
 	const float3& centerPos, int xpart, int ypart, float sphereSize,
-	float3 color, float alpha, AtlasedTexture* texture, CUnit* owner GML_PARG_C)
-:	CProjectile(centerPos, ZeroVector, owner, false, false, false GML_PARG_P),
+	float3 color, float alpha, AtlasedTexture* texture, CUnit* owner)
+:	CProjectile(centerPos, ZeroVector, owner, false, false, false),
 	centerPos(centerPos),
 	sphereSize(sphereSize),
 	baseAlpha(alpha),
@@ -54,25 +56,25 @@ CShieldPartProjectile::CShieldPartProjectile(
 	drawRadius = sphereSize * 0.4f;
 	usePerlin = false;
 
-	if (texture == &ph->perlintex) {
+	if (texture == projectileDrawer->perlintex) {
 		usePerlin = true;
 		ph->numPerlinProjectiles++;
 	}
 }
 
-CShieldPartProjectile::~CShieldPartProjectile(void)
+CShieldPartProjectile::~CShieldPartProjectile()
 {
 	if (ph && usePerlin) {
 		ph->numPerlinProjectiles--;
 	}
 }
 
-void CShieldPartProjectile::Update(void)
+void CShieldPartProjectile::Update()
 {
 	pos = centerPos + vectors[12] * sphereSize;
 }
 
-void CShieldPartProjectile::Draw(void)
+void CShieldPartProjectile::Draw()
 {
 	if (baseAlpha <= 0.0f) {
 		return;
@@ -87,7 +89,7 @@ void CShieldPartProjectile::Draw(void)
 	col[2] = (unsigned char) (color.z * alpha);
 	col[3] = (unsigned char) (alpha);
 
-	va->EnlargeArrays(4*4*4,0,VA_SIZE_TC);
+	va->EnlargeArrays(4 * 4 * 4, 0, VA_SIZE_TC);
 	for (int y = 0; y < 4; ++y) { //! CAUTION: loop count must match EnlargeArrays above
 		for (int x = 0; x < 4; ++x) {
 			va->AddVertexQTC(centerPos + vectors[(y    ) * 5 + x    ] * sphereSize, texCoords[(y    ) * 5 + x    ].x, texCoords[(y    ) * 5 + x    ].y, col);

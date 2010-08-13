@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaUnsyncedCtrl.cpp: implementation of the LuaUnsyncedCtrl class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <list>
@@ -52,7 +51,6 @@
 #include "Map/ReadMap.h"
 #include "Map/BaseGroundDrawer.h"
 #include "Rendering/GL/myGL.h"
-#include "Rendering/FontTexture.h"
 #include "Rendering/IconHandler.h"
 #include "Rendering/InMapDraw.h"
 #include "Sim/Misc/TeamHandler.h"
@@ -66,9 +64,9 @@
 #include "LogOutput.h"
 #include "Util.h"
 #include "NetProtocol.h"
-#include "Sound/Sound.h"
-#include "Sound/AudioChannel.h"
-#include "Sound/Music.h"
+#include "Sound/ISound.h"
+#include "Sound/IEffectChannel.h"
+#include "Sound/IMusicChannel.h"
 
 #include "FileSystem/FileHandler.h"
 #include "FileSystem/FileSystemHandler.h"
@@ -165,7 +163,6 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetConfigString);
 
 	REGISTER_LUA_CFUNC(CreateDir);
-	REGISTER_LUA_CFUNC(MakeFont);
 
 	REGISTER_LUA_CFUNC(SendCommands);
 	REGISTER_LUA_CFUNC(GiveOrder);
@@ -392,6 +389,7 @@ void LuaUnsyncedCtrl::DrawUnitCommandQueues()
 
 	glLineWidth(cmdColors.QueuedLineWidth());
 
+	GML_RECMUTEX_LOCK(unit); // DrawUnitCommandQueues
 	GML_STDMUTEX_LOCK(cai); // DrawUnitCommandQueues
 	GML_STDMUTEX_LOCK(dque); // DrawUnitCommandQueues
 
@@ -562,10 +560,7 @@ int LuaUnsyncedCtrl::PlaySoundFile(lua_State* L)
 	const string soundFile = lua_tostring(L, 1);
 	const unsigned int soundID = sound->GetSoundId(soundFile, false);
 	if (soundID > 0) {
-		float volume = 1.0f;
-		if (args >= 2) {
-			volume = lua_tofloat(L, 2);
-		}
+		float volume = luaL_optfloat(L, 2, 1.0f);
 
 		if (args < 5) {
 			Channels::General.PlaySample(soundID, volume);
@@ -685,7 +680,7 @@ int LuaUnsyncedCtrl::AddWorldUnit(lua_State* L)
 			"Incorrect arguments to AddWorldUnit(unitDefID, x, y, z, team, facing)");
 	}
 	const int unitDefID = lua_toint(L, 1);
-	if ((unitDefID < 0) || (unitDefID > unitDefHandler->numUnitDefs)) {
+	if (!unitDefHandler->IsValidUnitDefID(unitDefID)) {
 		return 0;
 	}
 	const float3 pos(lua_tofloat(L, 2),
@@ -996,7 +991,7 @@ int LuaUnsyncedCtrl::SetDrawSky(lua_State* L)
 	if (!lua_isboolean(L, 1)) {
 		luaL_error(L, "Incorrect arguments to SetDrawSky()");
 	}
-	game->drawSky = !!lua_toboolean(L, 1);
+	globalRendering->drawSky = !!lua_toboolean(L, 1);
 	return 0;
 }
 
@@ -1009,7 +1004,7 @@ int LuaUnsyncedCtrl::SetDrawWater(lua_State* L)
 	if (!lua_isboolean(L, 1)) {
 		luaL_error(L, "Incorrect arguments to SetDrawWater()");
 	}
-	game->drawWater = !!lua_toboolean(L, 1);
+	globalRendering->drawWater = !!lua_toboolean(L, 1);
 	return 0;
 }
 
@@ -1022,7 +1017,7 @@ int LuaUnsyncedCtrl::SetDrawGround(lua_State* L)
 	if (!lua_isboolean(L, 1)) {
 		luaL_error(L, "Incorrect arguments to SetDrawGround()");
 	}
-	game->drawGround = !!lua_toboolean(L, 1);
+	globalRendering->drawGround = !!lua_toboolean(L, 1);
 	return 0;
 }
 
@@ -1049,7 +1044,7 @@ int LuaUnsyncedCtrl::SetWaterParams(lua_State* L)
 			if (lua_istable(L, -1)) {
 				float color[3];
 				const int size = ParseFloatArray(L, -1, color, 3);
-				if (size>=3) {
+				if (size >= 3) {
 					if (key == "absorb") {
 						w.absorb = color;
 					} else if (key == "baseColor") {
@@ -1063,7 +1058,9 @@ int LuaUnsyncedCtrl::SetWaterParams(lua_State* L)
 					} else if (key == "specularColor") {
 						w.specularColor = color;
  					} else if (key == "planeColor") {
-						w.planeColor = color;
+						w.planeColor.x = color[0];
+						w.planeColor.y = color[1];
+						w.planeColor.z = color[2];
 					}
 				}
 			}
@@ -1462,7 +1459,7 @@ int LuaUnsyncedCtrl::WarpMouse(lua_State* L)
 		luaL_error(L, "Incorrect arguments to WarpMouse()");
 	}
 	const int x = lua_toint(L, 1);
-	const int y = gu->viewSizeY - lua_toint(L, 2) - 1;
+	const int y = globalRendering->viewSizeY - lua_toint(L, 2) - 1;
 	mouse->WarpMouse(x, y);
 	return 0;
 }
@@ -1543,7 +1540,8 @@ int LuaUnsyncedCtrl::GetConfigInt(lua_State* L)
 	}
 	const string name = luaL_checkstring(L, 1);
 	const int def     = luaL_optint(L, 2, 0);
-	const int value = configHandler->Get(name, def);
+	const bool setInOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	const int value = configHandler->Get(name, def, setInOverlay);
 	lua_pushnumber(L, value);
 	return 1;
 }
@@ -1556,7 +1554,8 @@ int LuaUnsyncedCtrl::SetConfigInt(lua_State* L)
 	}
 	const string name = luaL_checkstring(L, 1);
 	const int value   = luaL_checkint(L, 2);
-	configHandler->Set(name, value);
+	const bool useOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	configHandler->Set(name, value, useOverlay);
 	return 0;
 }
 
@@ -1568,7 +1567,8 @@ int LuaUnsyncedCtrl::GetConfigString(lua_State* L)
 	}
 	const string name = luaL_checkstring(L, 1);
 	const string def  = luaL_optstring(L, 2, "");
-	const string value = configHandler->GetString(name, def);
+	const bool setInOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	const string value = configHandler->GetString(name, def, setInOverlay);
 	lua_pushstring(L, value.c_str());
 	return 1;
 }
@@ -1581,7 +1581,8 @@ int LuaUnsyncedCtrl::SetConfigString(lua_State* L)
 	}
 	const string name  = luaL_checkstring(L, 1);
 	const string value = luaL_checkstring(L, 2);
-	configHandler->SetString(name, value);
+	const bool useOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	configHandler->SetString(name, value, useOverlay);
 	return 0;
 }
 
@@ -1609,73 +1610,6 @@ int LuaUnsyncedCtrl::CreateDir(lua_State* L)
 
 /******************************************************************************/
 
-int LuaUnsyncedCtrl::MakeFont(lua_State* L)
-{
-	if (!CheckModUICtrl()) {
-		return 0;
-	}
-
-	int tableIndex = 1;
-	string inputFile;
-	string inputData;
-	if (lua_israwstring(L, 1)) {
-		inputFile = lua_tostring(L, 1);
-		tableIndex++;
-	}
-
-	FontTexture::Reset();
-	if (lua_istable(L, tableIndex)) {
-		for (lua_pushnil(L); lua_next(L, tableIndex) != 0; lua_pop(L, 1)) {
-			if (lua_israwstring(L, -2)) {
-				const string key = lua_tostring(L, -2);
-				if (lua_israwstring(L, -1)) {
-					if (key == "outName") {
-						FontTexture::SetOutBaseName(lua_tostring(L, -1));
-					}
-					else if (key == "inData") {
-						size_t len = 0;
-						const char* ptr = lua_tolstring(L, -1, &len);
-						inputData.assign(ptr, len);
-						FontTexture::SetInData(inputData);
-					}
-				}
-				else if (lua_isnumber(L, -1)) {
-					const unsigned int value = (unsigned int)lua_tonumber(L, -1);
-					if (key == "height") {
-						FontTexture::SetFontHeight(value);
-					} else if (key == "texWidth") {
-						FontTexture::SetTextureWidth(value);
-					} else if (key == "minChar") {
-						FontTexture::SetMinChar(value);
-					} else if (key == "maxChar") {
-						FontTexture::SetMaxChar(value);
-					} else if (key == "outlineMode") {
-						FontTexture::SetOutlineMode(value);
-					} else if (key == "outlineRadius") {
-						FontTexture::SetOutlineRadius(value);
-					} else if (key == "outlineWeight") {
-						FontTexture::SetOutlineWeight(value);
-					} else if (key == "padding") {
-						FontTexture::SetPadding(value);
-					} else if (key == "stuffing") {
-						FontTexture::SetStuffing(value);
-					} else if (key == "debug") {
-						FontTexture::SetDebugLevel(value);
-					}
-				}
-			}
-		}
-	}
-
-	if (!inputFile.empty()) {
-		// inputData has the override
-		FontTexture::SetInFileName(inputFile);
-	}
-
-	lua_pushboolean(L, FontTexture::Execute());
-	return 1;
-}
-
 int LuaUnsyncedCtrl::Restart(lua_State* L)
 {
 	const int args = lua_gettop(L); // number of arguments
@@ -1687,8 +1621,14 @@ int LuaUnsyncedCtrl::Restart(lua_State* L)
 	const string arguments = luaL_checkstring(L, 1);
 	const string script = luaL_checkstring(L, 2);
 
-	const std::string springFullName = (Platform::GetBinaryFile());
+	const std::string springFullName = (Platform::GetProcessExecutableFile());
 	// LogObject() << "Args: " << arguments;
+
+#ifdef _WIN32
+	//! else OpenAL soft crashs when using execlp
+	ISound::Shutdown();
+#endif
+
 	if (!script.empty())
 	{
 		const std::string scriptFullName = FileSystemHandler::GetInstance().GetWriteDir()+"script.txt";

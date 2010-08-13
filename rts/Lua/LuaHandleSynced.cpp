@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaHandleSynced.cpp: implementation of the CLuaHandleSynced class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <cctype>
@@ -32,6 +31,7 @@
 #include "LuaScream.h"
 #include "LuaOpenGL.h"
 #include "LuaVFS.h"
+#include "LuaZip.h"
 
 #include "Game/Game.h"
 #include "Game/WordCompletion.h"
@@ -51,6 +51,9 @@
 
 static const LuaHashString unsyncedStr("UNSYNCED");
 
+LuaRulesParams::Params  CLuaHandleSynced::gameParams;
+LuaRulesParams::HashMap CLuaHandleSynced::gameParamsMap;
+
 
 #if (LUA_VERSION_NUM < 500)
 #  define LUA_OPEN_LIB(L, lib) lib(L)
@@ -64,11 +67,9 @@ static const LuaHashString unsyncedStr("UNSYNCED");
 /******************************************************************************/
 /******************************************************************************/
 
-CLuaHandleSynced::CLuaHandleSynced(const string& _name, int _order, const string& msgPrefix)
+CLuaHandleSynced::CLuaHandleSynced(const string& _name, int _order)
 : CLuaHandle(_name, _order, false),
-  messagePrefix(msgPrefix),
   allowChanges(false),
-  allowUnsafeChanges(false),
   teamsLocked(false)
 {
 	printTracebacks = true;
@@ -93,8 +94,7 @@ void CLuaHandleSynced::Init(const string& syncedFile,
 	}
 
 	if (fullCtrl) {
-		// numWeaponDefs has an extra slot
-		for (int w = 0; w <= weaponDefHandler->numWeaponDefs; w++) {
+		for (int w = 0; w < weaponDefHandler->numWeaponDefs; w++) {
 			watchWeapons.push_back(false);
 		}
 	}
@@ -141,6 +141,7 @@ void CLuaHandleSynced::Init(const string& syncedFile,
 	CLuaHandle* origHandle = activeHandle;
 	SetActiveHandle();
 
+	allowChanges = true;
 	synced = true;
 
 	const bool haveSynced = SetupSynced(syncedCode, syncedFile);
@@ -149,6 +150,7 @@ void CLuaHandleSynced::Init(const string& syncedFile,
 		return;
 	}
 
+	allowChanges = false;
 	synced = false;
 
 	const bool haveUnsynced = SetupUnsynced(unsyncedCode, unsyncedFile);
@@ -158,6 +160,7 @@ void CLuaHandleSynced::Init(const string& syncedFile,
 	}
 
 	synced = true;
+	allowChanges = true;
 
 	if (!haveSynced && !haveUnsynced) {
 		KillLua();
@@ -197,12 +200,12 @@ bool CLuaHandleSynced::SetupSynced(const string& code, const string& filename)
 	LuaPushNamedCFunc(L, "loadstring", LoadStringData);
 	LuaPushNamedCFunc(L, "CallAsTeam", CallAsTeam);
 
-	LuaPushNamedCFunc(L, "AllowUnsafeChanges", AllowUnsafeChanges);
-
 	LuaPushNamedNumber(L, "COBSCALE", COBSCALE);
 
 	// load our libraries  (LuaSyncedCtrl overrides some LuaUnsyncedCtrl entries)
 	if (!AddEntriesToTable(L, "VFS",         LuaVFS::PushSynced)           ||
+		!AddEntriesToTable(L, "VFS",         LuaZipFileReader::PushSynced) ||
+		!AddEntriesToTable(L, "VFS",         LuaZipFileWriter::PushSynced) ||
 	    !AddEntriesToTable(L, "UnitDefs",    LuaUnitDefs::PushEntries)     ||
 	    !AddEntriesToTable(L, "WeaponDefs",  LuaWeaponDefs::PushEntries)   ||
 	    !AddEntriesToTable(L, "FeatureDefs", LuaFeatureDefs::PushEntries)  ||
@@ -270,6 +273,8 @@ bool CLuaHandleSynced::SetupUnsynced(const string& code, const string& filename)
 	// load our libraries
 	if (!LuaSyncedTable::PushEntries(L)                                    ||
 	    !AddEntriesToTable(L, "VFS",         LuaVFS::PushUnsynced)         ||
+	    !AddEntriesToTable(L, "VFS",       LuaZipFileReader::PushUnsynced) ||
+	    !AddEntriesToTable(L, "VFS",       LuaZipFileWriter::PushUnsynced) ||
 	    !AddEntriesToTable(L, "UnitDefs",    LuaUnitDefs::PushEntries)     ||
 	    !AddEntriesToTable(L, "WeaponDefs",  LuaWeaponDefs::PushEntries)   ||
 	    !AddEntriesToTable(L, "FeatureDefs", LuaFeatureDefs::PushEntries)  ||
@@ -299,6 +304,10 @@ bool CLuaHandleSynced::SetupUnsynced(const string& code, const string& filename)
 	lua_getglobal(L, "string"); LightCopyTable(-2, -1); lua_pop(L, 1);
 	lua_rawset(L, -3);
 
+	lua_pushstring(L, "coroutine"); lua_newtable(L);
+	lua_getglobal(L, "coroutine"); LightCopyTable(-2, -1); lua_pop(L, 1);
+	lua_rawset(L, -3);
+
 	if (!CopyRealRandomFuncs()) {
 		KillLua();
 		return false;
@@ -313,7 +322,7 @@ bool CLuaHandleSynced::SetupUnsynced(const string& code, const string& filename)
 		"next",           "pairs",        "ipairs",
 		"tonumber",       "tostring",     "type",
 		"collectgarbage", "gcinfo",
-		"unpack",
+		"unpack",         "select",
 		"getmetatable",   "setmetatable",
 		"rawequal",       "rawget",       "rawset",
 		"getfenv",        "setfenv",
@@ -557,6 +566,7 @@ bool CLuaHandleSynced::HasCallIn(const string& name)
 
 	int tableIndex;
 	if ((name != "DrawUnit") &&
+	    (name != "DrawFeature") &&
 	    (name != "AICallIn") &&
 	    (name != "RecvFromSynced") &&
 	    !eventHandler.IsUnsynced(name)) {
@@ -706,9 +716,7 @@ void CLuaHandleSynced::GameFrame(int frameNumber)
 	lua_pushnumber(L, frameNumber); // 6 day roll-over
 
 	// call the routine
-	allowChanges = true;
 	RunCallInTraceback(cmdStr, 1, 0, errfunc);
-	allowChanges = allowUnsafeChanges;
 
 	return;
 }
@@ -742,9 +750,7 @@ bool CLuaHandleSynced::GotChatMsg(const string& msg, int playerID)
 	lua_pushnumber(L, playerID);
 
 	// call the routine
-	allowChanges = true;
 	RunCallIn(cmdStr, 2, 0);
-	allowChanges = allowUnsafeChanges;
 
 	return true;
 }
@@ -762,14 +768,13 @@ void CLuaHandleSynced::RecvFromSynced(int args)
 	lua_insert(L, 1); // place the function
 
 	// call the routine
-	const bool prevAllowChanges = allowChanges;
 	allowChanges = false;
 	synced = false;
 
 	RunCallIn(cmdStr, args, 0);
 
 	synced = true;
-	allowChanges = prevAllowChanges;
+	allowChanges = true;
 
 	return;
 }
@@ -777,6 +782,7 @@ void CLuaHandleSynced::RecvFromSynced(int args)
 
 bool CLuaHandleSynced::RecvLuaMsg(const string& msg, int playerID)
 {
+	//FIXME: is there a reason to disallow gamestate changes in RecvLuaMsg?
 	const bool prevAllowChanges = allowChanges;
 	allowChanges = false;
 
@@ -1071,21 +1077,6 @@ int CLuaHandleSynced::CallAsTeam(lua_State* L)
 }
 
 
-int CLuaHandleSynced::AllowUnsafeChanges(lua_State* L)
-{
-	const int args = lua_gettop(L);
-	if ((args != 1) || !lua_isstring(L, 1)) {
-		luaL_error(L, "Incorrect arguments to AllowUnsafeChanges()");
-	}
-	const string magic = lua_tostring(L, 1);
-	const bool value = (magic == "USE AT YOUR OWN PERIL");
-	CLuaHandleSynced* lhs = GetActiveHandle();
-	lhs->allowChanges = value;
-	lhs->allowUnsafeChanges = value;
-	return 0;
-}
-
-
 int CLuaHandleSynced::AddSyncedActionFallback(lua_State* L)
 {
 	const int args = lua_gettop(L);
@@ -1139,12 +1130,11 @@ int CLuaHandleSynced::RemoveSyncedActionFallback(lua_State* L)
 	map<string, string>::iterator it = lhs->textCommands.find(cmd);
 	if (it != lhs->textCommands.end()) {
 		lhs->textCommands.erase(it);
+		game->wordCompletion->RemoveWord(cmdRaw);
 		lua_pushboolean(L, true);
 	} else {
 		lua_pushboolean(L, false);
 	}
-	// FIXME -- word completion should also be removed
-	lua_pushboolean(L, true);
 	return 1;
 }
 

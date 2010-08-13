@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -10,11 +12,13 @@
 #include "LogOutput.h"
 #include "Util.h"
 #include "GlobalUnsynced.h"
+#include "Rendering/GlobalRendering.h"
 #include "MouseCursor.h"
 #include "HwMouseCursor.h"
 #include "myMath.h"
 #include "Rendering/Textures/Bitmap.h"
 
+using std::string;
 
 //////////////////////////////////////////////////////////////////////
 // CMouseCursor Class
@@ -303,7 +307,7 @@ void CMouseCursor::Draw(int x, int y, float scale)
 	glAlphaFunc(GL_GREATER, 0.01f);
 	glColor4f(1,1,1,1);
 
-	glViewport(xp, gu->viewSizeY - yp, xs, ys);
+	glViewport(xp, globalRendering->viewSizeY - yp, xs, ys);
 
 	static float vertices[] = {0.f, 0.f, 0.f,
 				   0.f, 1.f, 0.f,
@@ -325,7 +329,7 @@ void CMouseCursor::Draw(int x, int y, float scale)
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 	glDisableClientState(GL_VERTEX_ARRAY);
 
-	glViewport(gu->viewPosX, 0, gu->viewSizeX, gu->viewSizeY);
+	glViewport(globalRendering->viewPosX, 0, globalRendering->viewSizeX, globalRendering->viewSizeY);
 }
 
 
@@ -341,7 +345,7 @@ void CMouseCursor::DrawQuad(int x, int y)
 	const int xp = int(float(x) - (float(xofs) * scale));
 	const int yp = int(float(y) - (float(ys) - (float(yofs) * scale)));
 
-	glViewport(gu->viewPosX + xp, yp, xs, ys);
+	glViewport(globalRendering->viewPosX + xp, yp, xs, ys);
 
 	static float vertices[] = {0.f, 0.f, 0.f,
 				   0.f, 1.f, 0.f,
@@ -371,7 +375,7 @@ void CMouseCursor::Update()
 		return;
 	}
 
-	animTime = fmod(animTime + gu->lastFrameTime, animPeriod);
+	animTime = fmod(animTime + globalRendering->lastFrameTime, animPeriod);
 
 	if (animTime < frames[currentFrame].startTime) {
 		currentFrame = 0;

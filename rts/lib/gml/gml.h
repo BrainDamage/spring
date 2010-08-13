@@ -174,7 +174,6 @@ extern boost::mutex inmapmutex;
 extern boost::mutex tempmutex;
 extern boost::mutex posmutex;
 extern boost::mutex runitmutex;
-extern boost::mutex simmutex;
 extern boost::mutex netmutex;
 extern boost::mutex histmutex;
 extern boost::mutex logmutex;
@@ -201,6 +200,8 @@ extern boost::recursive_mutex filemutex;
 extern boost::recursive_mutex &qnummutex;
 extern boost::recursive_mutex &groupmutex;
 extern boost::recursive_mutex &grpselmutex;
+extern boost::recursive_mutex simmutex;
+extern boost::recursive_mutex laycmdmutex;
 
 #if GML_MUTEX_PROFILER
 #	include "System/TimeProfiler.h"
@@ -260,21 +261,15 @@ inline unsigned gmlGetTicks() {
 		if(gmlCurrentLuaState) luaL_error(gmlCurrentLuaState,"Invalid call");\
 	}
 #define GML_CALL_DEBUGGER() gmlCallDebugger gmlCDBG(L);
+#define GML_DRAW_CALLIN_TIME() (gmlCallDebugger::getDrawCallInTime())
 #else
 #define GML_EXPGEN_CHECK()
 #define GML_CALL_DEBUGGER()
+#define GML_DRAW_CALLIN_TIME() 0
 #endif
 
 #define GML_GET_TICKS(var) var=gmlGetTicks()
 #define GML_UPDATE_TICKS() gmlUpdateTicks()
-
-#define GML_PARG_H//, boost::recursive_mutex::scoped_lock *projlock = &boost::recursive_mutex::scoped_lock(projmutex)
-#define GML_PARG_C//, boost::recursive_mutex::scoped_lock *projlock
-#define GML_PARG_P//, projlock
-
-#define GML_FARG_H// , boost::recursive_mutex::scoped_lock *flashlock = &boost::recursive_mutex::scoped_lock(flashmutex)
-#define GML_FARG_C// , boost::recursive_mutex::scoped_lock *flashlock
-#define GML_FARG_P// , flashlock
 
 #else
 
@@ -285,16 +280,9 @@ inline unsigned gmlGetTicks() {
 #define GML_GET_TICKS(var)
 #define GML_UPDATE_TICKS()
 
-#define GML_PARG_H
-#define GML_PARG_C
-#define GML_PARG_P
-
-#define GML_FARG_H
-#define GML_FARG_C
-#define GML_FARG_P
-
 #define GML_EXPGEN_CHECK()
 #define GML_CALL_DEBUGGER()
+#define GML_DRAW_CALLIN_TIME() 0
 
 #endif
 
@@ -310,22 +298,22 @@ inline unsigned gmlGetTicks() {
 #define GML_GET_TICKS(var)
 #define GML_UPDATE_TICKS()
 
-#define GML_PARG_H
-#define GML_PARG_C
-#define GML_PARG_P
-
-#define GML_FARG_H
-#define GML_FARG_C
-#define GML_FARG_P
-
 #define GML_EXPGEN_CHECK()
 #define GML_CALL_DEBUGGER()
+#define GML_DRAW_CALLIN_TIME() 0
 
 #endif // USE_GML
 
+#ifdef    HEADLESS
+#define glGenerateMipmapEXT_NONGML NULL
+#define glUseProgram_NONGML NULL
+#define glProgramParameteriEXT_NONGML NULL
+#define glBlendEquation_NONGML NULL
+#else  // HEADLESS
 #define glGenerateMipmapEXT_NONGML GLEW_GET_FUN(__glewGenerateMipmapEXT)
 #define glUseProgram_NONGML GLEW_GET_FUN(__glewUseProgram)
 #define glProgramParameteriEXT_NONGML GLEW_GET_FUN(__glewProgramParameteriEXT)
 #define glBlendEquation_NONGML GLEW_GET_FUN(__glewBlendEquation)
+#endif // HEADLESS
 
 #endif

@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef COMMAND_H
 #define COMMAND_H
 
@@ -97,9 +99,27 @@ private:
 
 public:
 	Command():
+		id(0),
 		options(0),
 		tag(0),
 		timeOut(INT_MAX) {}
+
+	bool IsAreaCommand() const {
+		if (id == CMD_REPAIR ||
+			id == CMD_RECLAIM ||
+			id == CMD_CAPTURE ||
+			id == CMD_RESURRECT ||
+			id == CMD_LOAD_UNITS ||
+			id == CMD_UNLOAD_UNITS) {
+			// params[0..2] always holds the position, params[3] the radius
+			return (params.size() == 4);
+		}
+		if (id == CMD_AREA_ATTACK) {
+			return true;
+		}
+
+		return false;
+	}
 
 	/// CMD_xxx code  (custom codes can also be used)
 	int id;
@@ -116,9 +136,13 @@ public:
 	unsigned int tag;
 
 	/**
-	 * Remove this command after this frame
-	 * can only be set locally, not sent over net
+	 * Remove this command after this frame (absolute).
+	 * This can only be set locally and is not sent over the network.
 	 * (used for temporary orders)
+	 * Examples:
+	 * - 0
+	 * - MAX_INT
+	 * - currenFrame + 60
 	 */
 	int timeOut;
 };
@@ -130,6 +154,8 @@ private:
 
 public:
 	CommandDescription():
+		id(0),
+		type(CMDTYPE_ICON),
 		hidden(false),
 		disabled(false),
 		showUnique(false),

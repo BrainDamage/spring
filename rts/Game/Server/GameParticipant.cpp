@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "GameParticipant.h"
 
 #include "Net/Connection.h"
@@ -6,7 +8,10 @@
 GameParticipant::GameParticipant()
 : myState(UNCONNECTED)
 , lastFrameResponse(0)
+, speedControl(0)
+, luaDrawTime(0)
 , isLocal(false)
+, isReconn(false)
 {
 }
 
@@ -35,3 +40,4 @@ void GameParticipant::Kill(const std::string& reason)
 #endif
 	myState = DISCONNECTED;
 }
+

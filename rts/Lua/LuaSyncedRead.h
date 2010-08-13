@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_SYNCED_INFO_H
 #define LUA_SYNCED_INFO_H
-// LuaSyncedRead.h: interface for the LuaSyncedRead class.
-//
-//////////////////////////////////////////////////////////////////////
 
 struct lua_State;
 
@@ -28,7 +27,6 @@ class LuaSyncedRead {
 		static int IsGameOver(lua_State* L);
 
 		static int GetGaiaTeamID(lua_State* L);
-		static int GetRulesInfoMap(lua_State* L);
 
 		static int GetGameSpeed(lua_State* L);
 		static int GetGameFrame(lua_State* L);
@@ -58,6 +56,7 @@ class LuaSyncedRead {
 		static int GetTeamInfo(lua_State* L);
 		static int GetTeamResources(lua_State* L);
 		static int GetTeamUnitStats(lua_State* L);
+		static int GetTeamResourceStats(lua_State* L);
 		static int GetTeamRulesParam(lua_State* L);
 		static int GetTeamRulesParams(lua_State* L);
 		static int GetTeamStatsHistory(lua_State* L);
@@ -97,6 +96,7 @@ class LuaSyncedRead {
 		static int GetUnitIsDead(lua_State* L);
 		static int GetUnitIsStunned(lua_State* L);
 		static int GetUnitResources(lua_State* L);
+		static int GetUnitMetalExtraction(lua_State* L);
 		static int GetUnitExperience(lua_State* L);
 		static int GetUnitStates(lua_State* L);
 		static int GetUnitArmored(lua_State* L);

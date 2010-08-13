@@ -1,16 +1,28 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 // TODO: move this out of Sim, this is rendering code!
 
 #include "StdAfx.h"
+
 #include "LineDrawer.h"
+
+#include "Rendering/GlobalRendering.h"
 #include "Game/UI/CommandColors.h"
-#include "GlobalUnsynced.h"
+#include "System/GlobalUnsynced.h"
 
 CLineDrawer lineDrawer;
 
 
 CLineDrawer::CLineDrawer()
+	: lineStipple(false)
+	, useColorRestarts(false)
+	, useRestartColor(false)
+	, restartAlpha(0.0f)
+	, restartColor(NULL)
+	, lastPos(ZeroVector)
+	, lastColor(NULL)
+	, stippleTimer(0.0f)
 {
-	stippleTimer = 0.0f;
 	lines.reserve(32);
 	stippled.reserve(32);
 }
@@ -18,7 +30,7 @@ CLineDrawer::CLineDrawer()
 
 void CLineDrawer::UpdateLineStipple()
 {
-	stippleTimer += (gu->lastFrameTime * cmdColors.StippleSpeed());
+	stippleTimer += (globalRendering->lastFrameTime * cmdColors.StippleSpeed());
 	stippleTimer = fmod(stippleTimer, (16.0f / 20.0f));
 }
 

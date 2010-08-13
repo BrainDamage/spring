@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef TAPALETTE_H
 #define TAPALETTE_H
-// TAPalette.h: interface for the CTAPalette class.
-//
-//////////////////////////////////////////////////////////////////////
 
 class CTAPalette
 {
@@ -16,7 +15,7 @@ public:
 
 	unsigned char p[256][4];
 
-	int NumTeamColors() { return 10; }
+	int NumTeamColors() const { return 10; }
 	void Init(void);
 };
 extern CTAPalette palette;

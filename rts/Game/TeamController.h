@@ -1,22 +1,7 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-#ifndef __TEAM_CONTROLLER_H
-#define __TEAM_CONTROLLER_H
+#ifndef _TEAM_CONTROLLER_H
+#define _TEAM_CONTROLLER_H
 
 #include "Platform/byteorder.h" // for swabdword
 
@@ -49,6 +34,10 @@ public:
 	 * This is either the human players nick or the Skirmish AIs instance nick.
 	 */
 	std::string name;
+
+	virtual bool operator == (const TeamController& tc) const {
+		return (name == tc.name);
+	}
 };
 
 /**
@@ -76,4 +65,4 @@ protected:
 	}
 };
 
-#endif // __TEAM_CONTROLLER_H
+#endif // _TEAM_CONTROLLER_H

@@ -1,8 +1,6 @@
-#include "StdAfx.h"
-// LuaUnitRendering.cpp: implementation of the CLuaUnitRendering class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include "StdAfx.h"
 #include "mmgr.h"
 
 #include "LuaUnitRendering.h"
@@ -14,13 +12,11 @@
 #include "LuaHashString.h"
 #include "LuaUtils.h"
 
+#include "Rendering/UnitDrawer.h"
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
 #include "Rendering/Textures/NamedTextures.h"
-#include "Rendering/UnitModels/IModelParser.h"
-#include "Rendering/UnitModels/3DOParser.h"
-#include "Rendering/UnitModels/s3oParser.h"
-#include "Rendering/UnitModels/UnitDrawer.h"
+#include "Rendering/Models/IModelParser.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -64,6 +60,7 @@ bool LuaUnitRendering::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitUniform);
 
 	REGISTER_LUA_CFUNC(SetUnitLuaDraw);
+	REGISTER_LUA_CFUNC(SetFeatureLuaDraw);
 
 	REGISTER_LUA_CFUNC(Debug);
 
@@ -244,11 +241,13 @@ static void ParseShader(lua_State* L, const char* caller, int index,
 	}
 	else if (luaType == LUA_TSTRING) {
 		const string key = StringToLower(lua_tostring(L, index));
+
 		if (key == "3do") {
 			shader.type = LuaMatShader::LUASHADER_3DO;
-		}
-		else if (key == "s3o") {
+		} else if (key == "s3o") {
 			shader.type = LuaMatShader::LUASHADER_S3O;
+		} else if (key == "obj") {
+			shader.type = LuaMatShader::LUASHADER_S3O; //!
 		}
 	}
 	return;
@@ -710,6 +709,21 @@ int LuaUnitRendering::SetUnitLuaDraw(lua_State* L)
 	return 0;
 }
 
+int LuaUnitRendering::SetFeatureLuaDraw(lua_State* L)
+{
+	const int featureID = luaL_checkint(L, 1);
+	CFeature* feature = featureHandler->GetFeature(featureID);
+
+	if (feature == NULL) {
+		return 0;
+	}
+
+	if (!lua_isboolean(L, 2)) {
+		return 0;
+	}
+	feature->luaDraw = lua_toboolean(L, 2);
+	return 0;
+}
 
 /******************************************************************************/
 /******************************************************************************/

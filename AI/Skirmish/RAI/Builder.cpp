@@ -1,9 +1,7 @@
 #include "Builder.h"
-//#include "Sim/Units/UnitDef.h"
-//struct WeaponDef;
-//#include <set>
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
+#include "Sim/Units/CommandAI/CommandQueue.h"
 
 sBuildQuarry::sBuildQuarry(sRAIBuildList *buildlist)
 {

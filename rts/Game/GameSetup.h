@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef __GAME_SETUP_H__
 #define __GAME_SETUP_H__
 
@@ -50,12 +52,10 @@ public:
 	bool fixedAllies;
 	unsigned int mapHash;
 	unsigned int modHash;
+	std::string MapFile() const;
 	std::string mapName;
 	std::string modName;
-	std::string scriptName;
 	bool useLuaGaia;
-	std::string luaGaiaStr;
-	std::string luaRulesStr;
 
 	std::string gameSetupText;
 
@@ -80,7 +80,6 @@ public:
 
 	bool ghostedBuildings;
 	bool limitDgun;
-	bool diminishingMMs;
 	bool disableMapDamage;
 
 	float maxSpeed;
@@ -91,9 +90,6 @@ public:
 	int numDemoPlayers;
 
 	std::string saveName;
-
-	int startMetal;
-	int startEnergy;
 
 	int gameMode;
 	int noHelperAIs;

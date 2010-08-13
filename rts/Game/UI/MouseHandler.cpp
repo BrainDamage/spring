@@ -1,9 +1,11 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// MouseHandler.cpp: implementation of the CMouseHandler class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include "mmgr.h"
+
+#include <algorithm>
+#include <boost/cstdint.hpp>
 
 #include "MouseHandler.h"
 #include "Game/CameraHandler.h"
@@ -14,18 +16,19 @@
 #include "GuiHandler.h"
 #include "MiniMap.h"
 #include "MouseCursor.h"
-#include "MouseInput.h"
+#include "System/Input/MouseInput.h"
 #include "TooltipConsole.h"
 #include "Sim/Units/Groups/Group.h"
 #include "Game/Game.h"
 #include "Game/GameHelper.h"
 #include "Game/SelectedUnits.h"
 #include "Game/PlayerHandler.h"
+#include "Game/UI/UnitTracker.h"
 #include "Map/Ground.h"
 #include "Map/MapDamage.h"
 #include "Lua/LuaInputReceiver.h"
 #include "ConfigHandler.h"
-#include "Platform/errorhandler.h"
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/glFont.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/InMapDraw.h"
@@ -37,11 +40,12 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitHandler.h"
-#include "Sim/Units/UnitTracker.h"
 #include "EventHandler.h"
-#include "Sound/Sound.h"
-#include "Sound/AudioChannel.h"
-#include <boost/cstdint.hpp>
+#include "Exceptions.h"
+#include "FastMath.h"
+#include "myMath.h"
+#include "Sound/ISound.h"
+#include "Sound/IEffectChannel.h"
 
 // can't be up there since those contain conflicting definitions
 #include <SDL_mouse.h>
@@ -53,7 +57,6 @@
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-extern bool	fullscreen;
 extern boost::uint8_t *keys;
 
 
@@ -63,30 +66,41 @@ static CInputReceiver*& activeReceiver = CInputReceiver::GetActiveReceiverRef();
 
 
 CMouseHandler::CMouseHandler()
-: locked(false)
+	: hardwareCursor(false)
+	, lastx(300)
+	, lasty(200)
+	, hide(true)
+	, hwHide(true)
+	, locked(false)
+	, invertMouse(false)
+	, doubleClickTime(0.0f)
+	, scrollWheelSpeed(0.0f)
+	, dragScrollThreshold(0.0f)
+	, crossSize(0.0f)
+	, crossAlpha(0.0f)
+	, crossMoveScale(0.0f)
+	, activeButton(-1)
+	, dir(ZeroVector)
+	, soundMultiselID(0)
+	, cursorScale(1.0f)
+	, cursorText("")
+	, currentCursor(NULL)
+	, wasLocked(false)
+	, scrollx(0.0f)
+	, scrolly(0.0f)
 {
-	lastx = 300;
-	lasty = 200;
-	hide = true;
-	hwHide = true;
-	currentCursor = NULL;
-
 	for (int a = 1; a <= NUM_BUTTONS; a++) {
 		buttons[a].pressed = false;
 		buttons[a].lastRelease = -20;
 		buttons[a].movement = 0;
 	}
 
-	cursorScale = 1.0f;
-
 	LoadCursors();
 
-	// hide the cursor until we are ingame (not in loading screen etc.)
+	//! hide the cursor until we are ingame (hide it during loading screen etc.)
 	SDL_ShowCursor(SDL_DISABLE);
 
-#ifdef __APPLE__
-	hardwareCursor = false;
-#else
+#ifndef __APPLE__
 	hardwareCursor = !!configHandler->Get("HardwareCursor", 0);
 #endif
 
@@ -96,7 +110,15 @@ CMouseHandler::CMouseHandler()
 	doubleClickTime = configHandler->Get("DoubleClickTime", 200.0f) / 1000.0f;
 
 	scrollWheelSpeed = configHandler->Get("ScrollWheelSpeed", 25.0f);
-	scrollWheelSpeed = std::max(-255.0f, std::min(255.0f, scrollWheelSpeed));
+	scrollWheelSpeed = Clamp(scrollWheelSpeed,-255.f,255.f);
+
+	crossSize      = configHandler->Get("CrossSize", 12.0f);
+	crossAlpha     = configHandler->Get("CrossAlpha", 0.5f);
+	crossMoveScale = configHandler->Get("CrossMoveScale", 1.0f) * 0.005f;
+
+	dragScrollThreshold = configHandler->Get("MouseDragScrollThreshold", 0.3f);
+
+	configHandler->NotifyOnChange(this);
 }
 
 CMouseHandler::~CMouseHandler()
@@ -152,52 +174,45 @@ void CMouseHandler::LoadCursors()
 
 	// the default cursor must exist
 	if (cursorCommandMap.find("") == cursorCommandMap.end()) {
-		handleerror(0,
+		throw content_error(
 			"Unable to load default cursor. Check that you have the required\n"
-			"content packages installed in your Spring \"base/\" directory.\n",
-			"Missing Dependency: \"cursornormal\"", 0);
+			"content packages installed in your Spring \"base/\" directory.\n");
 	}
 }
 
 
 /******************************************************************************/
 
-void CMouseHandler::MouseMove(int x, int y)
+void CMouseHandler::MouseMove(int x, int y, int dx, int dy)
 {
-	if(hide) {
-		lastx = x;
-		lasty = y;
-
-		int dx = lastx - (gu->viewSizeX / 2 + gu->viewPosX);
-		int dy = lasty - (gu->viewSizeY / 2 + gu->viewPosY);
-
-		float3 move;
-		move.x = dx;
-		move.y = dy;
-		move.z = invertMouse? -1.0f : 1.0f;
-		camHandler->GetCurrentController().MouseMove(move);
-		return;
-	}
-
-	const int dx = x - lastx;
-	const int dy = y - lasty;
 	lastx = x;
 	lasty = y;
 
-	dir=hide ? camera->forward : camera->CalcPixelDir(x,y);
+	const int screenCenterX = globalRendering->viewSizeX / 2 + globalRendering->viewPosX;
+	const int screenCenterY = globalRendering->viewSizeY / 2 + globalRendering->viewPosY;
 
-	buttons[SDL_BUTTON_LEFT].movement += abs(dx) + abs(dy);
-	buttons[SDL_BUTTON_RIGHT].movement += abs(dx) + abs(dy);
+	scrollx += lastx - screenCenterX;
+	scrolly += lasty - screenCenterY;
 
-	if (!game->gameOver) {
-		playerHandler->Player(gu->myPlayerNum)->currentStats.mousePixels+=abs(dx)+abs(dy);
+	dir = hide ? camera->forward : camera->CalcPixelDir(x,y);
+
+	if (hide) {
+		camHandler->GetCurrentController().MouseMove(float3(dx, dy, invertMouse ? -1.0f : 1.0f));
+		return;
 	}
 
-	if(activeReceiver){
+	buttons[SDL_BUTTON_LEFT].movement  += (int)sqrt(float(dx*dx + dy*dy));
+	buttons[SDL_BUTTON_RIGHT].movement += (int)sqrt(float(dx*dx + dy*dy));
+
+	if (!game->gameOver) {
+		playerHandler->Player(gu->myPlayerNum)->currentStats.mousePixels += (int)sqrt(float(dx*dx + dy*dy));
+	}
+
+	if (activeReceiver){
 		activeReceiver->MouseMove(x, y, dx, dy, activeButton);
 	}
 
-	if(inMapDrawer && inMapDrawer->keyPressed){
+	if (inMapDrawer && inMapDrawer->keyPressed){
 		inMapDrawer->MouseMove(x, y, dx, dy, activeButton);
 	}
 
@@ -227,15 +242,13 @@ void CMouseHandler::MousePress(int x, int y, int button)
 	buttons[button].x = x;
 	buttons[button].y = y;
 	buttons[button].camPos = camera->pos;
-	buttons[button].dir = hide ? camera->forward : camera->CalcPixelDir(x,y);
+	buttons[button].dir = dir;
 	buttons[button].movement = 0;
 
 	activeButton = button;
 
-	if (activeReceiver) {
-		activeReceiver->MousePress(x, y, button);
+	if (activeReceiver && activeReceiver->MousePress(x, y, button))
 		return;
-	}
 
 	if(inMapDrawer &&  inMapDrawer->keyPressed){
 		inMapDrawer->MousePress(x, y, button);
@@ -266,18 +279,22 @@ void CMouseHandler::MousePress(int x, int y, int button)
 	if (!game->hideInterface) {
 		for (ri = inputReceivers.begin(); ri != inputReceivers.end(); ++ri) {
 			CInputReceiver* recv=*ri;
-			if (recv && recv->MousePress(x, y, button)) {
-				activeReceiver = recv;
+			if (recv && recv->MousePress(x, y, button))
+			{
+				if (!activeReceiver)
+					activeReceiver = recv;
 				return;
 			}
 		}
 	} else {
 		if (luaInputReceiver && luaInputReceiver->MousePress(x, y, button)) {
-			activeReceiver = luaInputReceiver;
+			if (!activeReceiver)
+				activeReceiver = luaInputReceiver;
 			return;
 		}
 		if (guihandler && guihandler->MousePress(x,y,button)) {
-			activeReceiver = guihandler; // for default (rmb) commands
+			if (!activeReceiver)
+				activeReceiver = guihandler; // for default (rmb) commands
 			return;
 		}
 	}
@@ -303,20 +320,18 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 
 	if (activeReceiver) {
 		activeReceiver->MouseRelease(x, y, button);
-		int x, y;
-		const boost::uint8_t buttons = SDL_GetMouseState(&x, &y);
-		const boost::uint8_t mask = (SDL_BUTTON_LMASK | SDL_BUTTON_MMASK | SDL_BUTTON_RMASK);
-		if ((buttons & mask) == 0) {
+		if(!buttons[SDL_BUTTON_LEFT].pressed && !buttons[SDL_BUTTON_MIDDLE].pressed && !buttons[SDL_BUTTON_RIGHT].pressed)
 			activeReceiver = NULL;
-		}
 		return;
 	}
 
-	// Switch camera mode on a middle click that wasn't a middle mouse drag scroll.
-	// (the latter is determined by the time the mouse was held down:
-	//  <= 0.3 s means a camera mode switch, > 0.3 s means a drag scroll)
+	//! Switch camera mode on a middle click that wasn't a middle mouse drag scroll.
+	//! the latter is determined by the time the mouse was held down:
+	//! switch (dragScrollThreshold)
+	//!   <= means a camera mode switch
+	//!    > means a drag scroll
 	if (button == SDL_BUTTON_MIDDLE) {
-		if (buttons[SDL_BUTTON_MIDDLE].time > (gu->gameTime - 0.3f))
+		if (buttons[SDL_BUTTON_MIDDLE].time > (gu->gameTime - dragScrollThreshold))
 			ToggleState();
 		return;
 	}
@@ -332,48 +347,42 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 
 		if (buttons[SDL_BUTTON_LEFT].movement > 4) {
 			// select box
-			float dist=ground->LineGroundCol(buttons[SDL_BUTTON_LEFT].camPos,buttons[SDL_BUTTON_LEFT].camPos+buttons[SDL_BUTTON_LEFT].dir*gu->viewRange*1.4f);
+			float dist=ground->LineGroundCol(buttons[SDL_BUTTON_LEFT].camPos,buttons[SDL_BUTTON_LEFT].camPos+buttons[SDL_BUTTON_LEFT].dir*globalRendering->viewRange*1.4f);
 			if(dist<0)
-				dist=gu->viewRange*1.4f;
+				dist=globalRendering->viewRange*1.4f;
 			float3 pos1=buttons[SDL_BUTTON_LEFT].camPos+buttons[SDL_BUTTON_LEFT].dir*dist;
 
-			dist=ground->LineGroundCol(camera->pos,camera->pos+dir*gu->viewRange*1.4f);
+			dist=ground->LineGroundCol(camera->pos,camera->pos+dir*globalRendering->viewRange*1.4f);
 			if(dist<0)
-				dist=gu->viewRange*1.4f;
+				dist=globalRendering->viewRange*1.4f;
 			float3 pos2=camera->pos+dir*dist;
 
-			float3 dir1=pos1-camera->pos;
+			float3 dir1 = pos1 - camera->pos;
 			dir1.ANormalize();
-			float3 dir2=pos2-camera->pos;
+			float3 dir2 = pos2 - camera->pos;
 			dir2.ANormalize();
 
-			float rl1=(dir1.dot(camera->right))/dir1.dot(camera->forward);
-			float ul1=(dir1.dot(camera->up))/dir1.dot(camera->forward);
+			float rl1 = dir1.dot(camera->right) / dir1.dot(camera->forward);
+			float ul1 = dir1.dot(camera->up) / dir1.dot(camera->forward);
 
-			float rl2=(dir2.dot(camera->right))/dir2.dot(camera->forward);
-			float ul2=(dir2.dot(camera->up))/dir2.dot(camera->forward);
+			float rl2 = dir2.dot(camera->right) / dir2.dot(camera->forward);
+			float ul2 = dir2.dot(camera->up) / dir2.dot(camera->forward);
 
-			if(rl1<rl2){
-				float t=rl1;
-				rl1=rl2;
-				rl2=t;
-			}
-			if(ul1<ul2){
-				float t=ul1;
-				ul1=ul2;
-				ul2=t;
-			}
+			if (rl1<rl2)
+				std::swap(rl1, rl2);
+			if (ul1<ul2)
+				std::swap(ul1, ul2);
 
 			float3 norm1,norm2,norm3,norm4;
 
-			if(ul1>0)
+			if (ul1>0)
 				norm1=-camera->forward+camera->up/fabs(ul1);
 			else if(ul1<0)
 				norm1=camera->forward+camera->up/fabs(ul1);
 			else
 				norm1=camera->up;
 
-			if(ul2>0)
+			if (ul2>0)
 				norm2=camera->forward-camera->up/fabs(ul2);
 			else if(ul2<0)
 				norm2=-camera->forward-camera->up/fabs(ul2);
@@ -431,7 +440,7 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 				Channels::UserInterface.PlaySample(soundMultiselID);
 		} else {
 			const CUnit* unit;
-			helper->GuiTraceRay(camera->pos,dir,gu->viewRange*1.4f,unit,false);
+			helper->GuiTraceRay(camera->pos,dir,globalRendering->viewRange*1.4f,unit,false);
 			if (unit && ((unit->team == gu->myTeam) || gu->spectatingFullSelect)) {
 				if (buttons[button].lastRelease < (gu->gameTime - doubleClickTime)) {
 					CUnit* unitM = uh->units[unit->id];
@@ -491,7 +500,7 @@ void CMouseHandler::MouseWheel(float delta)
 }
 
 
-void CMouseHandler::Draw()
+void CMouseHandler::DrawSelectionBox()
 {
 	dir = hide ? camera->forward : camera->CalcPixelDir(lastx, lasty);
 	if (activeReceiver) {
@@ -507,14 +516,14 @@ void CMouseHandler::Draw()
 
 		float dist=ground->LineGroundCol(buttons[SDL_BUTTON_LEFT].camPos,
 		                                 buttons[SDL_BUTTON_LEFT].camPos
-		                                 + buttons[SDL_BUTTON_LEFT].dir*gu->viewRange*1.4f);
+		                                 + buttons[SDL_BUTTON_LEFT].dir*globalRendering->viewRange*1.4f);
 		if(dist<0)
-			dist=gu->viewRange*1.4f;
+			dist=globalRendering->viewRange*1.4f;
 		float3 pos1=buttons[SDL_BUTTON_LEFT].camPos+buttons[SDL_BUTTON_LEFT].dir*dist;
 
-		dist=ground->LineGroundCol(camera->pos,camera->pos+dir*gu->viewRange*1.4f);
+		dist=ground->LineGroundCol(camera->pos,camera->pos+dir*globalRendering->viewRange*1.4f);
 		if(dist<0)
-			dist=gu->viewRange*1.4f;
+			dist=globalRendering->viewRange*1.4f;
 		float3 pos2=camera->pos+dir*dist;
 
 		float3 dir1=pos1-camera->pos;
@@ -522,11 +531,11 @@ void CMouseHandler::Draw()
 		float3 dir2=pos2-camera->pos;
 		dir2.Normalize();
 
-		float3 dir1S=camera->right*(dir1.dot(camera->right))/dir1.dot(camera->forward);
-		float3 dir1U=camera->up*(dir1.dot(camera->up))/dir1.dot(camera->forward);
+		float3 dir1S = camera->right * dir1.dot(camera->right) / dir1.dot(camera->forward);
+		float3 dir1U = camera->up * dir1.dot(camera->up) / dir1.dot(camera->forward);
 
-		float3 dir2S=camera->right*(dir2.dot(camera->right))/dir2.dot(camera->forward);
-		float3 dir2U=camera->up*(dir2.dot(camera->up))/dir2.dot(camera->forward);
+		float3 dir2S = camera->right * dir2.dot(camera->right) / dir2.dot(camera->forward);
+		float3 dir2U = camera->up * dir2.dot(camera->up) / dir2.dot(camera->forward);
 
 		glColor4fv(cmdColors.mouseBox);
 
@@ -564,11 +573,12 @@ void CMouseHandler::Draw()
 void CMouseHandler::WarpMouse(int x, int y)
 {
 	if (!locked) {
-		lastx = x + gu->viewPosX;
-		lasty = y + gu->viewPosY;
+		lastx = x + globalRendering->viewPosX;
+		lasty = y + globalRendering->viewPosY;
 		mouseInput->SetPos(int2(lastx, lasty));
 	}
 }
+
 
 // CALLINFO:
 // LuaUnsyncedRead::GetCurrentTooltip
@@ -596,7 +606,7 @@ std::string CMouseHandler::GetCurrentTooltip(void)
 	GML_RECMUTEX_LOCK(sel); // GetCurrentTooltip - anti deadlock
 	GML_RECMUTEX_LOCK(quad); // GetCurrentTooltip - called from ToolTipConsole::Draw --> MouseHandler::GetCurrentTooltip
 
-	const float range = (gu->viewRange * 1.4f);
+	const float range = (globalRendering->viewRange * 1.4f);
 	const CUnit* unit = NULL;
 	float udist = helper->GuiTraceRay(camera->pos, dir, range, unit, true);
 	const CFeature* feature = NULL;
@@ -641,10 +651,13 @@ void CMouseHandler::EmptyMsgQueUpdate()
 		return;
 	}
 
-	lastx = gu->viewSizeX / 2 + gu->viewPosX;
-	lasty = gu->viewSizeY / 2 + gu->viewPosY;
+	scrollx *= 0.5f;
+	scrolly *= 0.5f;
 
-	if (gu->active) {
+	lastx = globalRendering->viewSizeX / 2 + globalRendering->viewPosX;
+	lasty = globalRendering->viewSizeY / 2 + globalRendering->viewPosY;
+
+	if (globalRendering->active) {
 		mouseInput->SetPos(int2(lastx, lasty));
 	}
 }
@@ -672,8 +685,10 @@ void CMouseHandler::HideMouse()
 		hwHide = true;
 		SDL_ShowCursor(SDL_DISABLE);
 		mouseInput->SetWMMouseCursor(NULL);
-		lastx = gu->viewSizeX / 2 + gu->viewPosX;
-		lasty = gu->viewSizeY / 2 + gu->viewPosY;
+		scrollx = 0.f;
+		scrolly = 0.f;
+		lastx = globalRendering->viewSizeX / 2 + globalRendering->viewPosX;
+		lasty = globalRendering->viewSizeY / 2 + globalRendering->viewPosY;
 		mouseInput->SetPos(int2(lastx, lasty));
 		hide = true;
 	}
@@ -747,11 +762,120 @@ void CMouseHandler::UpdateCursors()
 	}
 }
 
+void CMouseHandler::DrawScrollCursor()
+{
+	const float scaleL = fabs(std::min(0.0f,scrollx)) * crossMoveScale + 1.0f;
+	const float scaleT = fabs(std::min(0.0f,scrolly)) * crossMoveScale + 1.0f;
+	const float scaleR = fabs(std::max(0.0f,scrollx)) * crossMoveScale + 1.0f;
+	const float scaleB = fabs(std::max(0.0f,scrolly)) * crossMoveScale + 1.0f;
 
-void CMouseHandler::DrawCursor(void)
+	glDisable(GL_TEXTURE_2D);
+	glBegin(GL_TRIANGLES);
+		glColor4f(1.0f, 1.0f, 1.0f, crossAlpha);
+			glVertex2f(   0.f * scaleT,  1.00f * scaleT);
+			glVertex2f( 0.33f * scaleT,  0.66f * scaleT);
+			glVertex2f(-0.33f * scaleT,  0.66f * scaleT);
+
+			glVertex2f(   0.f * scaleB, -1.00f * scaleB);
+			glVertex2f( 0.33f * scaleB, -0.66f * scaleB);
+			glVertex2f(-0.33f * scaleB, -0.66f * scaleB);
+
+			glVertex2f(-1.00f * scaleL,    0.f * scaleL);
+			glVertex2f(-0.66f * scaleL,  0.33f * scaleL);
+			glVertex2f(-0.66f * scaleL, -0.33f * scaleL);
+
+			glVertex2f( 1.00f * scaleR,    0.f * scaleR);
+			glVertex2f( 0.66f * scaleR,  0.33f * scaleR);
+			glVertex2f( 0.66f * scaleR, -0.33f * scaleR);
+
+		glColor4f(1.0f, 1.0f, 1.0f, crossAlpha);
+			glVertex2f(-0.33f * scaleT,  0.66f * scaleT);
+			glVertex2f( 0.33f * scaleT,  0.66f * scaleT);
+		glColor4f(0.2f, 0.2f, 0.2f, 0.f);
+			glVertex2f(   0.f,    0.f);
+
+		glColor4f(1.0f, 1.0f, 1.0f, crossAlpha);
+			glVertex2f(-0.33f * scaleB, -0.66f * scaleB);
+			glVertex2f( 0.33f * scaleB, -0.66f * scaleB);
+		glColor4f(0.2f, 0.2f, 0.2f, 0.f);
+			glVertex2f(   0.f,    0.f);
+
+		glColor4f(1.0f, 1.0f, 1.0f, crossAlpha);
+			glVertex2f(-0.66f * scaleL,  0.33f * scaleL);
+			glVertex2f(-0.66f * scaleL, -0.33f * scaleL);
+		glColor4f(0.2f, 0.2f, 0.2f, 0.f);
+			glVertex2f(   0.f,    0.f);
+
+		glColor4f(1.0f, 1.0f, 1.0f, crossAlpha);
+			glVertex2f( 0.66f * scaleR, -0.33f * scaleR);
+			glVertex2f( 0.66f * scaleR,  0.33f * scaleR);
+		glColor4f(0.2f, 0.2f, 0.2f, 0.f);
+			glVertex2f(   0.f,    0.f);
+	glEnd();
+
+	glEnable(GL_POINT_SMOOTH);
+
+	glPointSize(crossSize * 0.6f);
+	glBegin(GL_POINTS);
+		glColor4f(1.0f, 1.0f, 1.0f, 1.2f * crossAlpha);
+		glVertex2f(0.f, 0.f);
+	glEnd();
+
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+	glPointSize(1.0f);
+}
+
+
+void CMouseHandler::DrawFPSCursor()
+{
+	glDisable(GL_TEXTURE_2D);
+
+	const float wingHalf = fastmath::PI / 9.0f;
+	const int stepNumHalf = 2;
+	const float step = wingHalf / stepNumHalf;
+
+	glBegin(GL_TRIANGLES);
+		glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+
+		for (float angle = 0.0f; angle < fastmath::PI2; angle += fastmath::PI2 / 3.f) {
+			for (int i = -stepNumHalf; i < stepNumHalf; i++) {
+				glVertex2f(0.1f * fastmath::sin(angle),                0.1f * fastmath::cos(angle));
+				glVertex2f(0.8f * fastmath::sin(angle +     i * step), 0.8f * fastmath::cos(angle +     i * step));
+				glVertex2f(0.8f * fastmath::sin(angle + (i+1) * step), 0.8f * fastmath::cos(angle + (i+1) * step));
+			}
+		}
+	glEnd();
+
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+
+void CMouseHandler::DrawCursor()
 {
 	if (guihandler)
 		guihandler->DrawCentroidCursor();
+
+	if (locked) {
+		if (crossSize > 0.0f) {
+			const float xscale = (crossSize / globalRendering->viewSizeX);
+			const float yscale = (crossSize / globalRendering->viewSizeY);
+
+			glPushMatrix();
+			glTranslatef(0.5f - globalRendering->pixelX * 0.5f, 0.5f - globalRendering->pixelY * 0.5f, 0.f);
+			glScalef(xscale, yscale, 1.f);
+
+			if (gu->directControl) {
+				DrawFPSCursor();
+			} else {
+				DrawScrollCursor();
+			}
+
+			glPopMatrix();
+		}
+
+		glEnable(GL_TEXTURE_2D);
+		return;
+	}
 
 	if (hide || (cursorText == "none"))
 		return;
@@ -765,6 +889,7 @@ void CMouseHandler::DrawCursor(void)
 		currentCursor->Draw(lastx, lasty, cursorScale);
 	}
 	else {
+		//! hovered minimap, show default cursor and draw `special` cursor scaled-down bottom right of the default one
 		CMouseCursor* nc = cursorFileMap["cursornormal"];
 		if (nc == NULL) {
 			currentCursor->Draw(lastx, lasty, -cursorScale);
@@ -883,3 +1008,10 @@ void CMouseHandler::SafeDeleteCursor(CMouseCursor* cursor)
 
 
 /******************************************************************************/
+
+void CMouseHandler::ConfigNotify(const std::string& key, const std::string& value)
+{
+	if (key == "MouseDragScrollThreshold") {
+		dragScrollThreshold = atof(value.c_str());
+	}
+}

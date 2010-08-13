@@ -1,9 +1,6 @@
-// UnitLoader.cpp: implementation of the CUnitLoader class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
-#include "Rendering/GL/myGL.h"
 #include "mmgr.h"
 
 #include "UnitLoader.h"
@@ -26,8 +23,7 @@
 #include "Map/MapDamage.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
-#include "Platform/errorhandler.h"
-#include "Rendering/UnitModels/IModelParser.h"
+#include "Rendering/Models/IModelParser.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/AirMoveType.h"
@@ -50,7 +46,8 @@
 #include "Sim/Weapons/StarburstLauncher.h"
 #include "Sim/Weapons/TorpedoLauncher.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
-#include "Sound/AudioChannel.h"
+#include "System/EventBatchHandler.h"
+#include "Sound/IEffectChannel.h"
 #include "myMath.h"
 #include "LogOutput.h"
 #include "Exceptions.h"
@@ -150,8 +147,6 @@ CUnit* CUnitLoader::LoadUnit(const UnitDef* ud, float3 pos, int team,
 	unit->power = ud->power;
 	unit->maxHealth = ud->health;
 	unit->health = ud->health;
-	//unit->metalUpkeep = ud->metalUpkeep*16.0f/GAME_SPEED;
-	//unit->energyUpkeep = ud->energyUpkeep*16.0f/GAME_SPEED;
 	unit->controlRadius = (int)(ud->controlRadius / SQUARE_SIZE);
 	unit->losHeight = ud->losHeight;
 	unit->metalCost = ud->metalCost;
@@ -171,9 +166,9 @@ CUnit* CUnitLoader::LoadUnit(const UnitDef* ud, float3 pos, int team,
 	unit->sonarJamRadius   = ud->sonarJamRadius / (SQUARE_SIZE * 8);
 	unit->seismicRadius    = ud->seismicRadius  / (SQUARE_SIZE * 8);
 	unit->seismicSignature = ud->seismicSignature;
-	unit->hasRadarCapacity = unit->radarRadius  || unit->sonarRadius    ||
-	                         unit->jammerRadius || unit->sonarJamRadius ||
-	                         unit->seismicRadius;
+	unit->hasRadarCapacity = (unit->radarRadius   > 0.0f) || (unit->sonarRadius    > 0.0f) ||
+	                         (unit->jammerRadius  > 0.0f) || (unit->sonarJamRadius > 0.0f) ||
+	                         (unit->seismicRadius > 0.0f);
 	unit->stealth = ud->stealth;
 	unit->sonarStealth = ud->sonarStealth;
 	unit->category = ud->category;
@@ -184,6 +179,7 @@ CUnit* CUnitLoader::LoadUnit(const UnitDef* ud, float3 pos, int team,
 	unit->maxSpeed = ud->speed / GAME_SPEED;
 	unit->maxReverseSpeed = ud->rSpeed / GAME_SPEED;
 	unit->decloakDistance = ud->decloakDistance;
+	unit->cloakTimeout = ud->cloakTimeout;
 
 	unit->flankingBonusMode        = ud->flankingBonusMode;
 	unit->flankingBonusDir         = ud->flankingBonusDir;
@@ -193,17 +189,17 @@ CUnit* CUnitLoader::LoadUnit(const UnitDef* ud, float3 pos, int team,
 	unit->flankingBonusDifDamage = (ud->flankingBonusMax - ud->flankingBonusMin) * 0.5f;
 
 
-	if(ud->highTrajectoryType==1)
-		unit->useHighTrajectory=true;
+	if (ud->highTrajectoryType == 1)
+		unit->useHighTrajectory = true;
 
-	if(ud->fireState >= 0)
+	if (ud->fireState >= 0)
 		unit->fireState = ud->fireState;
 
-	if(build){
-		unit->ChangeLos(1,1);
-		unit->health=0.1f;
+	if (build) {
+		unit->ChangeLos(1, 1);
+		unit->health = 0.1f;
 	} else {
-		unit->ChangeLos((int)(ud->losRadius),(int)(ud->airLosRadius));
+		unit->ChangeLos(int(ud->losRadius), int(ud->airLosRadius));
 	}
 
 	if (type == "GroundUnit") {
@@ -320,6 +316,7 @@ CUnit* CUnitLoader::LoadUnit(const UnitDef* ud, float3 pos, int team,
 			unit->moveType = mt;
 		}
 	} else {
+		assert(ud->movedata == NULL);
 		unit->moveType = new CStaticMoveType(unit);
 		unit->upright = true;
 	}
@@ -342,12 +339,6 @@ CUnit* CUnitLoader::LoadUnit(const UnitDef* ud, float3 pos, int team,
 	// iif no custom volume is defined (unit->model->radius and
 	// unit->radius themselves are no longer altered)
 	unit->collisionVolume = new CollisionVolume(ud->collisionVolume, unit->model->radius * ((ud->canfly)? 0.5f: 1.0f));
-
-	if (unit->model->radius <= 60.0f) {
-		// the interval-based method fails too easily for units
-		// with small default volumes, force use of raytracing
-		unit->collisionVolume->SetTestType(COLVOL_TEST_CONT);
-	}
 
 
 	if (ud->floater) {
@@ -372,13 +363,16 @@ CUnit* CUnitLoader::LoadUnit(const UnitDef* ud, float3 pos, int team,
 	unit->updir = UpVector;
 	unit->rightdir = unit->frontdir.cross(unit->updir);
 
-	unit->curYardMap = ud->yardmaps[facing];
+	unit->curYardMap = (ud->yardmaps[facing].empty())? NULL: &ud->yardmaps[facing][0];
 
 	unit->Init(builder);
 
 	if (!build) {
 		unit->FinishedBuilding();
 	}
+
+	(eventBatchHandler->GetUnitCreatedDestroyedBatch()).enqueue(EventBatchHandler::UD(unit, unit->isCloaked));
+
 	return unit;
 }
 
@@ -439,8 +433,8 @@ CWeapon* CUnitLoader::LoadWeapon(const WeaponDef *weapondef, CUnit* owner, const
 			((CStarburstLauncher*) weapon)->tracking = 0;
 		((CStarburstLauncher*) weapon)->uptime = weapondef->uptime * GAME_SPEED;
 	} else {
+		weapon = new CNoWeapon(owner);
 		LogObject() << "Unknown weapon type " << weapondef->type.c_str() << "\n";
-		return 0;
 	}
 	weapon->weaponDef = weapondef;
 
