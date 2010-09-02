@@ -43,6 +43,7 @@
 #include "Exceptions.h"
 #include "TimeProfiler.h"
 #include "Net/UnpackPacket.h"
+#include "PlayerHandler.h"
 
 CPreGame* pregame = NULL;
 using netcode::RawPacket;
@@ -206,7 +207,7 @@ void CPreGame::UpdateClientNet()
 	}
 
 	boost::shared_ptr<const RawPacket> packet;
-	while ((packet = net->GetData()))
+	while ((packet = net->GetData(gs->frameNum)))
 	{
 		const unsigned char* inbuf = packet->data;
 		switch (inbuf[0]) {
@@ -222,12 +223,46 @@ void CPreGame::UpdateClientNet()
 				}		
 				break;
 			}
-			case NETMSG_GAMEDATA: { // server first sends this to let us know about teams, allyteams etc.
+			case NETMSG_CREATE_NEWPLAYER: { // server will send this first if we're using midgame join feature, to let us know about ourself (we won't be in gamedata), otherwise skip to gamedata
+				try {
+					netcode::UnpackPacket pckt(packet, 3);
+					unsigned char spectator, team, playerNum;
+					std::string name;
+					// since the >> operator uses dest size to extract data from the packet, we need to use temp variables
+					// of the same size of the packet, then convert to dest variable
+					pckt >> playerNum;
+					pckt >> spectator;
+					pckt >> team;
+					pckt >> name;
+					CPlayer player;
+					player.name = name;
+					player.spectator = spectator;
+					player.team = team;
+					player.playerNum = playerNum;
+					// add ourself, to avoid crashing if our player num gets queried
+					// we'll receive the same message later, in the game class, which is the global broadcast version
+					// the global broadcast will overwrite the user with the same values as here
+					playerHandler->AddPlayer(player);
+				} catch (netcode::UnpackPacketException &e) {
+					logOutput.Print("Got invalid New player message: %s", e.err.c_str());
+				}
+				break;
+			}
+			case NETMSG_GAMEDATA: { // server first ( not if we're joining midgame as extra players ) sends this to let us know about teams, allyteams etc.
+				if (gameSetup)
+					throw content_error("Duplicate game data received from server");
 				GameDataReceived(packet);
 				break;
 			}
 			case NETMSG_SETPLAYERNUM: { // this is sent afterwards to let us know which playernum we have
-				gu->SetMyPlayer(packet->data[1]);
+				if (!gameSetup)
+					throw content_error("No game data received from server");
+
+				unsigned char playerNum = packet->data[1];
+				if (playerHandler->ActivePlayers() <= playerNum)
+					throw content_error("Invalid player number received from server");
+
+				gu->SetMyPlayer(playerNum);
 				logOutput.Print("User number %i (team %i, allyteam %i)", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
 
 				// When calling this function, mod archives have to be loaded

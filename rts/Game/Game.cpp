@@ -1892,11 +1892,12 @@ bool CGame::ActionPressed(const Action& action,
 	}
 	else if (cmd == "teamhighlight") {
 		if (action.extra.empty()) {
-			gc->teamHighlight = !gc->teamHighlight;
+			gc->teamHighlight = abs(gc->teamHighlight + 1) % 3;
 		} else {
-			gc->teamHighlight = !!atoi(action.extra.c_str());
+			gc->teamHighlight = abs(atoi(action.extra.c_str())) % 3;
 		}
-		configHandler->Set("TeamHighlight", gc->teamHighlight ? 1 : 0);
+		logOutput.Print("Team highlighting: %s", ((gc->teamHighlight == 1) ? "Players only" : ((gc->teamHighlight == 2) ? "Players and spectators" : "Disabled")));
+		configHandler->Set("TeamHighlight", gc->teamHighlight);
 	}
 	else if (cmd == "info") {
 		if (action.extra.empty()) {
@@ -2305,7 +2306,7 @@ bool CGame::ActionPressed(const Action& action,
 		if (!Console::Instance().ExecuteAction(action))
 		{
 			if (guihandler != NULL) // maybe a widget is interested?
-				guihandler->PushLayoutCommand(action.rawline);
+				guihandler->PushLayoutCommand(action.rawline, false);
 			return false;
 		}
 	}
@@ -2462,24 +2463,25 @@ void CGame::ActionReceived(const Action& action, int playernum)
 
 		int amount = 1;
 		int team = playerHandler->Player(playernum)->team;
+		int allyteam = -1;
 
-		int amountArg = -1;
-		int teamArg = -1;
+		int amountArgIdx = -1;
+		int teamArgIdx = -1;
 
 		if (args.size() == 5) {
-			amountArg = 1;
-			teamArg = 3;
+			amountArgIdx = 1;
+			teamArgIdx = 3;
 		}
 		else if (args.size() == 4) {
 			if (args[1].find_first_not_of("0123456789") == string::npos) {
-				amountArg = 1;
+				amountArgIdx = 1;
 			} else {
-				teamArg = 2;
+				teamArgIdx = 2;
 			}
 		}
 
-		if (amountArg >= 0) {
-			const string& amountStr = args[amountArg];
+		if (amountArgIdx >= 0) {
+			const string& amountStr = args[amountArgIdx];
 			amount = atoi(amountStr.c_str());
 			if ((amount < 0) || (amountStr.find_first_not_of("0123456789") != string::npos)) {
 				logOutput.Print("Bad give amount: %s", amountStr.c_str());
@@ -2487,8 +2489,8 @@ void CGame::ActionReceived(const Action& action, int playernum)
 			}
 		}
 
-		if (teamArg >= 0) {
-			const string& teamStr = args[teamArg];
+		if (teamArgIdx >= 0) {
+			const string& teamStr = args[teamArgIdx];
 			team = atoi(teamStr.c_str());
 			if ((team < 0) || (team >= teamHandler->ActiveTeams()) || (teamStr.find_first_not_of("0123456789") != string::npos)) {
 				logOutput.Print("Bad give team: %s", teamStr.c_str());
@@ -2496,7 +2498,7 @@ void CGame::ActionReceived(const Action& action, int playernum)
 			}
 		}
 
-		const string unitName = (amountArg >= 0) ? args[2] : args[1];
+		const string unitName = (amountArgIdx >= 0) ? args[2] : args[1];
 
 		if (unitName == "all") {
 			// player entered ".give all"
@@ -2568,10 +2570,12 @@ void CGame::ActionReceived(const Action& action, int playernum)
 				}
 
 				logOutput.Print("Giving %i %s to team %i", numRequestedUnits, unitName.c_str(), team);
-			}
-			else {
-				if (teamArg < 0) {
+			} else {
+				if (teamArgIdx < 0) {
 					team = -1; // default to world features
+					allyteam = -1;
+				} else {
+					allyteam = teamHandler->AllyTeam(team);
 				}
 
 				const FeatureDef* featureDef = featureHandler->GetFeatureDef(unitName);
@@ -2591,8 +2595,9 @@ void CGame::ActionReceived(const Action& action, int playernum)
 							float minposz = minpos.z + z * zsize * SQUARE_SIZE;
 							float minposy = ground->GetHeight2(minposx, minposz);
 							const float3 upos(minposx, minposy, minposz);
+
 							CFeature* feature = new CFeature();
-							feature->Initialize(upos, featureDef, 0, 0, team, teamHandler->AllyTeam(team), "");
+							feature->Initialize(upos, featureDef, 0, 0, team, allyteam, "");
 							--total;
 						}
 					}
@@ -3482,6 +3487,7 @@ void CGame::StartPlaying()
 	lastTick = clock();
 	lastframe = SDL_GetTicks();
 
+	gu->startTime = gu->gameTime;
 	gu->myTeam = playerHandler->Player(gu->myPlayerNum)->team;
 	gu->myAllyTeam = teamHandler->AllyTeam(gu->myTeam);
 //	grouphandler->team = gu->myTeam;
@@ -3679,7 +3685,7 @@ void CGame::ClientReadNet()
 	// always render at least 2FPS (will otherwise be highly unresponsive when catching up after a reconnection)
 	unsigned procstarttime = SDL_GetTicks();
 	// really process the messages
-	while (timeLeft > 0.0f && (SDL_GetTicks() - procstarttime) < 500 && (packet = net->GetData()))
+	while (timeLeft > 0.0f && (SDL_GetTicks() - procstarttime) < 500 && (packet = net->GetData(gs->frameNum)))
 	{
 		const unsigned char* inbuf = packet->data;
 		const unsigned dataLength = packet->length;
@@ -3825,6 +3831,9 @@ void CGame::ClientReadNet()
 					netcode::UnpackPacket pckt(packet, 2);
 					unsigned char player;
 					pckt >> player;
+					if (player >= playerHandler->ActivePlayers())
+						throw netcode::UnpackPacketException("Invalid player number");
+
 					pckt >> playerHandler->Player(player)->name;
 					playerHandler->Player(player)->readyToStart=(gameSetup->startPosType != CGameSetup::StartPos_ChooseInGame);
 					playerHandler->Player(player)->active=true;
@@ -4595,6 +4604,32 @@ void CGame::ClientReadNet()
 			case NETMSG_SETPLAYERNUM:
 			case NETMSG_ATTEMPTCONNECT: {
 				AddTraffic(-1, packetCode, dataLength);
+				break;
+			}
+			case NETMSG_CREATE_NEWPLAYER: { // server sends this second to let us know about new clients that join midgame
+				try {
+					netcode::UnpackPacket pckt(packet, 3);
+					unsigned char spectator, team, playerNum;
+					std::string name;
+					// since the >> operator uses dest size to extract data from the packet, we need to use temp variables
+					// of the same size of the packet, then convert to dest variable
+					pckt >> playerNum;
+					pckt >> spectator;
+					pckt >> team;
+					pckt >> name;
+					CPlayer player;
+					player.name = name;
+					player.spectator = spectator;
+					player.team = team;
+					player.playerNum = playerNum;
+					// add the new player
+					playerHandler->AddPlayer(player);
+					logOutput.Print("Added new player: %s", name.c_str());
+					//TODO: perhaps add a lua hook, hook should be able to reassign the player to a team and/or create a new team/allyteam
+					AddTraffic(-1, packetCode, dataLength);
+				} catch (netcode::UnpackPacketException &e) {
+					logOutput.Print("Got invalid New player message: %s", e.err.c_str());
+				}
 				break;
 			}
 			default: {

@@ -103,7 +103,7 @@ CGrassDrawer::CGrassDrawer()
 	{
 		CBitmap grassBladeTexBM;
 		if (!grassBladeTexBM.Load(mapInfo->smf.grassBladeTexName)) {
-			//! map didn't defined a grasstex, so generate one
+			//! map didn't define a grasstex, so generate one
 			grassBladeTexBM.Alloc(256,64);
 
 			for (int a = 0; a < 16; ++a) {
@@ -182,31 +182,21 @@ void CGrassDrawer::LoadGrassShaders() {
 	CShaderHandler* sh = shaderHandler;
 
 	if (!globalRendering->haveGLSL) {
-		grassShaders[GRASS_PROGRAM_DIST_BASIC] =
-			sh->CreateProgramObject("[GrassDrawer]", shaderNames[GRASS_PROGRAM_DIST_BASIC] + "ARB", true);
-		grassShaders[GRASS_PROGRAM_DIST_BASIC]->AttachShaderObject(
-			sh->CreateShaderObject("ARB/grassFarNS.vp", "", GL_VERTEX_PROGRAM_ARB)
-		);
+		grassShaders[GRASS_PROGRAM_DIST_BASIC] = sh->CreateProgramObject("[GrassDrawer]", shaderNames[GRASS_PROGRAM_DIST_BASIC] + "ARB", true);
+		grassShaders[GRASS_PROGRAM_DIST_BASIC]->AttachShaderObject(sh->CreateShaderObject("ARB/grassFarNS.vp", "", GL_VERTEX_PROGRAM_ARB));
+
+		// these remain stubs if !canUseShadows
+		grassShaders[GRASS_PROGRAM_NEAR_SHADOW] = sh->CreateProgramObject("[GrassDrawer]", shaderNames[GRASS_PROGRAM_NEAR_SHADOW] + "ARB", true);
+		grassShaders[GRASS_PROGRAM_DIST_SHADOW] = sh->CreateProgramObject("[GrassDrawer]", shaderNames[GRASS_PROGRAM_DIST_SHADOW] + "ARB", true);
 
 		if (shadowHandler->canUseShadows) {
-			grassShaders[GRASS_PROGRAM_NEAR_SHADOW] =
-				sh->CreateProgramObject("[GrassDrawer]", shaderNames[GRASS_PROGRAM_NEAR_SHADOW] + "ARB", true);
-			grassShaders[GRASS_PROGRAM_NEAR_SHADOW]->AttachShaderObject(
-				sh->CreateShaderObject("ARB/grass.vp", "", GL_VERTEX_PROGRAM_ARB)
-			);
-
-			grassShaders[GRASS_PROGRAM_DIST_SHADOW] =
-				sh->CreateProgramObject("[GrassDrawer]", shaderNames[GRASS_PROGRAM_DIST_SHADOW] + "ARB", true);
-			grassShaders[GRASS_PROGRAM_DIST_SHADOW]->AttachShaderObject(
-				sh->CreateShaderObject("ARB/grassFar.vp", "", GL_VERTEX_PROGRAM_ARB)
-			);
+			grassShaders[GRASS_PROGRAM_NEAR_SHADOW]->AttachShaderObject(sh->CreateShaderObject("ARB/grass.vp", "", GL_VERTEX_PROGRAM_ARB));
+			grassShaders[GRASS_PROGRAM_DIST_SHADOW]->AttachShaderObject(sh->CreateShaderObject("ARB/grassFar.vp", "", GL_VERTEX_PROGRAM_ARB));
 		}
 	} else {
 		for (int i = GRASS_PROGRAM_NEAR_SHADOW; i < GRASS_PROGRAM_LAST; i++) {
 			grassShaders[i] = sh->CreateProgramObject("[GrassDrawer]", shaderNames[i] + "GLSL", false);
-			grassShaders[i]->AttachShaderObject(
-				sh->CreateShaderObject("GLSL/GrassVertProg.glsl", shaderDefines[i] + extraDefs, GL_VERTEX_SHADER)
-			);
+			grassShaders[i]->AttachShaderObject(sh->CreateShaderObject("GLSL/GrassVertProg.glsl", shaderDefines[i] + extraDefs, GL_VERTEX_SHADER));
 		}
 	}
 

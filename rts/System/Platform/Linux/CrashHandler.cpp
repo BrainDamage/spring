@@ -294,6 +294,7 @@ namespace CrashHandler {
 						containsOglSo = (containsOglSo || (path.find("libGLcore.so") != std::string::npos));
 						containsOglSo = (containsOglSo || (path.find("psb_dri.so") != std::string::npos));
 						containsOglSo = (containsOglSo || (path.find("i965_dri.so") != std::string::npos));
+						containsOglSo = (containsOglSo || (path.find("fglrx_dri.so") != std::string::npos));
 						const std::string absPath = createAbsolutePath(path);
 						if (containedAIInterfaceSo.empty() && (absPath.find("Interfaces") != std::string::npos)) {
 							containedAIInterfaceSo = absPath;
@@ -319,7 +320,8 @@ namespace CrashHandler {
 				if (containsOglSo) {
 					logOutput.Print("This stack trace indicates a problem with your graphic card driver. "
 					                "Please try upgrading or downgrading it. "
-					                "Specifically recommended is the latest driver, and one that is as old as your graphic card.\n");
+					                "Specifically recommended is the latest driver, and one that is as old as your graphic card. "
+					                "Also try lower graphic details and disabling Lua widgets in spring-settings.\n");
 					logOutput.Flush();
 				}
 				if (!containedAIInterfaceSo.empty()) {

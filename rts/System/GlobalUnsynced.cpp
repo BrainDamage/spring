@@ -34,6 +34,7 @@ CR_BIND(CGlobalUnsynced, );
 CR_REG_METADATA(CGlobalUnsynced, (
 				CR_MEMBER(modGameTime),
 				CR_MEMBER(gameTime),
+				CR_MEMBER(startTime),
 				CR_MEMBER(myPlayerNum),
 				CR_MEMBER(myTeam),
 				CR_MEMBER(myAllyTeam),
@@ -55,6 +56,7 @@ CGlobalUnsynced::CGlobalUnsynced()
 
 	modGameTime = 0;
 	gameTime = 0;
+	startTime = 0;
 
 	myPlayerNum = 0;
 	myTeam = 1;
@@ -127,18 +129,16 @@ float3 CGlobalUnsynced::usRandVector()
 void CGlobalUnsynced::SetMyPlayer(const int mynumber)
 {
 	myPlayerNum = mynumber;
-	if (gameSetup && gameSetup->playerStartingData.size() > mynumber)
-	{
-		myTeam = gameSetup->playerStartingData[myPlayerNum].team;
-		myAllyTeam = gameSetup->teamStartingData[myTeam].teamAllyteam;
+	CPlayer* Player = playerHandler->Player(myPlayerNum);
+	myTeam = Player->team;
+	myAllyTeam = gameSetup->teamStartingData[myTeam].teamAllyteam;
 
-		spectating = gameSetup->playerStartingData[myPlayerNum].spectator;
-		spectatingFullView   = gameSetup->playerStartingData[myPlayerNum].spectator;
-		spectatingFullSelect = gameSetup->playerStartingData[myPlayerNum].spectator;
+	spectating = Player->spectator;
+	spectatingFullView   = Player->spectator;
+	spectatingFullSelect = Player->spectator;
 
-		assert(myPlayerNum >= 0
-				&& gameSetup->playerStartingData.size() >= static_cast<size_t>(myPlayerNum)
-				&& myTeam >= 0
-				&& gameSetup->teamStartingData.size() >= myTeam);
-	}
+	assert(myPlayerNum >= 0
+		&& playerHandler->ActivePlayers() >= static_cast<size_t>(myPlayerNum)
+		&& myTeam >= 0
+		&& gameSetup->teamStartingData.size() >= myTeam);
 }
