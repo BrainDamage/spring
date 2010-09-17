@@ -1,25 +1,31 @@
-#ifndef EXPLOSION_GRAPHICS_H
-#define EXPLOSION_GRAPHICS_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef EXPLOSION_GENERATOR_H
+#define EXPLOSION_GENERATOR_H
 
 #include "Rendering/GL/myGL.h"
 #include "Sim/Misc/DamageArray.h"
 #include "Lua/LuaParser.h"
 #include "Sim/Objects/WorldObject.h"
 #include <map>
+#include <string>
+#include <vector>
+#include <boost/shared_ptr.hpp>
 
-
+class float3;
 class CUnit;
 class CExplosionGenerator;
 
 
 class CExpGenSpawnable: public CWorldObject
 {
-public:
 	CR_DECLARE(CExpGenSpawnable);
+public:
 	CExpGenSpawnable(): CWorldObject(){ GML_EXPGEN_CHECK() };
 	CExpGenSpawnable(const float3& pos): CWorldObject(pos) { GML_EXPGEN_CHECK() };
 	virtual ~CExpGenSpawnable() {};
-	virtual void Init(const float3& pos, CUnit* owner GML_PARG_H) = 0;
+
+	virtual void Init(const float3& pos, CUnit* owner) = 0;
 };
 
 
@@ -31,6 +37,7 @@ public:
 	void Load(const LuaTable&);
 	creg::Class* GetClass(const std::string& name);
 	std::string FindAlias(const std::string& className);
+
 protected:
 	std::map<std::string, std::string> aliases;
 };
@@ -42,9 +49,10 @@ public:
 	CExplosionGeneratorHandler();
 
 	CExplosionGenerator* LoadGenerator(const std::string& tag);
-	const LuaTable& GetTable() { return luaTable; }
+	const LuaTable& GetTable() const { return luaTable; }
 
 	ClassAliasList projectileClasses, generatorClasses;
+
 protected:
 	std::map<std::string, CExplosionGenerator*> generators;
 	LuaParser luaParser;
@@ -54,9 +62,9 @@ protected:
 
 class CExplosionGenerator
 {
-public:
 	CR_DECLARE(CExplosionGenerator);
 
+public:
 	CExplosionGenerator();
 	virtual ~CExplosionGenerator();
 
@@ -67,9 +75,9 @@ public:
 
 class CStdExplosionGenerator: public CExplosionGenerator
 {
-public:
 	CR_DECLARE(CStdExplosionGenerator);
 
+public:
 	CStdExplosionGenerator();
 	virtual ~CStdExplosionGenerator();
 
@@ -78,24 +86,37 @@ public:
 };
 
 
-/* Defines the result of an explosion as a series of new projectiles */
+/** Defines the result of an explosion as a series of new projectiles */
 class CCustomExplosionGenerator: public CStdExplosionGenerator
 {
-protected:
 	CR_DECLARE(CCustomExplosionGenerator);
 
+protected:
 	struct ProjectileSpawnInfo {
-		ProjectileSpawnInfo() { projectileClass = 0; }
+		ProjectileSpawnInfo()
+			: projectileClass(NULL)
+			, count(0)
+			, flags(0)
+		{}
 
 		creg::Class* projectileClass;
 		std::vector<char> code;
-		int count;// number of projectiles spawned of this type
+		/// number of projectiles spawned of this type
+		int count;
 		unsigned int flags;
 	};
 
 	// TODO: Handle ground flashes with more flexibility like the projectiles
 	struct GroundFlashInfo {
-		GroundFlashInfo() { ttl = 0; }
+		GroundFlashInfo()
+			: flashSize(0.0f)
+			, flashAlpha(0.0f)
+			, circleGrowth(0.0f)
+			, circleAlpha(0.0f)
+			, ttl(0)
+			, color(0.0f, 0.0f, 0.0f)
+			, flags(0)
+		{}
 
 		float flashSize;
 		float flashAlpha;
@@ -116,14 +137,15 @@ protected:
 	std::map<string, CEGData>::iterator currentCEG;
 
 	void ParseExplosionCode(ProjectileSpawnInfo* psi, int baseOffset, boost::shared_ptr<creg::IType> type, const std::string& script, std::string& code);
-	void ExecuteExplosionCode (const char* code, float damage, char* instance, int spawnIndex, const float3& dir);
+	void ExecuteExplosionCode(const char* code, float damage, char* instance, int spawnIndex, const float3& dir);
 
 public:
 	CCustomExplosionGenerator();
 	~CCustomExplosionGenerator();
+
 	static void OutputProjectileClassInfo();
 
-	void Load (CExplosionGeneratorHandler* loader, const std::string& tag);// throws content_error/runtime_error on errors
+	void Load(CExplosionGeneratorHandler* loader, const std::string& tag);// throws content_error/runtime_error on errors
 	void Explosion(const float3& pos, float damage, float radius, CUnit* owner, float gfxMod, CUnit* hit, const float3& dir);
 };
 
@@ -131,4 +153,4 @@ public:
 extern CExplosionGeneratorHandler* explGenHandler;
 
 
-#endif
+#endif // EXPLOSION_GENERATOR_H

@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /**
- * @file Main.cpp
- * @brief Main class
- *
  * Main application class that launches
  * everything else
  */
@@ -11,8 +10,6 @@
 #endif
 #include <sstream>
 #include <boost/system/system_error.hpp>
-#include <boost/asio.hpp>
-#include <boost/version.hpp>
 
 #include "Platform/errorhandler.h"
 #ifndef _MSC_VER
@@ -24,13 +21,8 @@
 
 #include "SpringApp.h"
 
-#include <SDL.h>     // Must come after Game/UI/MouseHandler.h for ButtonPressEvt
-
 #ifdef WIN32
 #include "Platform/Win/win32.h"
-#include <winreg.h>
-#include <direct.h>
-#include "Platform/Win/seh.h"
 #endif
 
 
@@ -57,59 +49,30 @@ int Run(int argc, char* argv[])
 #	endif
 #endif
 
-// It's nice to be able to disable catching when you're debugging
-#ifndef NO_CATCH_EXCEPTIONS
+
 	try {
 		SpringApp app;
 		return app.Run(argc, argv);
 	}
 	catch (const content_error& e) {
-		SDL_Quit();
-		logOutput.RemoveAllSubscribers();
-		logOutput.Print("Content error: %s\n", e.what());
-		handleerror(NULL, e.what(), "Incorrect/Missing content:", MBF_OK | MBF_EXCL);
-		return -1;
+		ErrorMessageBox(e.what(), "Incorrect/Missing content:", MBF_OK | MBF_EXCL);
 	}
+#ifndef NO_CATCH_EXCEPTIONS
 	catch (const boost::system::system_error& e) {
-		logOutput.Print("Fatal system error: %d: %s", e.code().value(), e.what());
-	#ifdef _MSC_VER
-		throw;
-	#else
 		std::stringstream ss;
 		ss << e.code().value() << ": " << e.what();
 		std::string tmp = ss.str();
-		handleerror(NULL, tmp.c_str(), "Fatal Error", MBF_OK | MBF_EXCL);
-		return -1;
-	#endif
+		ErrorMessageBox(tmp, "Fatal Error", MBF_OK | MBF_EXCL);
 	}
 	catch (const std::exception& e) {
-		SDL_Quit();
-	#ifdef _MSC_VER
-		logOutput.Print("Fatal error: %s\n", e.what());
-		logOutput.RemoveAllSubscribers();
-		throw; // let the error handler catch it
-	#else
-		logOutput.RemoveAllSubscribers();
-		handleerror(NULL, e.what(), "Fatal Error", MBF_OK | MBF_EXCL);
-		return -1;
-	#endif
+		ErrorMessageBox(e.what(), "Fatal Error", MBF_OK | MBF_EXCL);
 	}
 	catch (const char* e) {
-		SDL_Quit();
-	#ifdef _MSC_VER
-		logOutput.Print("Fatal error: %s\n", e);
-		logOutput.RemoveAllSubscribers();
-		throw; // let the error handler catch it
-	#else
-		logOutput.RemoveAllSubscribers();
-		handleerror(NULL, e, "Fatal Error", MBF_OK | MBF_EXCL);
-		return -1;
-	#endif
+		ErrorMessageBox(e, "Fatal Error", MBF_OK | MBF_EXCL);
 	}
-#else
-	SpringApp app;
-	return app.Run(argc, argv);
 #endif
+
+	return -1;
 }
 
 

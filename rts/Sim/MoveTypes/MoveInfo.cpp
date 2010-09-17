@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include <boost/lexical_cast.hpp>
 #include "mmgr.h"
@@ -66,7 +68,7 @@ CMoveInfo* moveinfo;
 
 static float DegreesToMaxSlope(float degrees)
 {
-	return (float)(1.0 - cos(degrees * 1.5f * PI / 180.0f));
+	return (1.0f - cos(degrees * 1.5f * PI / 180.0f));
 }
 
 
@@ -135,9 +137,9 @@ CMoveInfo::CMoveInfo()
 			}
 		}
 
-		md->heatMapping = moveTable.GetBool("heatMapping", true);
-		md->heatMod = moveTable.GetFloat("heatMod", 0.05f);
-		md->heatProduced = moveTable.GetInt("heatProduced", 30);
+		md->heatMapping = moveTable.GetBool("heatMapping", false);
+		md->heatMod = moveTable.GetFloat("heatMod", 50.0f);
+		md->heatProduced = moveTable.GetInt("heatProduced", 60);
 
 		// ground units hug the ocean floor when in water,
 		// ships stay at a "fixed" level (their waterline)

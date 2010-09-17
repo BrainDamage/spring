@@ -1,4 +1,5 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /* heavily based on CobEngine.cpp */
 
 #include "UnitScriptEngine.h"
@@ -6,7 +7,6 @@
 
 #include "LogOutput.h"
 #include "FileSystem/FileHandler.h"
-#include "Platform/errorhandler.h"
 
 #ifndef _CONSOLE
 #  include "TimeProfiler.h"

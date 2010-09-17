@@ -1,12 +1,13 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// VerticalSync.cpp implementation of the CVerticalSync class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #ifdef WIN32
 #include "Platform/Win/win32.h"
+#elif defined HEADLESS
+#include "lib/headlessStubs/glxextstub.h" // for glXGetVideoSyncSGI() glXWaitVideoSyncSGI()
 #else
-#include <GL/glxew.h> // for glXWaitVideoSyncSGI()
+#include <GL/glxew.h> // for glXGetVideoSyncSGI() glXWaitVideoSyncSGI()
 #endif
 #include "mmgr.h"
 
@@ -74,7 +75,7 @@ void CVerticalSync::SetFrames(int f)
 
 /******************************************************************************/
 
-void CVerticalSync::Delay()
+void CVerticalSync::Delay() const
 {
 #if !defined(WIN32) && !defined(__APPLE__)
 	if (frames > 0) {

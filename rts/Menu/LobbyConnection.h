@@ -1,7 +1,9 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LOBBYCONNECTION_H
 #define LOBBYCONNECTION_H
 
-#include "lib/liblobby/Connection.h"
+#include "lib/lobby/Connection.h"
 
 class UpdaterWindow;
 

@@ -1,10 +1,14 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef READMAP_H
 #define READMAP_H
-// ReadMap.h: interface for the CReadMap class.
-//
-//////////////////////////////////////////////////////////////////////
 
+#ifdef BITMAP_NO_OPENGL
+// FIXME: this is hacky. this class should not depend on OpenGL stuff
+typedef unsigned int GLuint;
+#else
 #include "Rendering/GL/myGL.h"
+#endif
 #include "creg/creg_cond.h"
 #include "float3.h"
 #include "Sim/Misc/GlobalConstants.h"
@@ -30,7 +34,7 @@ struct MapFeatureInfo
 
 struct MapBitmapInfo
 {
-	MapBitmapInfo() {}
+	MapBitmapInfo() : width(0), height(0) {}
 	MapBitmapInfo(int w, int h) : width(w), height(h) {}
 
 	int width;
@@ -38,11 +42,10 @@ struct MapBitmapInfo
 };
 
 struct HeightmapUpdate {
-	HeightmapUpdate(int x, int xx, int y, int yy) : x1(x),x2(xx),y1(y),y2(yy) {}
-	int x1;
-	int x2;
-	int y1;
-	int y2;
+	HeightmapUpdate(int x, int xx, int y, int yy) : x1(x), x2(xx), y1(y), y2(yy) {}
+
+	int x1, x2;
+	int y1, y2;
 };
 
 class CReadMap
@@ -66,7 +69,10 @@ protected:
 	void CalcHeightmapChecksum();
 public:
 	virtual const float* GetHeightmap() const = 0; //! returns a float[(mapx+1)*(mapy+1)]
+
+	virtual void NewGroundDrawer() = 0;
 	virtual CBaseGroundDrawer* GetGroundDrawer() { return 0; }
+
 	virtual GLuint GetGrassShadingTexture() const { return 0; }
 	virtual GLuint GetShadingTexture() const = 0; //! a texture with RGB for shading and A for height (0 := above water; 1-255 := under water = 255+height*10)
 
@@ -75,13 +81,16 @@ public:
 	virtual void AddHeight(const int& idx, const float& a) = 0;
 	void HeightmapUpdated(const int& x1, const int& y1, const int& x2, const int& y2);
 
-	float* orgheightmap;    //! size: (mapx+1)*(mapy+1) (per vertex)
-	float* centerheightmap; //! size: (mapx)*(mapy)     (per face)
-	static const int numHeightMipMaps = 7;	//! number of heightmap mipmaps, including full resolution
-	float* mipHeightmap[numHeightMipMaps];	//! array of pointers to heightmap in different resolutions, mipHeightmap[0] is full resolution, mipHeightmap[n+1] is half resolution of mipHeightmap[n]
-	float* slopemap;        //! size: (mapx/2)*(mapy/2) (1.0 - interpolate(centernomal[i]).y)
-	float3* facenormals;    //! size: 2*mapx*mapy (contains 2 normals per quad -> triangle strip)
-	float3* centernormals;  //! size: mapx*mapy (contains interpolated 1 normal per quad, same as (facenormal0+facenormal1).Normalize())
+	float* orgheightmap;                   //! size: (mapx+1)*(mapy+1) (per vertex)
+	float* centerheightmap;                //! size: (mapx)*(mapy)     (per face)
+	static const int numHeightMipMaps = 7; //! number of heightmap mipmaps, including full resolution
+	float* mipHeightmap[numHeightMipMaps]; //! array of pointers to heightmap in different resolutions, mipHeightmap[0] is full resolution, mipHeightmap[n+1] is half resolution of mipHeightmap[n]
+	float* slopemap;                       //! size: (mapx/2)*(mapy/2) (1.0 - interpolate(centernomal[i]).y)
+	float3* facenormals;                   //! size: 2*mapx*mapy (contains 2 normals per quad -> triangle strip)
+	float3* centernormals;                 //! size: mapx*mapy (contains interpolated 1 normal per quad, same as (facenormal0+facenormal1).Normalize())
+
+	std::vector<float3> vertexNormals;     //! size: (mapx + 1) * (mapy + 1), contains one vertex normal per heightmap pixel
+
 	unsigned char* typemap;
 
 	CMetalMap *metalMap;   //! Metal-density/height-map

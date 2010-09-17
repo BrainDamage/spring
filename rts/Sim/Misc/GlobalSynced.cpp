@@ -1,32 +1,33 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "GlobalSynced.h"
 
 #include <assert.h>
 #include <cstring>
 
-#include "Game/GameSetup.h"
-#include "Game/PlayerHandler.h"
 #include "ExternalAI/SkirmishAIHandler.h"
+#include "Game/GameSetup.h"
 #include "Lua/LuaGaia.h"
 #include "Lua/LuaRules.h"
-#include "Team.h"
-#include "TeamHandler.h"
-#include "GlobalConstants.h"
-#include "Util.h"
+#include "Sim/Misc/Team.h"
+#include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/GlobalConstants.h"
+#include "System/Util.h"
 
 
 /**
  * @brief global synced
  *
- * Global instance of CGlobalSyncedStuff
+ * Global instance of CGlobalSynced
  */
-CGlobalSyncedStuff* gs;
+CGlobalSynced* gs = NULL;
 
 
 
-CR_BIND(CGlobalSyncedStuff,);
+CR_BIND(CGlobalSynced, );
 
-CR_REG_METADATA(CGlobalSyncedStuff, (
+CR_REG_METADATA(CGlobalSynced, (
 	CR_MEMBER(frameNum),
 	CR_MEMBER(speedFactor),
 	CR_MEMBER(userSpeedFactor),
@@ -52,12 +53,17 @@ CR_REG_METADATA(CGlobalSyncedStuff, (
 
 
 /**
- * Initializes variables in CGlobalSyncedStuff
+ * Initializes variables in CGlobalSynced
  */
-CGlobalSyncedStuff::CGlobalSyncedStuff()
+CGlobalSynced::CGlobalSynced()
 {
-	hmapx = 256;
-	hmapy = 256;
+	mapx  = 512;
+	mapy  = 512;
+	mapSquares = mapx * mapy;
+	hmapx = mapx>>1;
+	hmapy = mapy>>1;
+	pwr2mapx = mapx; //next_power_of_2(mapx);
+	pwr2mapy = mapy; //next_power_of_2(mapy);
 	randSeed = 18655;
 	initRandSeed = randSeed;
 	frameNum = 0;
@@ -72,32 +78,22 @@ CGlobalSyncedStuff::CGlobalSyncedStuff()
 	tempNum = 2;
 	useLuaGaia = true;
 
-	// TODO: put this somewhere else (playerHandler is unsynced, even)
-	playerHandler = new CPlayerHandler();
 	teamHandler = new CTeamHandler();
 }
 
 
-CGlobalSyncedStuff::~CGlobalSyncedStuff()
+CGlobalSynced::~CGlobalSynced()
 {
-	// TODO: put this somewhere else (playerHandler is unsynced, even)
-	SafeDelete(playerHandler);
 	SafeDelete(teamHandler);
 }
 
 
-void CGlobalSyncedStuff::LoadFromSetup(const CGameSetup* setup)
+void CGlobalSynced::LoadFromSetup(const CGameSetup* setup)
 {
 	noHelperAIs = !!setup->noHelperAIs;
-
-	useLuaGaia  = CLuaGaia::SetConfigString(setup->luaGaiaStr);
-	CLuaRules::SetConfigString(setup->luaRulesStr);
-
-	// TODO: this call is unsynced, technically
-	playerHandler->LoadFromSetup(setup);
+	useLuaGaia  = setup->useLuaGaia;
 
 	skirmishAIHandler.LoadFromSetup(*setup);
-
 	teamHandler->LoadFromSetup(setup);
 }
 
@@ -106,10 +102,10 @@ void CGlobalSyncedStuff::LoadFromSetup(const CGameSetup* setup)
  *
  * returns a synced random integer
  */
-int CGlobalSyncedStuff::randInt()
+int CGlobalSynced::randInt()
 {
 	randSeed = (randSeed * 214013L + 2531011L);
-	return randSeed & RANDINT_MAX;
+	return (randSeed >> 16) & RANDINT_MAX;
 }
 
 /**
@@ -117,10 +113,10 @@ int CGlobalSyncedStuff::randInt()
  *
  * returns a synced random float
  */
-float CGlobalSyncedStuff::randFloat()
+float CGlobalSynced::randFloat()
 {
 	randSeed = (randSeed * 214013L + 2531011L);
-	return float(randSeed & RANDINT_MAX)/RANDINT_MAX;
+	return float((randSeed >> 16) & RANDINT_MAX)/RANDINT_MAX;
 }
 
 /**
@@ -128,7 +124,7 @@ float CGlobalSyncedStuff::randFloat()
  *
  * returns a synced random vector
  */
-float3 CGlobalSyncedStuff::randVector()
+float3 CGlobalSynced::randVector()
 {
 	float3 ret;
 	do {

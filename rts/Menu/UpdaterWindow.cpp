@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifdef _MSC_VER
 #include "StdAfx.h"
 #endif
@@ -6,7 +8,7 @@
 #include <boost/bind.hpp>
 
 #include "ConfigHandler.h"
-#include "lib/liblobby/Connection.h"
+#include "lib/lobby/Connection.h"
 #include "aGui/LineEdit.h"
 #include "aGui/VerticalLayout.h"
 #include "aGui/HorizontalLayout.h"

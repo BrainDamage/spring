@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef __GAME_SERVER_H__
 #define __GAME_SERVER_H__
 
@@ -50,7 +52,7 @@ class GameTeam : public TeamBase
 public:
 	GameTeam() : active(false) {};
 	bool active;
-	void operator=(const TeamBase& base) { TeamBase::operator=(base); };
+	GameTeam& operator=(const TeamBase& base) { TeamBase::operator=(base); return *this; };
 };
 
 /**
@@ -61,9 +63,9 @@ public:
  */
 class CGameServer
 {
-	friend class CLoadSaveHandler;     //For initialize server state after load
+	friend class CCregLoadSaveHandler;     //For initialize server state after load
 public:
-	CGameServer(const ClientSetup* settings, bool onlyLocal, const GameData* const gameData, const CGameSetup* const setup);
+	CGameServer(int hostport, bool onlyLocal, const GameData* const gameData, const CGameSetup* const setup);
 	~CGameServer();
 
 	void AddLocalClient(const std::string& myName, const std::string& myVersion);
@@ -79,13 +81,14 @@ public:
 	void CreateNewFrame(bool fromServerThread, bool fixedFrameTime);
 
 	bool WaitsOnCon() const;
-	bool GameHasStarted() const;
 
 	void SetGamePausable(const bool arg);
 
 	bool HasDemo() const { return (demoReader != NULL); }
 	/// Is the server still running?
 	bool HasFinished() const;
+
+	void UpdateSpeedControl(int speedCtrl);
 
 private:
 	/**
@@ -101,7 +104,7 @@ private:
 	 */
 	void KickPlayer(const int playerNum);
 
-	unsigned BindConnection(std::string name, const std::string& passwd, const std::string& version, bool isLocal, boost::shared_ptr<netcode::CConnection> link);
+	unsigned BindConnection(std::string name, const std::string& passwd, const std::string& version, bool isLocal, boost::shared_ptr<netcode::CConnection> link, bool reconnect = false);
 
 	void CheckForGameStart(bool forced=false);
 	void StartGame();
@@ -132,6 +135,10 @@ private:
 	void Message(const std::string& message, bool broadcast=true);
 	void PrivateMessage(int playernum, const std::string& message);
 
+	void AddToPacketCache(boost::shared_ptr<const netcode::RawPacket> &pckt);
+
+	float GetDemoTime();
+
 	/////////////////// game status variables ///////////////////
 
 	volatile bool quitServer;
@@ -147,14 +154,14 @@ private:
 	spring_time lastPlayerInfo;
 	spring_time lastUpdate;
 	float modGameTime;
+	float gameTime;
+	float startTime;
 
 	bool isPaused;
 	float userSpeedFactor;
 	float internalSpeed;
 	bool cheating;
 
-	// Ugly hax for letting the script define initial team->isAI and team->leader for AI teams
-	friend class CSkirmishAITestScript;
 	std::vector<GameParticipant> players;
 	size_t ReserveNextAvailableSkirmishAIId();
 	
@@ -166,7 +173,8 @@ private:
 
 	float medianCpu;
 	int medianPing;
-	int enforceSpeed;
+	int curSpeedCtrl;
+	int speedControl;
 	/////////////////// game settings ///////////////////
 	boost::scoped_ptr<const CGameSetup> setup;
 	boost::scoped_ptr<const GameData> gameData;
@@ -182,7 +190,8 @@ private:
 	bool noHelperAIs;
 	bool allowSpecDraw;
 	bool allowAdditionalPlayers;
-	std::list< boost::shared_ptr<const netcode::RawPacket> > packetCache; //waaa, the overhead
+	bool whiteListAdditionalPlayers;
+	std::list< std::vector<boost::shared_ptr<const netcode::RawPacket> > > packetCache;
 
 	/////////////////// sync stuff ///////////////////
 #ifdef SYNCCHECK
@@ -194,6 +203,8 @@ private:
 	///////////////// internal stuff //////////////////
 	void InternalSpeedChange(float newSpeed);
 	void UserSpeedChange(float newSpeed, int player);
+
+	void AddAdditionalUser( const std::string& name, const std::string& passwd );
 
 	bool hasLocalClient;
 	unsigned localClientNumber;
@@ -221,6 +232,9 @@ private:
 	};
 	std::map<unsigned int, TeamStatsStruct> teamStats;
 #endif
+
+	bool canReconnect;
+	bool gameHasStarted;
 };
 
 extern CGameServer* gameServer;

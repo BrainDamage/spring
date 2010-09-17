@@ -1,5 +1,7 @@
-#ifndef FILESYSTEMHANDLER_H
-#define FILESYSTEMHANDLER_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef FILE_SYSTEM_HANDLER_H
+#define FILE_SYSTEM_HANDLER_H
 
 #include <vector>
 #include <string>
@@ -11,12 +13,13 @@
  */
 class FileSystemHandler
 {
+	~FileSystemHandler();
+	FileSystemHandler();
+
 public:
 	static FileSystemHandler& GetInstance();
 	static void Initialize(bool verbose);
 	static void Cleanup();
-
-	void Initialize();
 
 	// almost direct wrappers to system calls
 	static bool mkdir(const std::string& dir);
@@ -34,6 +37,24 @@ public:
 	 * on all other systems: ^/$
 	 */
 	static bool IsFSRoot(const std::string& path);
+
+	/**
+	 * Returns true if the path ends with the platform native path separator
+	 * (win: '\\', rest: '/').
+	 */
+	static bool HasPathSepAtEnd(const std::string& path);
+	/**
+	 * Ensures the path ends with the platform native path separator
+	 * (win: '\\', rest: '/').
+	 */
+	static void EnsurePathSepAtEnd(std::string& path);
+
+	/**
+	 * @brief get filesize
+	 *
+	 * @return the filesize or 0 if the file doesn't exist.
+	 */
+	static size_t GetFileSize(const std::string& file);
 
 	// custom functions
 	/**
@@ -72,9 +93,6 @@ public:
 	static bool IsAbsolutePath(const std::string& path);
 
 private:
-	~FileSystemHandler();
-	FileSystemHandler();
-
 	/**
 	 * @brief internal find-files-in-a-single-datadir-function
 	 * @param absolute paths to the dirs found will be added to this
@@ -94,4 +112,4 @@ private:
 	static const int native_path_separator;
 };
 
-#endif // !FILESYSTEMHANDLER_H
+#endif // !FILE_SYSTEM_HANDLER_H

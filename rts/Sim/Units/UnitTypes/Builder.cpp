@@ -1,6 +1,4 @@
-// Builder.cpp: implementation of the CBuilder class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include <assert.h>
@@ -14,7 +12,7 @@
 #include "Map/MapDamage.h"
 #include "Map/ReadMap.h"
 #include "myMath.h"
-#include "Rendering/UnitModels/3DOParser.h"
+#include "Rendering/GlobalRendering.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
@@ -28,10 +26,10 @@
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/UnitLoader.h"
-#include "GlobalUnsynced.h"
-#include "EventHandler.h"
-#include "Sound/AudioChannel.h"
-#include "mmgr.h"
+#include "System/GlobalUnsynced.h"
+#include "System/EventHandler.h"
+#include "System/Sound/IEffectChannel.h"
+#include "System/mmgr.h"
 
 using std::min;
 using std::max;
@@ -118,7 +116,7 @@ void CBuilder::UnitInit(const UnitDef* def, int team, const float3& position)
 	range3D = def->buildRange3D;
 	buildDistance = def->buildDistance;
 
-	const float scale = (1.0f / 32.0f);
+	const float scale = (1.0f / TEAM_SLOWUPDATE_RATE);
 
 	buildSpeed     = scale * def->buildSpeed;
 	repairSpeed    = scale * def->repairSpeed;
@@ -133,11 +131,7 @@ void CBuilder::UnitInit(const UnitDef* def, int team, const float3& position)
 
 void CBuilder::Update()
 {
-	if (beingBuilt) {
-		return;
-	}
-
-	if (!stunned) {
+	if (!beingBuilt && !stunned) {
 		if (terraforming && inBuildStance) {
 			const float* heightmap = readmap->GetHeightmap();
 			assert(!mapDamage->disabled); // The map should not be deformed in the first place.
@@ -741,7 +735,7 @@ void CBuilder::CreateNanoParticle(float3 goal, float radius, bool inverse)
 		float3 error = gu->usRandVector() * (radius / l);
 		float3 color = unitDef->nanoColor;
 
-		if (gu->teamNanospray) {
+		if (globalRendering->teamNanospray) {
 			unsigned char* tcol = teamHandler->Team(team)->color;
 			color = float3(tcol[0] * (1.f / 255.f), tcol[1] * (1.f / 255.f), tcol[2] * (1.f / 255.f));
 		}

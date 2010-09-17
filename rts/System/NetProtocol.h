@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef NETPROTOCOL_H
 #define NETPROTOCOL_H
 
@@ -27,7 +29,7 @@ public:
 	/**
 	@brief Initialise in client mode (remote server)
 	*/
-	void InitClient(const char* server,unsigned portnum,unsigned sourceport, const std::string& myName, const std::string& myPasswd, const std::string& myVersion);
+	void InitClient(const char* server,unsigned portnum, const std::string& myName, const std::string& myPasswd, const std::string& myVersion);
 	
 	/**
 	@brief Initialise in client mode (local server)
@@ -35,7 +37,11 @@ public:
 	void InitLocalClient();
 
 	/// Are we still connected (or did the connection timed out)?
-	bool Active() const;
+	bool CheckTimeout(int nsecs = 0, bool initial = false) const;
+
+	void AttemptReconnect(const std::string& myName, const std::string& myPasswd, const std::string& myVersion);
+
+	bool NeedsReconnect();
 
 	/// This checks if any data has been already received
 	bool Connected() const;
@@ -56,7 +62,7 @@ public:
 	
 	Receives only one message at a time (even if there are more in the recieve buffer), so call this until you get a 0 in return. When a demo recorder is present it will be recorded.
 	 */
-	boost::shared_ptr<const netcode::RawPacket> GetData();
+	boost::shared_ptr<const netcode::RawPacket> GetData(int framenum);
 	
 	/**
 	@brief Send a message to the server

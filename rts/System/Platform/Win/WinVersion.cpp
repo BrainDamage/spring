@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include <sstream>
 #include <string>
@@ -70,7 +72,6 @@ std::string GetOSDisplayString()
     OSVERSIONINFOEX osvi;
     SYSTEM_INFO si;
     PGNSI pGNSI;
-    PGPI pGPI;
     BOOL bOsVersionInfoEx;
     DWORD dwType;
 
@@ -110,7 +111,7 @@ std::string GetOSDisplayString()
                else oss << "Windows Server 2008 R2 ";
             }
 
-            pGPI = (PGPI) GetProcAddress(
+            PGPI pGPI = (PGPI) GetProcAddress(
                        GetModuleHandle(TEXT("kernel32.dll")),
                        "GetProductInfo");
 

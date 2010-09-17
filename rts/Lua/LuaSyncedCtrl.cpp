@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaSyncedCtrl.cpp: implementation of the CLuaSyncedCtrl class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <list>
@@ -31,7 +30,6 @@
 #include "Map/ReadMap.h"
 #include "Rendering/GroundDecalHandler.h"
 #include "Rendering/Env/BaseTreeDrawer.h"
-#include "Rendering/UnitModels/IModelParser.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/CollisionVolume.h"
@@ -123,6 +121,11 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(UseTeamResource);
 	REGISTER_LUA_CFUNC(SetTeamResource);
 	REGISTER_LUA_CFUNC(SetTeamShareLevel);
+	REGISTER_LUA_CFUNC(ShareTeamResource);
+
+	REGISTER_LUA_CFUNC(SetUnitRulesParam);
+	REGISTER_LUA_CFUNC(SetTeamRulesParam);
+	REGISTER_LUA_CFUNC(SetGameRulesParam);
 
 	REGISTER_LUA_CFUNC(CreateUnit);
 	REGISTER_LUA_CFUNC(DestroyUnit);
@@ -188,6 +191,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetFeatureCollisionVolumeData);
 
 
+	REGISTER_LUA_CFUNC(SetProjectileMoveControl);
 	REGISTER_LUA_CFUNC(SetProjectilePosition);
 	REGISTER_LUA_CFUNC(SetProjectileVelocity);
 	REGISTER_LUA_CFUNC(SetProjectileCollision);
@@ -403,7 +407,7 @@ static inline CProjectile* ParseProjectile(lua_State* L,
 	if (!lua_isnumber(L, index)) {
 		luaL_error(L, "%s(): Bad projectile ID", caller);
 	}
-	const ProjectileMapPair* pmp = ph->GetMapPairByID(lua_toint(L, index));
+	const ProjectileMapPair* pmp = ph->GetMapPairBySyncedID(lua_toint(L, index));
 	if (pmp == NULL) {
 		return NULL;
 	}
@@ -430,6 +434,7 @@ static CTeam* ParseTeam(lua_State* L, const char* caller, int index)
 	}
 	return team;
 }
+
 
 /******************************************************************************/
 /******************************************************************************/
@@ -592,6 +597,173 @@ int LuaSyncedCtrl::SetTeamShareLevel(lua_State* L)
 }
 
 
+int LuaSyncedCtrl::ShareTeamResource(lua_State* L)
+{
+	const int teamID1 = luaL_checkint(L, 1);
+	if ((teamID1 < 0) || (teamID1 >= teamHandler->ActiveTeams())) {
+		luaL_error(L, "Incorrect arguments to ShareTeamResource(teamID1, teamID2, type, amount)");
+	}
+	if (!CanControlTeam(teamID1)) {
+		return 0;
+	}
+	CTeam* team1 = teamHandler->Team(teamID1);
+	if (team1 == NULL) {
+		return 0;
+	}
+
+	const int teamID2 = luaL_checkint(L, 2);
+	if ((teamID2 < 0) || (teamID2 >= teamHandler->ActiveTeams())) {
+		luaL_error(L, "Incorrect arguments to ShareTeamResource(teamID1, teamID2, type, amount)");
+	}
+	CTeam* team2 = teamHandler->Team(teamID2);
+	if (team2 == NULL) {
+		return 0;
+	}
+
+	const string type = luaL_checkstring(L, 3);
+	float amount = luaL_checkfloat(L, 4);
+
+	if (type == "metal") {
+		amount = std::min(amount, team1->metal);
+		if (!luaRules || luaRules->AllowResourceTransfer(teamID1, teamID2, "m", amount)) {
+			team1->metal                       -= amount;
+			team1->metalSent                   += amount;
+			team1->currentStats->metalSent     += amount;
+			team2->metal                       += amount;
+			team2->metalReceived               += amount;
+			team2->currentStats->metalReceived += amount;
+		}
+	} else if (type == "energy") {
+		amount = std::min(amount, team1->energy);
+		if (!luaRules || luaRules->AllowResourceTransfer(teamID1, teamID2, "e", amount)) {
+			team1->energy                       -= amount;
+			team1->energySent                   += amount;
+			team1->currentStats->energySent     += amount;
+			team2->energy                       += amount;
+			team2->energyReceived               += amount;
+			team2->currentStats->energyReceived += amount;
+		}
+	}
+	return 0;
+}
+
+
+
+/******************************************************************************/
+
+void SetRulesParam(lua_State* L, const char* caller, int offset,
+				LuaRulesParams::Params& params,
+				LuaRulesParams::HashMap& paramsMap)
+{
+	const int index = offset + 1;
+	const int valIndex = offset + 2;
+	const int losIndex = offset + 3;
+	int pIndex = -1;
+
+	if (lua_israwnumber(L, index)) {
+		pIndex = lua_toint(L, index) - 1;
+	}
+	else if (lua_israwstring(L, index)) {
+		const string pName = lua_tostring(L, index);
+		map<string, int>::const_iterator it = paramsMap.find(pName);
+		if (it != paramsMap.end()) {
+			pIndex = it->second;
+		}
+		else {
+			// create a new parameter
+			pIndex = params.size();
+			paramsMap[pName] = pIndex;
+			params.push_back(LuaRulesParams::Param());
+		}
+	}
+	else {
+		luaL_error(L, "Incorrect arguments to %s()", caller);
+	}
+
+	if ((pIndex < 0)
+		|| (pIndex >= (int)params.size())
+		|| !lua_isnumber(L, valIndex)
+	) {
+		luaL_error(L, "Incorrect arguments to %s()", caller);
+	}
+
+	LuaRulesParams::Param& param = params[pIndex];
+
+	//! set the value of the parameter
+	param.value = lua_tofloat(L, valIndex);
+
+	//! set the los checking of the parameter
+	if (lua_istable(L, losIndex)) {
+		const int& table = losIndex;
+		int losMask = LuaRulesParams::RULESPARAMLOS_PRIVATE;
+
+		for (lua_pushnil(L); lua_next(L, table) != 0; lua_pop(L, 1)) {
+			//! ignore if the value is false
+			if (lua_isboolean(L, -1) && !lua_toboolean(L, -1)) {
+				continue;
+			}
+
+			//! read the losType from the key
+			if (lua_isstring(L, -2)) {
+				const string losType = lua_tostring(L, -2);
+
+				if (losType == "public") {
+					losMask |= LuaRulesParams::RULESPARAMLOS_PUBLIC;
+				}
+				else if (losType == "inlos") {
+					losMask |= LuaRulesParams::RULESPARAMLOS_INLOS;
+				}
+				else if (losType == "inradar") {
+					losMask |= LuaRulesParams::RULESPARAMLOS_INRADAR;
+				}
+				else if (losType == "allied") {
+					losMask |= LuaRulesParams::RULESPARAMLOS_ALLIED;
+				}
+				/*else if (losType == "private") {
+					losMask |= LuaRulesParams::RULESPARAMLOS_PRIVATE; //! default
+				}*/
+			}
+		}
+
+		param.los = losMask;
+	} else {
+		param.los = luaL_optint(L, losIndex, param.los);
+	}
+
+	return;
+}
+
+
+int LuaSyncedCtrl::SetGameRulesParam(lua_State* L)
+{
+	SetRulesParam(L, __FUNCTION__, 0, CLuaHandleSynced::gameParams, CLuaHandleSynced::gameParamsMap);
+	return 0;
+}
+
+
+int LuaSyncedCtrl::SetTeamRulesParam(lua_State* L)
+{
+	CTeam* team = ParseTeam(L, __FUNCTION__, 1);
+	if (team == NULL) {
+		return 0;
+	}
+	SetRulesParam(L, __FUNCTION__, 1, team->modParams, team->modParamsMap);
+	return 0;
+}
+
+
+int LuaSyncedCtrl::SetUnitRulesParam(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __FUNCTION__, 1);
+	if (unit == NULL) {
+		return 0;
+	}
+	SetRulesParam(L, __FUNCTION__, 1, unit->modParams, unit->modParamsMap);
+	return 0;
+}
+
+
+
 /******************************************************************************/
 /******************************************************************************/
 
@@ -685,7 +857,8 @@ int LuaSyncedCtrl::GetCOBScriptID(lua_State* L)
 	}
 	CCobInstance* cob = dynamic_cast<CCobInstance*>(unit->script);
 	if (cob == NULL) {
-		luaL_error(L, "GetCOBScriptID(): unit is not running a COB script");
+		// no error - allows using this to determine whether unit runs COB or LUS
+		return 0;
 	}
 
 	const string funcName = lua_tostring(L, 2);
@@ -899,7 +1072,7 @@ static bool SetUnitResourceParam(CUnit* unit, const string& name, float value)
 	//           use | make
 	//         metal | energy
 
-	value *= 0.25f;
+	value *= 0.5f;
 
 	if (name[0] == 'u') {
 		if (name[1] == 'u') {
@@ -1071,7 +1244,7 @@ static int SetSingleUnitWeaponState(lua_State* L, CWeapon* weapon, int index)
 	const string key = lua_tostring(L, index);
 	const float value = lua_tofloat(L, index + 1);
 	// FIXME: KDR -- missing checks and updates?
-	if (key == "reloadState") {
+	if (key == "reloadState" || key == "reloadFrame") {
 		weapon->reloadStatus = (int)value;
 	}
 	else if (key == "reloadTime") {
@@ -1336,7 +1509,7 @@ int LuaSyncedCtrl::SetUnitBuildSpeed(lua_State* L)
 		return 0;
 	}
 
-	const float buildScale = (1.0f / 32.0f);
+	const float buildScale = (1.0f / TEAM_SLOWUPDATE_RATE);
 	const float buildSpeed = buildScale * max(0.0f, luaL_checkfloat(L, 2));
 
 	CFactory* factory = dynamic_cast<CFactory*>(unit);
@@ -1630,7 +1803,7 @@ int LuaSyncedCtrl::SetUnitPieceCollisionVolumeData(lua_State* L)
 		// affects this unit only
 		if (enableLocal) {
 			if (argc == 14) {
-				lmp->colvol->Init(scales, offset, vType, COLVOL_TEST_CONT, pAxis);
+				lmp->colvol->Init(scales, offset, vType, CollisionVolume::COLVOL_HITTEST_CONT, pAxis);
 			}
 			lmp->colvol->Enable();
 		} else {
@@ -1642,7 +1815,7 @@ int LuaSyncedCtrl::SetUnitPieceCollisionVolumeData(lua_State* L)
 		// affects all future units with this model
 		if (enableGlobal) {
 			if (argc == 14) {
-				omp->colvol->Init(scales, offset, vType, COLVOL_TEST_CONT, pAxis);
+				omp->colvol->Init(scales, offset, vType, CollisionVolume::COLVOL_HITTEST_CONT, pAxis);
 			}
 			omp->colvol->Enable();
 		} else {
@@ -1860,8 +2033,7 @@ int LuaSyncedCtrl::AddUnitDamage(lua_State* L)
 		attacker = uh->units[attackerID];
 	}
 
-	// numWeaponDefs has an extra slot
-	if (weaponID > weaponDefHandler->numWeaponDefs) {
+	if (weaponID >= weaponDefHandler->numWeaponDefs) {
 		return 0;
 	}
 
@@ -2249,6 +2421,21 @@ int LuaSyncedCtrl::SetFeatureCollisionVolumeData(lua_State* L)
 /******************************************************************************/
 /******************************************************************************/
 
+int LuaSyncedCtrl::SetProjectileMoveControl(lua_State* L)
+{
+	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
+	if (proj == NULL) {
+		return 0;
+	}
+
+	if (!proj->weapon && !proj->piece) {
+		return 0;
+	}
+
+	proj->luaMoveCtrl = (lua_isboolean(L, 2) && lua_toboolean(L, 2));
+	return 0;
+}
+
 int LuaSyncedCtrl::SetProjectilePosition(lua_State* L)
 {
 	CProjectile* proj = ParseProjectile(L, __FUNCTION__, 1);
@@ -2273,6 +2460,9 @@ int LuaSyncedCtrl::SetProjectileVelocity(lua_State* L)
 	proj->speed.x = luaL_optfloat(L, 2, 0.0f);
 	proj->speed.y = luaL_optfloat(L, 3, 0.0f);
 	proj->speed.z = luaL_optfloat(L, 4, 0.0f);
+
+	proj->dir = proj->speed;
+	proj->dir.SafeNormalize();
 
 	return 0;
 }
@@ -3083,10 +3273,10 @@ int LuaSyncedCtrl::SetTerrainTypeData(lua_State* L)
 
 	CMapInfo::TerrainType* tt = const_cast<CMapInfo::TerrainType*>(&mapInfo->terrainTypes[tti]);
 
-	if (args >= 2) { tt->tankSpeed  = luaL_checkfloat(L, 2); }
-	if (args >= 3) { tt->kbotSpeed  = luaL_checkfloat(L, 3); }
-	if (args >= 4) { tt->hoverSpeed = luaL_checkfloat(L, 4); }
-	if (args >= 5) { tt->shipSpeed  = luaL_checkfloat(L, 5); }
+	if (args >= 2 && lua_isnumber(L, 2)) { tt->tankSpeed  = lua_tofloat(L, 2); }
+	if (args >= 3 && lua_isnumber(L, 3)) { tt->kbotSpeed  = lua_tofloat(L, 3); }
+	if (args >= 4 && lua_isnumber(L, 4)) { tt->hoverSpeed = lua_tofloat(L, 4); }
+	if (args >= 5 && lua_isnumber(L, 5)) { tt->shipSpeed  = lua_tofloat(L, 5); }
 
 	/*
 	if (!mapDamage->disabled) {

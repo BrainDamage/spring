@@ -1,22 +1,27 @@
-#ifndef __SIMPLE_PARTICLE_SYSTEM_H__
-#define __SIMPLE_PARTICLE_SYSTEM_H__
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef SIMPLE_PARTICLE_SYSTEM_H
+#define SIMPLE_PARTICLE_SYSTEM_H
 
 #include "Sim/Projectiles/Projectile.h"
 #include "Rendering/Textures/TextureAtlas.h"
+#include "System/float3.h"
 
+class CUnit;
 class CColorMap;
 
 class CSimpleParticleSystem : public CProjectile
 {
 	CR_DECLARE(CSimpleParticleSystem);
 	CR_DECLARE_SUB(Particle);
+
 public:
+	CSimpleParticleSystem();
+	virtual ~CSimpleParticleSystem();
+
 	virtual void Draw();
 	virtual void Update();
-
-	CSimpleParticleSystem(void);
-	virtual ~CSimpleParticleSystem(void);
-	virtual void Init(const float3& explosionPos, CUnit* owner GML_PARG_H);
+	virtual void Init(const float3& explosionPos, CUnit* owner);
 
 	float3 emitVector;
 	float3 emitMul;
@@ -55,10 +60,13 @@ public:
 	};
 
 protected:
-	 Particle *particles;
+	 Particle* particles;
 };
 
-//same behaviour as CSimpleParticleSystem but spawn the particles as independant objects
+/**
+ * Same behaviour as CSimpleParticleSystem but spawns the particles
+ * as independant objects
+ */
 class CSphereParticleSpawner : public CSimpleParticleSystem
 {
 	CR_DECLARE(CSphereParticleSpawner);
@@ -67,11 +75,10 @@ public:
 	CSphereParticleSpawner();
 	~CSphereParticleSpawner();
 
-	void Draw(){};
-	void Update(){};
-
-	virtual void Init(const float3& explosionPos, CUnit *owner GML_PARG_H);
+	void Draw() {};
+	void Update() {};
+	virtual void Init(const float3& explosionPos, CUnit* owner);
 
 };
 
-#endif
+#endif // SIMPLE_PARTICLE_SYSTEM_H

@@ -1,4 +1,5 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /* heavily based on CobInstance.cpp */
 
 #include "UnitScript.h"
@@ -13,8 +14,6 @@
 #include "Game/GameHelper.h"
 #include "LogOutput.h"
 #include "Map/Ground.h"
-#include "Rendering/UnitModels/3DOParser.h"
-#include "Rendering/UnitModels/s3oParser.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/RadarHandler.h"
@@ -42,8 +41,9 @@
 #include "Sim/Weapons/Weapon.h"
 #include "GlobalUnsynced.h"
 #include "Util.h"
-#include "Sound/AudioChannel.h"
+#include "Sound/IEffectChannel.h"
 #include "myMath.h"
+#include "FastMath.h"
 #include "Sync/SyncTracer.h"
 #include "CobDefines.h"
 
@@ -217,18 +217,12 @@ bool CUnitScript::DoSpin(float &cur, float dest, float &speed, float accel, int 
  */
 int CUnitScript::Tick(int deltaTime)
 {
-	bool done;
-	std::list<struct AnimInfo *>::iterator it = anims.begin();
-	std::list<struct AnimInfo *>::iterator cur;
-	std::list<struct AnimInfo *> remove;
+	std::vector<struct AnimInfo *> remove;
 
-	while (it != anims.end()) {
-		//Advance it, so we can erase cur safely
-		cur = it++;
+	for (std::list<struct AnimInfo *>::iterator it = anims.begin(); it != anims.end(); ) {
+		struct AnimInfo *ai = *it;
 
-		struct AnimInfo *ai = *cur;
-
-		done = false;
+		bool done = false;
 		pieces[ai->piece]->updated = true;
 
 		switch (ai->type) {
@@ -245,13 +239,16 @@ int CUnitScript::Tick(int deltaTime)
 
 		// Queue for removal (UnblockAll may add new anims)
 		if (done) {
-			anims.erase(cur);
 			remove.push_back(ai);
+			it = anims.erase(it);
+		}
+		else {
+			++it;
 		}
 	}
 
 	//Tell listeners to unblock?
-	for (it = remove.begin(); it != remove.end(); ++it) {
+	for (std::vector<struct AnimInfo *>::iterator it = remove.begin(); it != remove.end(); ++it) {
 		UnblockAll(*it);
 		delete *it;
 	}
@@ -456,33 +453,42 @@ void CUnitScript::EmitSfx(int type, int piece)
 		return;
 	}
 
-	if(ph->particleSaturation>1 && type<1024){		//skip adding particles when we have to many (make sure below can be unsynced)
+	if (ph->particleSaturation > 1 && type < 1024) {
+		// skip adding (unsynced!) particles when we have too many
 		return;
 	}
 
-	float3 relPos(0,0,0);
-	float3 relDir(0,1,0);
+	float3 relPos = ZeroVector;
+	float3 relDir = UpVector;
 	if (!GetEmitDirPos(piece, relPos, relDir)) {
 		ShowScriptError("emit-sfx: GetEmitDirPos failed");
 		return;
 	}
 
-	float3 pos = unit->pos + unit->frontdir * relPos.z + unit->updir * relPos.y + unit->rightdir * relPos.x;
+	const float3 pos =
+		unit->pos +
+		unit->frontdir * relPos.z +
+		unit->updir    * relPos.y +
+		unit->rightdir * relPos.x;
+	const float3 dir =
+		unit->frontdir * relDir.z +
+		unit->updir    * relDir.y +
+		unit->rightdir * relDir.x;
 
-	float alpha = 0.3f+gu->usRandFloat()*0.2f;
+	float alpha = 0.3f + gu->usRandFloat() * 0.2f;
 	float alphaFalloff = 0.004f;
-	float fadeupTime=4;
+	float fadeupTime = 4;
 
-	//Hovers need special care
+	// Hovers need special care
 	if (unit->unitDef->canhover) {
-		fadeupTime=8;
-		alpha = 0.15f+gu->usRandFloat()*0.2f;
+		fadeupTime = 8.0f;
+		alpha = 0.15f + gu->usRandFloat() * 0.2f;
 		alphaFalloff = 0.008f;
 	}
 
 	//Make sure wakes are only emitted on water
 	if ((type >= 2) && (type <= 5)) {
-		if (ground->GetApproximateHeight(unit->pos.x, unit->pos.z) > 0){
+		if (ground->GetApproximateHeight(unit->pos.x, unit->pos.z) > 0) {
 			return;
 		}
 	}
@@ -490,75 +496,114 @@ void CUnitScript::EmitSfx(int type, int piece)
 	switch (type) {
 		case SFX_REVERSE_WAKE:
 		case SFX_REVERSE_WAKE_2: {  //reverse wake
-			//float3 relDir = -GetPieceDirection(piece) * 0.2f;
 			relDir *= -0.2f;
-			float3 dir = unit->frontdir * relDir.z + unit->updir * relDir.y + unit->rightdir * relDir.x;
-			new CWakeProjectile(pos+gu->usRandVector()*2,dir*0.4f,6+gu->usRandFloat()*4,0.15f+gu->usRandFloat()*0.3f,unit, alpha, alphaFalloff,fadeupTime);
+
+			new CWakeProjectile(
+				pos + gu->usRandVector() * 2.0f,
+				dir * 0.4f,
+				6.0f + gu->usRandFloat() * 4.0f,
+				0.15f + gu->usRandFloat() * 0.3f,
+				unit,
+				alpha, alphaFalloff, fadeupTime
+			);
 			break;
 		}
+
 		case SFX_WAKE_2:  //wake 2, in TA it lives longer..
 		case SFX_WAKE: {  //regular ship wake
-			//float3 relDir = GetPieceDirection(piece) * 0.2f;
 			relDir *= 0.2f;
-			float3 dir = unit->frontdir * relDir.z + unit->updir * relDir.y + unit->rightdir * relDir.x;
-			new CWakeProjectile(pos+gu->usRandVector()*2,dir*0.4f,6+gu->usRandFloat()*4,0.15f+gu->usRandFloat()*0.3f,unit, alpha, alphaFalloff,fadeupTime);
+
+			new CWakeProjectile(
+				pos + gu->usRandVector() * 2.0f,
+				dir * 0.4f,
+				6.0f + gu->usRandFloat() * 4.0f,
+				0.15f + gu->usRandFloat() * 0.3f,
+				unit,
+				alpha, alphaFalloff, fadeupTime
+			);
 			break;
 		}
+
 		case SFX_BUBBLE: {  //submarine bubble. does not provide direction through piece vertices..
-			float3 pspeed=gu->usRandVector()*0.1f;
-			pspeed.y+=0.2f;
-			new CBubbleProjectile(pos+gu->usRandVector()*2,pspeed,40+gu->usRandFloat()*30,1+gu->usRandFloat()*2,0.01f,unit,0.3f+gu->usRandFloat()*0.3f);
-			break;}
+			float3 pspeed = gu->usRandVector() * 0.1f;
+				pspeed.y += 0.2f;
+
+			new CBubbleProjectile(
+				pos + gu->usRandVector() * 2.0f,
+				pspeed,
+				40.0f + gu->usRandFloat() * 30.0f,
+				1.0f + gu->usRandFloat() * 2.0f,
+				0.01f,
+				unit,
+				0.3f + gu->usRandFloat() * 0.3f
+			);
+		} break;
+
 		case SFX_WHITE_SMOKE:  //damaged unit smoke
-			new CSmokeProjectile(pos,gu->usRandVector()*0.5f+UpVector*1.1f,60,4,0.5f,unit,0.5f);
-			// FIXME -- needs a 'break'?
+			new CSmokeProjectile(pos, gu->usRandVector() * 0.5f + UpVector * 1.1f, 60, 4, 0.5f, unit, 0.5f);
+			break;
 		case SFX_BLACK_SMOKE:  //damaged unit smoke
-			new CSmokeProjectile(pos,gu->usRandVector()*0.5f+UpVector*1.1f,60,4,0.5f,unit,0.6f);
+			new CSmokeProjectile(pos, gu->usRandVector() * 0.5f + UpVector * 1.1f, 60, 4, 0.5f, unit, 0.6f);
 			break;
 		case SFX_VTOL: {  //vtol
-			//relDir = GetPieceDirection(piece) * 0.2f;
 			relDir *= 0.2f;
-			float3 dir = unit->frontdir * relDir.z + unit->updir * -fabs(relDir.y) + unit->rightdir * relDir.x;
-			CHeatCloudProjectile* hc=new CHeatCloudProjectile(pos, unit->speed*0.7f+dir * 0.5f, 10 + gu->usRandFloat() * 5, 3 + gu->usRandFloat() * 2, unit);
-			hc->size=3;
+
+			const float3 udir =
+				unit->frontdir * relDir.z +
+				unit->updir    * -fabs(relDir.y) +
+				unit->rightdir * relDir.x;
+
+			CHeatCloudProjectile* hc = new CHeatCloudProjectile(
+				pos,
+				unit->speed * 0.7f + udir * 0.5f,
+				10 + gu->usRandFloat() * 5,
+				3 + gu->usRandFloat() * 2,
+				unit
+			);
+			hc->size = 3;
 			break;
 		}
-		default:
-			//logOutput.Print("Unknown sfx: %d", type);
-			if (type & SFX_CEG)	//emit defined explosiongenerator
-			{
+		default: {
+			if (type & SFX_CEG) {
+				// emit defined explosiongenerator
 				const unsigned index = type - SFX_CEG;
 				if (index >= unit->unitDef->sfxExplGens.size() || unit->unitDef->sfxExplGens[index] == NULL) {
 					ShowScriptError("Invalid explosion generator index for emit-sfx");
 					break;
 				}
-				//float3 relDir = -GetPieceDirection(piece) * 0.2f;
-				float3 dir = unit->frontdir * relDir.z + unit->updir * relDir.y + unit->rightdir * relDir.x;
-				dir.SafeNormalize();
-				unit->unitDef->sfxExplGens[index]->Explosion(pos, unit->cegDamage, 1, unit, 0, 0, dir);
+
+				float3 ndir = dir; 
+
+				CExplosionGenerator* explGen = unit->unitDef->sfxExplGens[index];
+				explGen->Explosion(pos, unit->cegDamage, 1, unit, 0, 0, ndir.SafeNormalize());
 			}
-			else if (type & SFX_FIRE_WEAPON)  //make a weapon fire from the piece
-			{
+			else if (type & SFX_FIRE_WEAPON) {
+				// make a weapon fire from the piece
 				const unsigned index = type - SFX_FIRE_WEAPON;
 				if (index >= unit->weapons.size() || unit->weapons[index] == NULL) {
 					ShowScriptError("Invalid weapon index for emit-sfx");
 					break;
 				}
-				//this is very hackish and probably has a lot of side effects, but might be usefull for something
-				//float3 relDir =-GetPieceDirection(piece);
-				float3 dir = unit->frontdir * relDir.z + unit->updir * relDir.y + unit->rightdir * relDir.x;
-				dir.SafeNormalize();
 
-				const float3 targetPos = unit->weapons[index]->targetPos;
-				const float3 weaponMuzzlePos = unit->weapons[index]->weaponMuzzlePos;
+				CWeapon* weapon = unit->weapons[index];
 
-				unit->weapons[index]->targetPos = pos+dir;
-				unit->weapons[index]->weaponMuzzlePos = pos;
+				const float3 targetPos = weapon->targetPos;
+				const float3 weaponMuzzlePos = weapon->weaponMuzzlePos;
 
-				unit->weapons[index]->Fire();
+				float3 ndir = dir;
 
-				unit->weapons[index]->targetPos = targetPos;
-				unit->weapons[index]->weaponMuzzlePos = weaponMuzzlePos;
+				// don't override the weapon's target position
+				// if it was not set internally (so that force-
+				// fire keeps working as expected)
+				if (!weapon->haveUserTarget) {
+					weapon->targetPos = pos + ndir.SafeNormalize();
+				}
+
+				weapon->weaponMuzzlePos = pos;
+				weapon->Fire();
+				weapon->weaponMuzzlePos = weaponMuzzlePos;
+
+				weapon->targetPos = targetPos;
 			}
 			else if (type & SFX_DETONATE_WEAPON) {
 				const unsigned index = type - SFX_DETONATE_WEAPON;
@@ -566,8 +611,10 @@ void CUnitScript::EmitSfx(int type, int piece)
 					ShowScriptError("Invalid weapon index for emit-sfx");
 					break;
 				}
+
 				// detonate weapon from piece
 				const WeaponDef* weaponDef = unit->weapons[index]->weaponDef;
+
 				if (weaponDef->soundhit.getID(0) > 0) {
 					Channels::Battle.PlaySample(weaponDef->soundhit.getID(0), unit, weaponDef->soundhit.getVolume(0));
 				}
@@ -578,7 +625,7 @@ void CUnitScript::EmitSfx(int type, int piece)
 					NULL, float3(0, 0, 0), weaponDef->id
 				);
 			}
-			break;
+		} break;
 	}
 
 
@@ -595,11 +642,10 @@ void CUnitScript::AttachUnit(int piece, int u)
 	}
 
 #ifndef _CONSOLE
-	CTransportUnit* tu=dynamic_cast<CTransportUnit*>(unit);
+	CTransportUnit* tu = dynamic_cast<CTransportUnit*>(unit);
 
-	if(tu && uh->units[u]){
-		//logOutput.Print("attach");
-		tu->AttachUnit(uh->units[u],piece);
+	if (tu && uh->units[u]) {
+		tu->AttachUnit(uh->units[u], piece);
 	}
 #endif
 }
@@ -608,9 +654,9 @@ void CUnitScript::AttachUnit(int piece, int u)
 void CUnitScript::DropUnit(int u)
 {
 #ifndef _CONSOLE
-	CTransportUnit* tu=dynamic_cast<CTransportUnit*>(unit);
+	CTransportUnit* tu = dynamic_cast<CTransportUnit*>(unit);
 
-	if(tu && uh->units[u]){
+	if (tu && uh->units[u]) {
 		tu->DetachUnit(uh->units[u]);
 	}
 #endif
@@ -699,80 +745,11 @@ void CUnitScript::Explode(int piece, int flags)
 
 void CUnitScript::Shatter(int piece, const float3& pos, const float3& speed)
 {
-	const float pieceChance = 1 - (ph->currentParticles - (ph->maxParticles - 2000)) / 2000;
-	LocalModelPiece* pieceData = pieces[piece];
+	const LocalModelPiece* lmp = pieces[piece];
+	const S3DModelPiece* omp = lmp->original;
+	const float pieceChance = 1.0f - (ph->currentParticles - (ph->maxParticles - 2000)) / 2000.0f;
 
-	if (pieceData->type == MODELTYPE_3DO) {
-		/* 3DO */
-
-		S3DOPiece* dl = (S3DOPiece*)pieceData->original;
-
-		for (std::vector<S3DOPrimitive>::iterator pi = dl->prims.begin(); pi != dl->prims.end(); ++pi) {
-			if (gu->usRandFloat() > pieceChance || pi->numVertex != 4)
-				continue;
-
-			ph->AddFlyingPiece(unit->team, pos, speed + gu->usRandVector() * 2, dl, &*pi);
-		}
-	} else {
-		/* S3O */
-
-		SS3OPiece* cookedPiece = (SS3OPiece*)pieceData->original;
-
-		if (cookedPiece->primitiveType == 0){
-			/* GL_TRIANGLES */
-
-			for (size_t i = 0; i < cookedPiece->vertexDrawOrder.size(); i += 3){
-				if(gu->usRandFloat() > pieceChance)
-					continue;
-
-				SS3OVertex * verts = new SS3OVertex[4];
-
-				verts[0] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 0]];
-				verts[1] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 1]];
-				verts[2] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 1]];
-				verts[3] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 2]];
-
-				ph->AddFlyingPiece(unit->model->textureType,
-					unit->team,
-					pos, speed + gu->usRandVector() * 2, verts);
-			}
-		} else if (cookedPiece->primitiveType == 1){
-			/* GL_TRIANGLE_STRIP */
-			for (size_t i = 2; i < cookedPiece->vertexDrawOrder.size(); i++){
-				if(gu->usRandFloat() > pieceChance)
-					continue;
-
-				SS3OVertex * verts = new SS3OVertex[4];
-
-				verts[0] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i - 2]];
-				verts[1] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i - 1]];
-				verts[2] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i - 1]];
-				verts[3] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i - 0]];
-
-				ph->AddFlyingPiece(unit->model->textureType,
-					unit->team,
-					pos, speed+gu->usRandVector()*2, verts);
-			}
-		} else if (cookedPiece->primitiveType == 2){
-			/* GL_QUADS */
-
-			for (size_t i = 0; i < cookedPiece->vertexDrawOrder.size(); i += 4){
-				if(gu->usRandFloat() > pieceChance)
-					continue;
-
-				SS3OVertex * verts = new SS3OVertex[4];
-
-				verts[0] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 0]];
-				verts[1] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 1]];
-				verts[2] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 2]];
-				verts[3] = cookedPiece->vertices[cookedPiece->vertexDrawOrder[i + 3]];
-
-				ph->AddFlyingPiece(unit->model->textureType,
-					unit->team,
-					pos, speed+gu->usRandVector()*2, verts);
-			}
-		}
-	}
+	omp->Shatter(pieceChance, unit->model->textureType, unit->team, pos, speed);
 }
 
 
@@ -783,13 +760,16 @@ void CUnitScript::ShowFlare(int piece)
 		return;
 	}
 #ifndef _CONSOLE
-	float3 relpos = GetPiecePos(piece);
-	float3 pos=unit->pos + unit->frontdir*relpos.z + unit->updir*relpos.y + unit->rightdir*relpos.x;
-	float3 dir=unit->lastMuzzleFlameDir;
+	const float3 relpos = GetPiecePos(piece);
+	const float3 pos =
+		unit->pos +
+		unit->frontdir * relpos.z +
+		unit->updir    * relpos.y +
+		unit->rightdir * relpos.x;
+	const float3 dir = unit->lastMuzzleFlameDir;
+	const float size = unit->lastMuzzleFlameSize;
 
-	float size=unit->lastMuzzleFlameSize;
-
-	new CMuzzleFlame(pos, unit->speed,dir, size);
+	new CMuzzleFlame(pos, unit->speed, dir, size);
 #endif
 }
 
@@ -856,7 +836,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	}
 
 #ifndef _CONSOLE
-	switch(val)
+	switch (val)
 	{
 	case ACTIVATION:
 		if (unit->activated)
@@ -870,15 +850,17 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	case STANDINGFIREORDERS:
 		return unit->fireState;
 		break;
-	case HEALTH:{
+	case HEALTH: {
 		if (p1 <= 0)
-			return (int) ((unit->health/unit->maxHealth)*100.0f);
-		CUnit *u = (p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
+			return int((unit->health / unit->maxHealth) * 100.0f);
+
+		const CUnit* u = uh->GetUnit(p1);
+
 		if (u == NULL)
 			return 0;
 		else
-			return (int) ((u->health/u->maxHealth)*100.0f);
-		}
+			return int((u->health / u->maxHealth) * 100.0f);
+	}
 	case INBUILDSTANCE:
 		if (unit->inBuildStance)
 			return 1;
@@ -890,61 +872,72 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		else
 			return 0;
 		break;
-	case PIECE_XZ:{
+	case PIECE_XZ: {
 		if (!PieceExists(p1)) {
 			ShowScriptError("Invalid piecenumber for get piece_xz");
 			break;
 		}
 		float3 relPos = GetPiecePos(p1);
 		float3 pos = unit->pos + unit->frontdir * relPos.z + unit->updir * relPos.y + unit->rightdir * relPos.x;
-		return PACKXZ(pos.x, pos.z);}
-	case PIECE_Y:{
+		return PACKXZ(pos.x, pos.z);
+	}
+	case PIECE_Y: {
 		if (!PieceExists(p1)) {
 			ShowScriptError("Invalid piecenumber for get piece_y");
 			break;
 		}
 		float3 relPos = GetPiecePos(p1);
 		float3 pos = unit->pos + unit->frontdir * relPos.z + unit->updir * relPos.y + unit->rightdir * relPos.x;
-		return (int)(pos.y * COBSCALE);}
+		return int(pos.y * COBSCALE);
+	}
 	case UNIT_XZ: {
 		if (p1 <= 0)
 			return PACKXZ(unit->pos.x, unit->pos.z);
-		CUnit *u = (p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
+
+		const CUnit* u = uh->GetUnit(p1);
+
 		if (u == NULL)
-			return PACKXZ(0,0);
+			return PACKXZ(0, 0);
 		else
-			return PACKXZ(u->pos.x, u->pos.z);}
+			return PACKXZ(u->pos.x, u->pos.z);
+	}
 	case UNIT_Y: {
-		//logOutput.Print("Unit-y %d", p1);
 		if (p1 <= 0)
-			return (int)(unit->pos.y * COBSCALE);
-		CUnit *u = (p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
+			return int(unit->pos.y * COBSCALE);
+
+		const CUnit* u = uh->GetUnit(p1);
+
 		if (u == NULL)
 			return 0;
 		else
-			return (int)(u->pos.y * COBSCALE);}
-	case UNIT_HEIGHT:{
+			return int(u->pos.y * COBSCALE);
+	}
+	case UNIT_HEIGHT: {
 		if (p1 <= 0)
-			return (int)(unit->radius * COBSCALE);
-		CUnit *u = (p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
+			return int(unit->radius * COBSCALE);
+
+		const CUnit* u = uh->GetUnit(p1);
+
 		if (u == NULL)
 			return 0;
 		else
-			return (int)(u->radius * COBSCALE);}
+			return int(u->radius * COBSCALE);
+	}
 	case XZ_ATAN:
-		return (int)(RAD2TAANG*atan2((float)UNPACKX(p1), (float)UNPACKZ(p1)) + 32768 - unit->heading);
+		return int(RAD2TAANG*atan2((float)UNPACKX(p1), (float)UNPACKZ(p1)) + 32768 - unit->heading);
 	case XZ_HYPOT:
-		return (int)(hypot((float)UNPACKX(p1), (float)UNPACKZ(p1)) * COBSCALE);
+		return int(hypot((float)UNPACKX(p1), (float)UNPACKZ(p1)) * COBSCALE);
 	case ATAN:
-		return (int)(RAD2TAANG*atan2((float)p1, (float)p2));
+		return int(RAD2TAANG*atan2((float)p1, (float)p2));
 	case HYPOT:
-		return (int)hypot((float)p1, (float)p2);
+		return int(hypot((float)p1, (float)p2));
 	case GROUND_HEIGHT:
-		return (int)(ground->GetHeight(UNPACKX(p1), UNPACKZ(p1)) * COBSCALE);
+		return int(ground->GetHeight(UNPACKX(p1), UNPACKZ(p1)) * COBSCALE);
 	case GROUND_WATER_HEIGHT:
-		return (int)(ground->GetHeight2(UNPACKX(p1), UNPACKZ(p1)) * COBSCALE);
+		return int(ground->GetHeight2(UNPACKX(p1), UNPACKZ(p1)) * COBSCALE);
 	case BUILD_PERCENT_LEFT:
-		return (int)((1 - unit->buildProgress) * 100);
+		return int((1.0f - unit->buildProgress) * 100);
+
 	case YARD_OPEN:
 		if (yardOpen)
 			return 1;
@@ -958,10 +951,10 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		else
 			return 0;
 	case VETERAN_LEVEL:
-		return (int)(100*unit->experience);
+		return int(100 * unit->experience);
 	case CURRENT_SPEED:
 		if (unit->moveType)
-			return (int)(unit->speed.Length()*COBSCALE);
+			return int(unit->speed.Length() * COBSCALE);
 		return 0;
 	case ON_ROAD:
 		return 0;
@@ -971,18 +964,27 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return uh->MaxUnits()-1;
 	case MY_ID:
 		return unit->id;
+
 	case UNIT_TEAM: {
-		CUnit *u = (p1 >= 0 && p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
-		return u ? unit->team : 0;
+		const CUnit* u = uh->GetUnit(p1);
+		return (u != NULL)? unit->team : 0;
 	}
 	case UNIT_ALLIED: {
-		CUnit *u = (p1 >= 0 && p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
-		if (u) return teamHandler->Ally (unit->allyteam, u->allyteam) ? 1 : 0;
+		const CUnit* u = uh->GetUnit(p1);
+
+		if (u != NULL) {
+			return teamHandler->Ally(unit->allyteam, u->allyteam) ? 1 : 0;
+		}
+
 		return 0;
 	}
 	case UNIT_BUILD_PERCENT_LEFT: {
-		CUnit *u = (p1 >= 0 && p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
-		if (u) return (int)((1 - u->buildProgress) * 100);
+		const CUnit* u = uh->GetUnit(p1);
+
+		if (u != NULL) {
+			return int((1.0f - u->buildProgress) * 100);
+		}
+
 		return 0;
 	}
 	case MAX_SPEED:
@@ -1008,18 +1010,23 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		logOutput.Print("Value 1: %d, 2: %d, 3: %d, 4: %d", p1, p2, p3, p4);
 		break;
 	case HEADING: {
-		if (p1 <= 0)
+		if (p1 <= 0) {
 			return unit->heading;
-		CUnit *u = (p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
-		if (u == NULL)
-			return -1;
-		else
+		}
+
+		const CUnit* u = uh->GetUnit(p1);
+
+		if (u != NULL) {
 			return u->heading;
+		}
+
+		return -1;
 	}
-	case TARGET_ID:
-		if (unit->weapons[p1-1]) {
-			CWeapon* weapon = unit->weapons[p1-1];
-			TargetType tType = weapon->targetType;
+	case TARGET_ID: {
+		if (unit->weapons[p1 - 1]) {
+			const CWeapon* weapon = unit->weapons[p1 - 1];
+			const TargetType tType = weapon->targetType;
+
 			if (tType == Target_Unit)
 				return unit->weapons[p1 - 1]->targetUnit->id;
 			else if (tType == Target_None)
@@ -1030,8 +1037,10 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 				return -3;
 		}
 		return -4; // weapon does not exist
+	}
+
 	case LAST_ATTACKER_ID:
-		return unit->lastAttacker?unit->lastAttacker->id:-1;
+		return unit->lastAttacker? unit->lastAttacker->id: -1;
 	case LOS_RADIUS:
 		return unit->realLosRadius;
 	case AIR_LOS_RADIUS:
@@ -1046,6 +1055,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return unit->sonarJamRadius;
 	case SEISMIC_RADIUS:
 		return unit->seismicRadius;
+
 	case DO_SEISMIC_PING:
 		float pingSize;
 		if (p1 == 0) {
@@ -1055,17 +1065,20 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		}
 		unit->DoSeismicPing(pingSize);
 		break;
+
 	case CURRENT_FUEL:
 		return int(unit->currentFuel * float(COBSCALE));
 	case TRANSPORT_ID:
 		return unit->transporter?unit->transporter->id:-1;
+
 	case SHIELD_POWER: {
 		if (unit->shieldWeapon == NULL) {
 			return -1;
 		}
-		const CPlasmaRepulser* shield = (CPlasmaRepulser*)unit->shieldWeapon;
+		const CPlasmaRepulser* shield = (CPlasmaRepulser*) unit->shieldWeapon;
 		return int(shield->curPower * float(COBSCALE));
 	}
+
 	case STEALTH: {
 		return unit->stealth ? 1 : 0;
 	}
@@ -1077,14 +1090,16 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	case ALPHA_THRESHOLD: {
 		return int(unit->alphaThreshold * 255);
 	}
+
 	case COB_ID: {
 		if (p1 <= 0) {
 			return unit->unitDef->cobID;
 		} else {
-			const CUnit *u = (p1 < uh->MaxUnits()) ? uh->units[p1] : NULL;
-			return (u == NULL) ? -1 : u->unitDef->cobID;
+			const CUnit* u = uh->GetUnit(p1);
+			return ((u == NULL)? -1 : u->unitDef->cobID);
 		}
 	}
+
  	case PLAY_SOUND: {
  		// FIXME: this can currently only work for CCobInstance, because Lua can not get sound IDs
  		// (however, for Lua scripts there is already LuaUnsyncedCtrl::PlaySoundFile)
@@ -1132,17 +1147,24 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return 0;
 	}
 	case SET_WEAPON_UNIT_TARGET: {
-		const int weaponID = p1 - 1;
-		const int targetID = p2;
+		const unsigned int weaponID = p1 - 1;
+		const unsigned int targetID = p2;
 		const bool userTarget = !!p3;
-		if ((weaponID < 0) || (static_cast<size_t>(weaponID) >= unit->weapons.size())) {
+
+		if (weaponID >= unit->weapons.size()) {
 			return 0;
 		}
+
 		CWeapon* weapon = unit->weapons[weaponID];
-		if (weapon == NULL) { return 0; }
-		if ((targetID < 0) || (static_cast<size_t>(targetID) >= uh->MaxUnits())) { return 0; }
-		CUnit* target = (targetID == 0) ? NULL : uh->units[targetID];
-		return weapon->AttackUnit(target, userTarget) ? 1 : 0;
+
+		if (weapon == NULL) {
+			return 0;
+		}
+
+		//! if targetID is 0, just sets weapon->haveUserTarget
+		//! to false (and targetType to None) without attacking
+		CUnit* target = (targetID > 0)? uh->GetUnit(targetID): NULL;
+		return (weapon->AttackUnit(target, userTarget) ? 1 : 0);
 	}
 	case SET_WEAPON_GROUND_TARGET: {
 		const int weaponID = p1 - 1;
@@ -1164,10 +1186,18 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return std::max(p1, p2);
 	case ABS:
 		return abs(p1);
+	case KSIN:
+		return int(1024*streflop::sinf(TAANG2RAD*(float)p1));
+	case KCOS:
+		return int(1024*streflop::cosf(TAANG2RAD*(float)p1));
+	case KTAN:
+		return int(1024*streflop::tanf(TAANG2RAD*(float)p1));
+	case SQRT:
+		return int(math::sqrt((float)p1));
 	case FLANK_B_MODE:
 		return unit->flankingBonusMode;
 	case FLANK_B_DIR:
-		switch(p1){
+		switch (p1) {
 			case 1: return int(unit->flankingBonusDir.x * COBSCALE);
 			case 2: return int(unit->flankingBonusDir.y * COBSCALE);
 			case 3: return int(unit->flankingBonusDir.z * COBSCALE);
@@ -1184,16 +1214,21 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	case FLANK_B_MIN_DAMAGE:
 		return int((unit->flankingBonusAvgDamage - unit->flankingBonusDifDamage) * COBSCALE);
 	case KILL_UNIT: {
-		if (p1 >= 0 && p1 < uh->MaxUnits()) {
-			CUnit *u = p1 ? uh->units[p1] : unit;
-			if (!u) {
-				return 0;
-			}
-			if (u->beingBuilt) u->KillUnit(false, true, NULL); // no explosions and no corpse for units under construction
-			else u->KillUnit(p2!=0, p3!=0, NULL);
-			return 1;
+		//! ID 0 is reserved for the script's owner
+		CUnit* u = (p1 > 0)? uh->GetUnit(p1): this->unit;
+
+		if (u == NULL) {
+			return 0;
 		}
-		return 0;
+
+		if (u->beingBuilt) {
+			// no explosions and no corpse for units under construction
+			u->KillUnit(false, true, NULL);
+		} else {
+			u->KillUnit(p2 != 0, p3 != 0, NULL);
+		}
+
+		return 1;
 	}
 	case WEAPON_RELOADSTATE: {
 		if (p1 > 0 && static_cast<size_t>(p1) <= unit->weapons.size()) {
@@ -1288,27 +1323,27 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		}
 		else if ((val >= UNIT_VAR_START) && (val <= UNIT_VAR_END)) {
 			const int varID = val - UNIT_VAR_START;
+
 			if (p1 == 0) {
 				return unitVars[varID];
 			}
 			else if (p1 > 0) {
 				// get the unit var for another unit
-				if (p1 < uh->MaxUnits()) {
-					const CUnit* u = uh->units[p1];
-					if (u != NULL && u->script != NULL) {
-						return u->script->unitVars[varID];
-					}
+				const CUnit* u = uh->GetUnit(p1);
+
+				if (u != NULL && u->script != NULL) {
+					return u->script->unitVars[varID];
 				}
 			}
 			else {
 				// set the unit var for another unit
 				p1 = -p1;
-				if (p1 < uh->MaxUnits()) {
-					CUnit* u = uh->units[p1];
-					if (u != NULL && u->script != NULL) {
-						u->script->unitVars[varID] = p2;
-						return 1;
-					}
+
+				CUnit* u = uh->GetUnit(p1);
+
+				if (u != NULL && u->script != NULL) {
+					u->script->unitVars[varID] = p2;
+					return 1;
 				}
 			}
 			return 0;
@@ -1639,3 +1674,19 @@ void CUnitScript::BenchmarkScript(const string& unitname)
 }
 
 #endif
+
+/******************************************************************************/
+/******************************************************************************/
+
+int CUnitScript::ScriptToModel(int scriptnum) const {
+	const LocalModelPiece* p = GetLocalModelPiece(scriptnum);
+
+	if (p == NULL) return -1;
+
+	int i = 0;
+	const std::vector<LocalModelPiece*>& modelpieces = unit->localmodel->pieces;
+	for (std::vector<LocalModelPiece*>::const_iterator pm = modelpieces.begin(); pm != modelpieces.end(); pm++, i++) {
+		if (p == *pm) return i;
+	}
+	return -1;
+};

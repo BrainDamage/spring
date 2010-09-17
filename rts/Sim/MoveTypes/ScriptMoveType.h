@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef SCRIPT_MOVE_TYPE_H
 #define SCRIPT_MOVE_TYPE_H
 
@@ -88,7 +90,6 @@ class CScriptMoveType : public AMoveType
 	protected:
 		bool hasDecal;
 		bool isBuilding;
-		bool isBlocking;
 
 		float3 rotOffset;
 

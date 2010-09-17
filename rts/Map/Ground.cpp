@@ -1,6 +1,4 @@
-// Ground.cpp: implementation of the CGround class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "mmgr.h"
@@ -13,9 +11,6 @@
 #include "Sim/Misc/GeometricObjects.h"
 #include <assert.h>
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 CGround* ground;
 
 CGround::CGround()
@@ -79,7 +74,7 @@ inline float LineGroundSquareCol(const float3& from, const float3& to, int xs, i
 	//! The terrain grid is constructed by a triangle strip
 	//! so we have to check 2 triangles foreach quad
 
-	//! triangle 1
+	//! triangle topright
 	tri.x = xs * SQUARE_SIZE;
 	tri.z = ys * SQUARE_SIZE;
 	tri.y = heightmap[ys * (gs->mapx + 1) + xs];
@@ -87,22 +82,20 @@ inline float LineGroundSquareCol(const float3& from, const float3& to, int xs, i
 	const float3& norm = readmap->facenormals[(ys * gs->mapx + xs) * 2];
 	float side1 = (to - tri).dot(norm);
 
-	if (side1 <= 0) {
-		// linjen passerar triangelns plan?
+	if (side1 <= 0.0f) {
 		float side2 = (from - tri).dot(norm);
-		float dif = side2 - side1;
-		if (dif != 0) {
-			float frontpart = side2 / dif;
-			float3 col = from + ((to - from) * frontpart);
+
+		if (side2 != side1) {
+			float frontpart = side2 / (side2 - side1);
+			const float3 col = from * (1 - frontpart) + to * frontpart;
 
 			if ((col.x >= tri.x) && (col.z >= tri.z) && (col.x + col.z <= tri.x + tri.z + SQUARE_SIZE)) {
-				// kollision inuti triangeln (utnyttja trianglarnas "2d aktighet")
 				return col.distance(from);
 			}
 		}
 	}
 
-	//! triangle 2
+	//! triangle bottomleft
 	tri.x += SQUARE_SIZE;
 	tri.z += SQUARE_SIZE;
 	tri.y = heightmap[(ys + 1) * (gs->mapx + 1) + xs + 1];
@@ -110,16 +103,14 @@ inline float LineGroundSquareCol(const float3& from, const float3& to, int xs, i
 	const float3& norm2 = readmap->facenormals[(ys * gs->mapx + xs) * 2 + 1];
 	side1 = (to - tri).dot(norm2);
 
-	if (side1 <= 0) {
-		// linjen passerar triangelns plan?
+	if (side1 <= 0.0f) {
 		float side2 = (from - tri).dot(norm2);
-		float dif = side2 - side1;
-		if (dif != 0) {
-			float frontpart = side2 / dif;
-			float3 col = from + ((to - from) * frontpart);
+
+		if (side2 != side1) {
+			float frontpart = side2 / (side2 - side1);
+			const float3 col = from * (1 - frontpart) + to * frontpart;
 
 			if ((col.x <= tri.x) && (col.z <= tri.z) && (col.x + col.z >= tri.x + tri.z - SQUARE_SIZE)) {
-				// kollision inuti triangeln (utntri.ytja trianglarnas "2d aktighet")
 				return col.distance(from);
 			}
 		}
@@ -273,8 +264,8 @@ float CGround::GetApproximateHeight(float x, float y) const
 //rename to GetHeightAboveWater?
 float CGround::GetHeight(float x, float y) const
 {
-	float r = GetHeight2(x, y);
-	return (r < 0.0f? 0.0f: r);
+	const float r = GetHeight2(x, y);
+	return std::max(0.0f, r);
 }
 
 
@@ -371,8 +362,8 @@ float3 CGround::GetSmoothNormal(float x, float y) const
 	if (sx >= gs->mapx - 1)
 		sx = gs->mapx - 2;
 
-	float dx = (x - sx * SQUARE_SIZE) / SQUARE_SIZE;
-	float dy = (y - sy * SQUARE_SIZE) / SQUARE_SIZE;
+	float dx = (x / SQUARE_SIZE) - sx;
+	float dy = (y / SQUARE_SIZE) - sy;
 
 	int sy2;
 	float fy;

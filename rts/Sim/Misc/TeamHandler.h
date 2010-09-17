@@ -1,4 +1,4 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 /* based on code from GlobalSynced.{cpp,h} */
 
@@ -30,11 +30,7 @@ public:
 	 *
 	 * Accesses a CTeam instance at a given index
 	 */
-	CTeam* Team(int i) { return &teams[i]; }
-
-	bool IsValidTeam(int id) {
-		return ((id >= 0) && (id < teams.size()));
-	}
+	CTeam* Team(int i) const { return teams[i]; }
 
 	/**
 	 * @brief ally
@@ -44,7 +40,7 @@ public:
 	 *
 	 * Returns ally at [a][b]
 	 */
-	bool Ally(int a, int b) { return allyTeams[a].allies[b]; }
+	bool Ally(int a, int b) const { return allyTeams[a].allies[b]; }
 
 	/**
 	 * @brief ally team
@@ -53,10 +49,10 @@ public:
 	 *
 	 * returns the team2ally at given index
 	 */
-	int AllyTeam(int team) { return teams[team].teamAllyteam; }
+	int AllyTeam(int team) const { return teams[team]->teamAllyteam; }
 	::AllyTeam& GetAllyTeam(size_t id) { return allyTeams[id]; };
 
-	bool ValidAllyTeam(size_t id)
+	bool ValidAllyTeam(size_t id) const
 	{
 		return ((id >= 0) && (id < allyTeams.size()));
 	}
@@ -69,7 +65,7 @@ public:
 	 *
 	 * Tests whether teams are allied
 	 */
-	bool AlliedTeams(int a, int b) { return allyTeams[AllyTeam(a)].allies[AllyTeam(b)]; }
+	bool AlliedTeams(int a, int b) const { return allyTeams[AllyTeam(a)].allies[AllyTeam(b)]; }
 
 	/**
 	 * @brief set ally team
@@ -78,7 +74,7 @@ public:
 	 *
 	 * Sets team's ally team
 	 */
-	void SetAllyTeam(int team, int allyteam) { teams[team].teamAllyteam = allyteam; }
+	void SetAllyTeam(int team, int allyteam) { teams[team]->teamAllyteam = allyteam; }
 
 	/**
 	 * @brief set ally
@@ -98,8 +94,12 @@ public:
 	int ActiveTeams() const { return teams.size(); }
 	int ActiveAllyTeams() const { return allyTeams.size(); }
 
-	bool IsActiveTeam(int id) {
+	bool IsValidTeam(int id) const {
 		return ((id >= 0) && (id < ActiveTeams()));
+	}
+
+	bool IsActiveTeam(int id) const {
+		return IsValidTeam(id);
 	}
 
 	void GameFrame(int frameNum);
@@ -125,7 +125,7 @@ private:
 	 *
 	 * Array of CTeam instances for teams in game
 	 */
-	std::vector<CTeam> teams;
+	std::vector<CTeam *> teams;
 	std::vector< ::AllyTeam > allyTeams;
 };
 

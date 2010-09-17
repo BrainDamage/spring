@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef TEAMSTATISTICS_H
 #define TEAMSTATISTICS_H
 
@@ -7,6 +9,27 @@
 
 struct TeamStatistics
 {
+	TeamStatistics() {
+		/*metalUsed     = energyUsed     = 0.0f;
+		metalProduced = energyProduced = 0.0f;
+		metalExcess   = energyExcess   = 0.0f;
+		metalReceived = energyReceived = 0.0f;
+		metalSent     = energySent     = 0.0f;
+		damageDealt   = damageReceived = 0.0f;
+		unitsProduced    = 0;
+		unitsDied        = 0;
+		unitsReceived    = 0;
+		unitsSent        = 0;
+		unitsCaptured    = 0;
+		unitsOutCaptured = 0;
+		unitsKilled      = 0;
+		frame            = 0;*/
+		
+		memset(this,0,sizeof(TeamStatistics));
+	};
+
+	int frame;
+
 	float metalUsed,     energyUsed;
 	float metalProduced, energyProduced;
 	float metalExcess,   energyExcess;
@@ -28,6 +51,9 @@ struct TeamStatistics
 
 	/// Change structure from host endian to little endian or vice versa.
 	void swab();
+
+	/// In intervalls of this many seconds, statistics are updated
+	static const int statsPeriod = 16;
 };
 
 #pragma pack(pop)

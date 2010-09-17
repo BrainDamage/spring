@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -7,7 +9,7 @@
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
 #include "Rendering/GroundDecalHandler.h"
-#include "Rendering/UnitModels/3DModel.h"
+#include "Rendering/Models/3DModel.h"
 #include "Sim/Misc/Wind.h"
 #include "Sim/Misc/AirBaseHandler.h"
 #include "Sim/Misc/LosHandler.h"
@@ -45,7 +47,6 @@ CR_REG_METADATA(CScriptMoveType, (
 	CR_MEMBER(leaveTracks),
 	CR_MEMBER(hasDecal),
 	CR_MEMBER(isBuilding),
-	CR_MEMBER(isBlocking), // copy of CSolidObject::blocking (no longer used)
 	CR_MEMBER(rotOffset),
 	CR_MEMBER(lastTrackUpdate),
 	CR_MEMBER(oldPos),
@@ -152,9 +153,7 @@ void CScriptMoveType::SlowUpdate()
 		owner->mapSquare = newmapSquare;
 
 		loshandler->MoveUnit(owner, false);
-		if (owner->hasRadarCapacity) {
-			radarhandler->MoveUnit(owner);
-		}
+		radarhandler->MoveUnit(owner);
 	}
 	qf->MovedUnit(owner);
 
@@ -233,7 +232,7 @@ void CScriptMoveType::Update()
 		owner->Block();
 	}
 
-	if (groundDecals && owner->unitDef->leaveTracks && leaveTracks &&
+	if (owner->unitDef->leaveTracks && leaveTracks &&
 	    (lastTrackUpdate < (gs->frameNum - 7)) &&
 	    ((owner->losStatus[gu->myAllyTeam] & LOS_INLOS) || gu->spectatingFullView)) {
 		lastTrackUpdate = gs->frameNum;

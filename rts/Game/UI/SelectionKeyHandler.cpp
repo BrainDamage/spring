@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include <fstream>
 #include <SDL_keysym.h>
@@ -23,16 +25,16 @@
 #include "myMath.h"
 #include <boost/cstdint.hpp>
 
-CSelectionKeyHandler *selectionKeys;
+CSelectionKeyHandler* selectionKeys;
 
 extern boost::uint8_t *keys;
 
-CSelectionKeyHandler::CSelectionKeyHandler(void)
+CSelectionKeyHandler::CSelectionKeyHandler()
 {
 	LoadSelectionKeys();
 }
 
-CSelectionKeyHandler::~CSelectionKeyHandler(void)
+CSelectionKeyHandler::~CSelectionKeyHandler()
 {
 }
 
@@ -240,7 +242,7 @@ namespace
 	);
 
 	DECLARE_FILTER_EX(RulesParamEquals, 2, unit->modParamsMap.find(param) != unit->modParamsMap.end() &&
-	                  unit->modParams[unit->modParamsMap.find(param)->second] == wantedValue,
+	                  unit->modParams[unit->modParamsMap.find(param)->second].value == wantedValue,
 		std::string param;
 		float wantedValue;
 		void SetParam(int index, const std::string& value) {

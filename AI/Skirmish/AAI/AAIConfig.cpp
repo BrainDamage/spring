@@ -117,14 +117,46 @@ void AAIConfig::LoadConfig(AAI *ai)
 	char filename[500];
 	char buffer[500];
 
+	FILE* file = NULL;
+
 	STRCPY(buffer, MAIN_PATH);
 	STRCAT(buffer, MOD_CFG_PATH);
-	STRCAT(buffer, ai->cb->GetModName());
-	ReplaceExtension (buffer, filename, sizeof(filename), ".cfg");
-
+	const std::string modHumanName = MakeFileSystemCompatible(ai->cb->GetModHumanName());
+	STRCAT(buffer, modHumanName.c_str());
+	STRCAT(buffer, ".cfg");
+	STRCPY(filename, buffer);
 	ai->cb->GetValue(AIVAL_LOCATE_FILE_R, filename);
+	file = fopen(filename, "r");
+	if (file == NULL) {
+		fprintf(ai->file, "Mod config file %s not found\n", filename);
+		fprintf(ai->file, "Now trying with legacy mod config file name ...\n");
+		STRCPY(buffer, MAIN_PATH);
+		STRCAT(buffer, MOD_CFG_PATH);
+		const std::string modName = MakeFileSystemCompatible(ai->cb->GetModName());
+		STRCAT(buffer, modName.c_str());
+		ReplaceExtension(buffer, filename, sizeof(filename), ".cfg");
+		ai->cb->GetValue(AIVAL_LOCATE_FILE_R, filename);
+		file = fopen(filename, "r");
+	}
+	if (file == NULL) {
+		fprintf(ai->file, "Mod config file %s not found\n", filename);
+		fprintf(ai->file, "Now trying with version independent mod config file name ...\n");
+		STRCPY(buffer, MAIN_PATH);
+		STRCAT(buffer, MOD_CFG_PATH);
+		const std::string modShortName = MakeFileSystemCompatible(ai->cb->GetModShortName());
+		STRCAT(buffer, modShortName.c_str());
+		STRCAT(buffer, ".cfg");
+		STRCPY(filename, buffer);
+		ai->cb->GetValue(AIVAL_LOCATE_FILE_R, filename);
+		file = fopen(filename, "r");
+	}
+	if (file == NULL) {
+		fprintf(ai->file, "Mod config file %s not found\n", filename);
+		fprintf(ai->file, "Give up trying to find mod config file (required).\n");
+		initialized = false;
+		return;
+	}
 
-	FILE *file = fopen(filename, "r");
 	char keyword[50];
 	int ival;
 	float fval;
@@ -135,6 +167,8 @@ void AAIConfig::LoadConfig(AAI *ai)
 
 	if(file)
 	{
+		fprintf(ai->file, "Using mod config file %s\n", filename);
+
 		while(EOF != fscanf(file, "%s", keyword))
 		{
 			if(!strcmp(keyword,"SIDES"))
@@ -582,21 +616,13 @@ void AAIConfig::LoadConfig(AAI *ai)
 			fprintf(ai->file, "Mod config file loaded\n");
 		}
 	}
-	else
-	{
-		fprintf(ai->file, "Mod config file %s not found\n", filename);
-		initialized = false;
-		return;
-	}
 
 
 	// load general settings
 	STRCPY(buffer, MAIN_PATH);
 	STRCAT(buffer, GENERAL_CFG_FILE);
-	ReplaceExtension (buffer, filename, sizeof(filename), ".cfg");
-
+	ReplaceExtension(buffer, filename, sizeof(filename), ".cfg");
 	ai->cb->GetValue(AIVAL_LOCATE_FILE_R, filename);
-
 	file = fopen(filename, "r");
 
 	if(file)

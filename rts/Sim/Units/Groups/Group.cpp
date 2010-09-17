@@ -1,6 +1,4 @@
-// Group.cpp: implementation of the CGroup class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "Group.h"
@@ -106,7 +104,7 @@ const vector<CommandDescription>& CGroup::GetPossibleCommands()
 	return myCommands;
 }
 
-int CGroup::GetDefaultCmd(const CUnit *unit, const CFeature* feature)
+int CGroup::GetDefaultCmd(const CUnit *unit, const CFeature* feature) const
 {
 	return CMD_STOP;
 }

@@ -1,4 +1,4 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #define DEBUG_LUA 0
 
@@ -12,6 +12,7 @@
 #include "Lua/LuaCallInCheck.h"
 #include "Lua/LuaHandleSynced.h"
 #include "Sim/Units/UnitHandler.h"
+#include "Sim/Units/Unit.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
 
 
@@ -1037,6 +1038,12 @@ int CLuaUnitScript::CreateScript(lua_State* L)
 	}
 	unit->script = newScript;
 
+	// flush some caches (which store availability of certain script functions)
+	for (std::vector<CWeapon*>::iterator wi = unit->weapons.begin(); wi != unit->weapons.end(); ++wi) {
+		CWeapon* w = *wi;
+		w->SetWeaponNum(w->weaponNum);
+	}
+
 	LUA_TRACE("script replaced with CLuaUnitScript");
 
 	return 0;
@@ -1466,7 +1473,7 @@ int CLuaUnitScript::GetPieceTranslation(lua_State* L)
 int CLuaUnitScript::GetPieceRotation(lua_State* L)
 {
 	if (activeScript == NULL) {
-		return NULL;
+		return 0;
 	}
 	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __FUNCTION__);
 	return ToLua(L, piece->rot);
@@ -1476,7 +1483,7 @@ int CLuaUnitScript::GetPieceRotation(lua_State* L)
 int CLuaUnitScript::GetPiecePosDir(lua_State* L)
 {
 	if (activeScript == NULL) {
-		return NULL;
+		return 0;
 	}
 	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __FUNCTION__);
 	float3 pos, dir;

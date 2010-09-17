@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef FEATURE_DEF_H
 #define FEATURE_DEF_H
 
@@ -18,8 +20,10 @@ struct FeatureDef
 {
 	CR_DECLARE_STRUCT(FeatureDef);
 
-	FeatureDef():
-		metal(0), energy(0), maxHealth(0), reclaimTime(0), mass(0),
+	FeatureDef()
+		: collisionVolume(NULL)
+		, id(-1)
+		, metal(0), energy(0), maxHealth(0), reclaimTime(0), mass(0),
 		upright(false), drawType(0), model(NULL),
 		resurrectable(false), smokeTime(0), destructable(false), reclaimable(true), autoreclaim(true), blocking(false),
 		burnable(false), floating(false), noSelect(false), geoThermal(false),
@@ -41,11 +45,6 @@ struct FeatureDef
 
 	/// used to see if the object can be overrun
 	float mass;
-
-	std::string collisionVolumeTypeStr;  // can be "Ell", "CylT" (where T is one of "XYZ"), or "Box"
-	float3 collisionVolumeScales;        // the collision volume's full axis lengths
-	float3 collisionVolumeOffsets;       // relative to the feature's center position
-	int collisionVolumeTest;             // 0: discrete, 1: continuous
 
 	bool upright;
 	int drawType;

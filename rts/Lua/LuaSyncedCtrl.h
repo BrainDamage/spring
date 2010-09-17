@@ -1,16 +1,14 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_SYNCED_CTRL_H
 #define LUA_SYNCED_CTRL_H
-// LuaSyncedCtrl.h: interface for the LuaSyncedCtrl class.
-//
-//////////////////////////////////////////////////////////////////////
 
 struct lua_State;
 
-
-class LuaSyncedCtrl {
+class LuaSyncedCtrl
+{
 	public:
 		static bool PushEntries(lua_State* L);
-
 		static void CheckAllowGameChanges(lua_State* L);
 
 	private:
@@ -29,9 +27,14 @@ class LuaSyncedCtrl {
 		static int UseTeamResource(lua_State* L);
 		static int SetTeamResource(lua_State* L);
 		static int SetTeamShareLevel(lua_State* L);
+		static int ShareTeamResource(lua_State* L);
 
 		static int CallCOBScript(lua_State* L);
 		static int GetCOBScriptID(lua_State* L);
+
+		static int SetUnitRulesParam(lua_State* L);
+		static int SetTeamRulesParam(lua_State* L);
+		static int SetGameRulesParam(lua_State* L);
 
 		static int GiveOrderToUnit(lua_State* L);
 		static int GiveOrderToUnitMap(lua_State* L);
@@ -102,6 +105,7 @@ class LuaSyncedCtrl {
 		static int SetFeatureNoSelect(lua_State* L);
 		static int SetFeatureCollisionVolumeData(lua_State* L);
 
+		static int SetProjectileMoveControl(lua_State* L);
 		static int SetProjectilePosition(lua_State* L);
 		static int SetProjectileVelocity(lua_State* L);
 		static int SetProjectileCollision(lua_State* L);

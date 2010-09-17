@@ -1,19 +1,18 @@
-// WreckProjectile.cpp: implementation of the CWreckProjectile class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "mmgr.h"
 
-#include "Game/Camera.h"
-#include "Map/Ground.h"
-#include "Rendering/GL/myGL.h"
-#include "Rendering/GL/VertexArray.h"
-#include "Rendering/Colors.h"
-#include "Sim/Projectiles/ProjectileHandler.h"
 #include "SmokeProjectile.h"
 #include "WreckProjectile.h"
-#include "GlobalUnsynced.h"
+#include "Game/Camera.h"
+#include "Map/Ground.h"
+#include "Rendering/Colors.h"
+#include "Rendering/ProjectileDrawer.hpp"
+#include "Rendering/GL/myGL.h"
+#include "Rendering/GL/VertexArray.h"
+#include "Rendering/Textures/TextureAtlas.h"
+#include "Sim/Projectiles/ProjectileHandler.h"
 
 CR_BIND_DERIVED(CWreckProjectile, CProjectile, (float3(0, 0,0 ), float3(0, 0, 0), 0, 0));
 
@@ -25,8 +24,8 @@ CR_REG_METADATA(CWreckProjectile,
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-CWreckProjectile::CWreckProjectile(float3 pos,float3 speed,float temperature,CUnit* owner GML_PARG_C):
-	CProjectile(pos,speed,owner, false, false, false GML_PARG_P)
+CWreckProjectile::CWreckProjectile(float3 pos, float3 speed, float temperature, CUnit* owner):
+	CProjectile(pos,speed,owner, false, false, false)
 {
 	checkCol = false;
 	drawRadius = 2.0f;
@@ -43,8 +42,9 @@ void CWreckProjectile::Update()
 	speed.x *= 0.994f;
 	speed.z *= 0.994f;
 
-	if (speed.y > 0)
+	if (speed.y > 0) {
 		speed.y *= 0.998f;
+	}
 
 	pos += speed;
 
@@ -52,23 +52,26 @@ void CWreckProjectile::Update()
 		CSmokeProjectile* hp = new CSmokeProjectile(pos, ZeroVector, 50, 4, 0.3f, owner(), 0.5f);
 		hp->size += 0.1f;
 	}
-	if (pos.y + 0.3f < ground->GetApproximateHeight(pos.x, pos.z))
+	if (pos.y + 0.3f < ground->GetApproximateHeight(pos.x, pos.z)) {
 		deleteMe = true;
+	}
 }
 
-void CWreckProjectile::Draw(void)
+void CWreckProjectile::Draw()
 {
-	inArray=true;
+	inArray = true;
 	unsigned char col[4];
-	col[0]=(unsigned char) (0.15f*200);
-	col[1]=(unsigned char) (0.1f*200);
-	col[2]=(unsigned char) (0.05f*200);
-	col[3]=200;
+	col[0] = (unsigned char) (0.15f * 200);
+	col[1] = (unsigned char) (0.1f  * 200);
+	col[2] = (unsigned char) (0.05f * 200);
+	col[3] = 200;
 
-	va->AddVertexTC(drawPos-camera->right*drawRadius-camera->up*drawRadius,ph->wrecktex.xstart,ph->wrecktex.ystart,col);
-	va->AddVertexTC(drawPos+camera->right*drawRadius-camera->up*drawRadius,ph->wrecktex.xend,ph->wrecktex.ystart,col);
-	va->AddVertexTC(drawPos+camera->right*drawRadius+camera->up*drawRadius,ph->wrecktex.xend,ph->wrecktex.yend,col);
-	va->AddVertexTC(drawPos-camera->right*drawRadius+camera->up*drawRadius,ph->wrecktex.xstart,ph->wrecktex.yend,col);
+	#define wt projectileDrawer->wrecktex
+	va->AddVertexTC(drawPos - camera->right * drawRadius - camera->up * drawRadius, wt->xstart, wt->ystart, col);
+	va->AddVertexTC(drawPos + camera->right * drawRadius - camera->up * drawRadius, wt->xend,   wt->ystart, col);
+	va->AddVertexTC(drawPos + camera->right * drawRadius + camera->up * drawRadius, wt->xend,   wt->yend,   col);
+	va->AddVertexTC(drawPos - camera->right * drawRadius + camera->up * drawRadius, wt->xstart, wt->yend,   col);
+	#undef wt
 }
 
 void CWreckProjectile::DrawOnMinimap(CVertexArray& lines, CVertexArray& points)

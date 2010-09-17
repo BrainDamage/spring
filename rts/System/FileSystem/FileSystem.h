@@ -1,11 +1,4 @@
-/**
- * @file FileSystem.h
- * @brief Abstracts locating of content on different platforms
- * @author Tobi Vollebregt
- *
- * Copyright (C) 2006.  Licensed under the terms of the
- * GNU GPL, v2 or later
- */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef FILESYSTEM_H
 #define FILESYSTEM_H
@@ -24,6 +17,7 @@
 /**
  * @brief filesystem interface
  *
+ * Abstracts locating of content on different platforms.
  * Use this from the rest of the spring code, not FileSystemHandler!
  */
 class FileSystem
@@ -72,7 +66,8 @@ class FileSystem
 				const std::string& relPath) const;
 
 		// metadata read functions
-		size_t GetFilesize(std::string path) const;
+		bool FileExists(std::string path) const;
+		size_t GetFileSize(std::string path) const;
 
 		// directory functions
 		bool CreateDirectory(std::string dir) const;

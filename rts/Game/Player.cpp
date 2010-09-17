@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// Player.cpp: implementation of the CPlayer class.
-//
-//////////////////////////////////////////////////////////////////////
 #include <assert.h>
 #include <SDL_mouse.h>
 
@@ -10,6 +9,7 @@
 #include "ExternalAI/SkirmishAIHandler.h"
 #include "Game/Player.h"
 #include "Game/PlayerHandler.h"
+#ifndef DEDICATED_CLIENT
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
 #include "Game/GameHelper.h"
@@ -22,6 +22,7 @@
 #include "Sim/Units/COB/CobInstance.h"
 #include "System/myMath.h"
 #include "System/EventHandler.h"
+#endif
 #include "System/GlobalUnsynced.h"
 #include "System/NetProtocol.h"
 
@@ -57,9 +58,6 @@ CPlayer::CPlayer()
 	active   = false;
 	cpuUsage = 0;
 	ping     = 0;
-
-
-	dccs.playerControlledUnit = 0;
 
 	myControl.forward = 0;
 	myControl.back    = 0;
@@ -192,6 +190,9 @@ void CPlayer::GameFrame(int frameNum)
 
 void CPlayer::StopControllingUnit()
 {
+	if(!dccs.playerControlledUnit)
+		return;
+
 	CUnit* unit = dccs.playerControlledUnit;
 	unit->directControl = 0;
 	unit->AttackUnit(0, true);
