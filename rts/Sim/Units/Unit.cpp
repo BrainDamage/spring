@@ -137,7 +137,6 @@ CUnit::CUnit():
 	los(0),
 	tempNum(0),
 	lastSlowUpdate(0),
-	controlRadius(2),
 	losRadius(0),
 	airLosRadius(0),
 	losHeight(0),
@@ -685,6 +684,8 @@ void CUnit::SlowUpdate()
 		}
 	}
 
+	UpdateResources();
+
 	if (stunned) {
 		// de-stun only if we are not (still) inside a non-firebase transport
 		if ((paralyzeDamage <= (modInfo.paralyzeOnMaxHealth? maxHealth: health)) &&
@@ -693,7 +694,6 @@ void CUnit::SlowUpdate()
 		}
 
 		SlowUpdateCloak(true);
-		UpdateResources();
 		return;
 	}
 
@@ -723,9 +723,7 @@ void CUnit::SlowUpdate()
 			if (health < 0.0f) {
 				KillUnit(false, true, NULL);
 			}
-			UpdateResources();
 		}
-
 		ScriptDecloak(false);
 		return;
 	}
@@ -736,8 +734,6 @@ void CUnit::SlowUpdate()
 
 	commandAI->SlowUpdate();
 	moveType->SlowUpdate();
-
-	UpdateResources();
 
 	// FIXME: scriptMakeMetal ...?
 	AddMetal(uncondMakeMetal);
@@ -2278,7 +2274,6 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(tempNum),
 	CR_MEMBER(lastSlowUpdate),
 	CR_MEMBER(mapSquare),
-	CR_MEMBER(controlRadius),
 	CR_MEMBER(losRadius),
 	CR_MEMBER(airLosRadius),
 	CR_MEMBER(losHeight),

@@ -775,6 +775,7 @@ inline void CUnitDrawer::DrawOpaqueUnitShadow(CUnit* unit) {
 	const float sqDist = (unit->pos - camera->pos).SqLength();
 	const float farLength = unit->sqRadius * unitDrawDistSqr;
 
+	if (unit->noDraw) { return; }
 	if (sqDist >= farLength) { return; }
 	if (unit->isCloaked) { return; }
 	if (DrawAsIcon(unit, sqDist)) { return; }
@@ -1136,38 +1137,34 @@ void CUnitDrawer::DrawGhostedBuildings(int modelType)
 
 	// buildings that died while ghosted
 	for (std::set<GhostBuilding*>::iterator it = deadGhostedBuildings.begin(); it != deadGhostedBuildings.end(); ) {
-		std::set<GhostBuilding*>::iterator itNext(it); itNext++;
-
 		if (loshandler->InLos((*it)->pos, gu->myAllyTeam) || gu->spectatingFullView) {
 			// obtained LOS on the ghost of a dead building
-			if ((*it)->decal) {
+			if ((*it)->decal)
 				(*it)->decal->gbOwner = 0;
-			}
 
 			delete *it;
-			deadGhostedBuildings.erase(it);
-			it = itNext;
+			deadGhostedBuildings.erase(it++);
 		} else {
 			if (camera->InView((*it)->pos, (*it)->model->radius * 2.0f)) {
 				glPushMatrix();
 				glTranslatef3((*it)->pos);
 				glRotatef((*it)->facing * 90.0f, 0, 1, 0);
 
-				if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ) {
+				if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ)
 					texturehandlerS3O->SetS3oTexture((*it)->model->textureType);
-				}
 
 				SetTeamColour((*it)->team, cloakAlpha1);
 				(*it)->model->DrawStatic();
 				glPopMatrix();
 			}
 
-			it++;
+			++it;
 		}
 	}
 
-	for (std::set<CUnit*>::const_iterator ui = liveGhostedBuildings.begin(); ui != liveGhostedBuildings.end(); ++ui) {
-		DrawCloakedUnit(*ui, modelType, true);
+	if (!gu->spectatingFullView) {
+		for (std::set<CUnit*>::const_iterator ui = liveGhostedBuildings.begin(); ui != liveGhostedBuildings.end(); ++ui)
+			DrawCloakedUnit(*ui, modelType, true);
 	}
 }
 
@@ -2114,19 +2111,19 @@ inline void CUnitDrawer::UpdateUnitIconState(CUnit* unit) {
 	if ((losStatus & LOS_INLOS) || gu->spectatingFullView) {
 		unit->isIcon = DrawAsIcon(unit, (unit->pos - camera->pos).SqLength());
 #ifdef USE_GML
-		if (showHealthBars &&
+		if (showHealthBars && !unit->noDraw &&
 			(unit->health < unit->maxHealth || unit->paralyzeDamage > 0.0f || unit->limExperience > 0.0f ||
 			unit->beingBuilt || unit->stockpileWeapon || unit->group) && 
 			((unit->pos - camera->pos).SqLength() < (unitDrawDistSqr * 500.0f)))
 			drawStat.insert(unit);
 #endif
-	} else if (losStatus & LOS_PREVLOS) {
+	} else if ((losStatus & LOS_PREVLOS) && (losStatus & LOS_CONTRADAR)) {
 		if (gameSetup->ghostedBuildings && unit->mobility == NULL) {
 			unit->isIcon = DrawAsIcon(unit, (unit->pos - camera->pos).SqLength());
 		}
 	}
 
-	if(unit->isIcon)
+	if (unit->isIcon && !unit->noDraw)
 		drawIcon.insert(unit);
 }
 
@@ -2283,7 +2280,7 @@ void CUnitDrawer::RenderUnitCreated(const CUnit* u, int cloaked) {
 	CBuilding* building = dynamic_cast<CBuilding*>(unit);
 
 #if defined(USE_GML) && GML_ENABLE_SIM
-	if(u->model && TEX_TYPE(u) < 0)
+	if (u->model && TEX_TYPE(u) < 0)
 		TEX_TYPE(u) = texturehandlerS3O->LoadS3OTextureNow(u->model->tex1, u->model->tex2);
 #endif
 

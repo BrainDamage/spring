@@ -1455,20 +1455,42 @@ int CAICallback::HandleCommand(int commandId, void* data)
 
 			if (CHECK_UNITID(cmdData->srcUID)) {
 				const CUnit* srcUnit = uh->units[cmdData->srcUID];
-				const CUnit* hitUnit = NULL;
-				bool   haveHit = false;
-				bool   visible = true;
 
 				if (srcUnit != NULL) {
+					const CUnit* hitUnit = NULL;
 					const float realLen = helper->TraceRay(cmdData->rayPos, cmdData->rayDir, cmdData->rayLen, 0.0f, srcUnit, hitUnit, cmdData->flags);
 
 					if (hitUnit != NULL) {
-						haveHit = true;
-						visible = (hitUnit->losStatus[teamHandler->AllyTeam(team)] & LOS_INLOS);
+						const bool isUnitVisible = (hitUnit->losStatus[teamHandler->AllyTeam(team)] & LOS_INLOS);
+						if (isUnitVisible) {
+							cmdData->rayLen = realLen;
+							cmdData->hitUID = hitUnit->id;
+						}
 					}
+				}
+			}
 
-					cmdData->rayLen = (           visible)? realLen:     cmdData->rayLen;
-					cmdData->hitUID = (haveHit && visible)? hitUnit->id: cmdData->hitUID;
+			return 1;
+		} break;
+
+		case AIHCFeatureTraceRayId: {
+			AIHCFeatureTraceRay* cmdData = (AIHCFeatureTraceRay*) data;
+
+			if (CHECK_UNITID(cmdData->srcUID)) {
+				const CUnit* srcUnit = uh->units[cmdData->srcUID];
+
+				if (srcUnit != NULL) {
+					const CUnit* hitUnit = NULL;
+					const CFeature* hitFeature = NULL;
+					const float realLen = helper->TraceRay(cmdData->rayPos, cmdData->rayDir, cmdData->rayLen, 0.0f, srcUnit, hitUnit, cmdData->flags, &hitFeature);
+
+					if (hitFeature != NULL) {
+						const bool isFeatureVisible = hitFeature->IsInLosForAllyTeam(teamHandler->AllyTeam(team));
+						if (isFeatureVisible) {
+							cmdData->rayLen = realLen;
+							cmdData->hitFID = hitFeature->id;
+						}
+					}
 				}
 			}
 

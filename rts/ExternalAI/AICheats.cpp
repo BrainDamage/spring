@@ -10,6 +10,7 @@
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/UnitLoader.h"
+#include "Sim/Features/Feature.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Game/GameServer.h"
@@ -30,30 +31,30 @@ CAICheats::CAICheats(CSkirmishAIWrapper* ai): ai(ai)
 CAICheats::~CAICheats(void)
 {}
 
+
+
 bool CAICheats::OnlyPassiveCheats()
 {
-	return IsPassive();
-}
-bool CAICheats::IsPassive()
-{
+	// returns whether cheats will desync (this is
+	// always the case unless we are both the host
+	// and the only client) if used by an AI
 	if (!gameServer) {
-		// if we are NOT server, cheats will cause desync
 		return true;
-	}
-	else if (gameSetup && (gameSetup->playerStartingData.size() == 1)) {
-		// assuming AI's dont count on numPlayers
+	} else if (gameSetup && (gameSetup->playerStartingData.size() == 1)) {
+		// assumes AI's dont count toward numPlayers
 		return false;
-	}
-	else {
-		// disable it in case we are not sure
+	} else {
 		return true;
 	}
 }
 
 void CAICheats::EnableCheatEvents(bool enable)
 {
+	// enable sending of EnemyCreated, etc. events
 	ai->SetCheatEventsEnabled(enable);
 }
+
+
 
 void CAICheats::SetMyHandicap(float handicap)
 {
@@ -385,7 +386,7 @@ bool CAICheats::GetValue(int id, void* data) const
 	return false;
 }
 
-int CAICheats::HandleCommand(int commandId, void *data)
+int CAICheats::HandleCommand(int commandId, void* data)
 {
 	switch (commandId) {
 		case AIHCQuerySubVersionId:
@@ -405,9 +406,27 @@ int CAICheats::HandleCommand(int commandId, void *data)
 			}
 
 			return 1;
-		}
+		} break;
 
-		default:
+		case AIHCFeatureTraceRayId: {
+			AIHCFeatureTraceRay* cmdData = (AIHCFeatureTraceRay*) data;
+
+			if (CHECK_UNITID(cmdData->srcUID)) {
+				const CUnit* srcUnit = uh->units[cmdData->srcUID];
+				const CUnit* hitUnit = NULL;
+				const CFeature* hitFeature = NULL;
+
+				if (srcUnit != NULL) {
+					cmdData->rayLen = helper->TraceRay(cmdData->rayPos, cmdData->rayDir, cmdData->rayLen, 0.0f, srcUnit, hitUnit, cmdData->flags, &hitFeature);
+					cmdData->hitFID = (hitFeature != NULL)? hitFeature->id: -1;
+				}
+			}
+
+			return 1;
+		} break;
+
+		default: {
 			return 0;
+		}
 	}
 }
