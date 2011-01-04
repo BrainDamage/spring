@@ -156,6 +156,7 @@ Function .onInit
 		; check if we need to exit some processes which may be using unitsync
 		${CheckExecutableRunning} "TASClient.exe" "TASClient"
 		${CheckExecutableRunning} "springlobby.exe" "Spring Lobby"
+		IfSilent +2 ; Zero-K installs this silent, so don't check
 		${CheckExecutableRunning} "Zero-K.exe" "Zero-K Lobby"
 		${CheckExecutableRunning} "CADownloader.exe" "CA Downloader"
 		${CheckExecutableRunning} "springsettings.exe" "Spring Settings"
@@ -234,6 +235,13 @@ SectionGroup "Tools"
 		!define INSTALL
 			${!echonow} "Processing: archivemover"
 			!include "sections\archivemover.nsh"
+		!undef INSTALL
+	SectionEnd
+
+	Section "Simple spring-rapid downloader" SEC_RAPID
+		!define INSTALL
+			${!echonow} "Processing: rapid"
+			!include "sections\rapid.nsh"
 		!undef INSTALL
 	SectionEnd
 SectionGroupEnd

@@ -61,10 +61,13 @@ public:
 	CDGunControllerHandler* GetDGunControllerHandler() { return dgunControllerHandler; }
 
 	CCommandTracker* GetCommandTracker() { return commandTracker; }
-	CLogger* GetLogHandler() { return logHandler; }
+	CLogger* GetLogger() { return logHandler; }
 	LuaParser* GetLuaParser() { return luaConfigParser; }
 
-	CUNIT* GetUnit(int id) const { return activeUnits[id]; }
+	CUNIT* GetUnit(int id) const {
+		assert((id >= 0) && (id < activeUnits.size()));
+		return activeUnits[id];
+	}
 	std::vector<CUNIT*>& GetActiveUnits() { return activeUnits; }
 	std::vector<int>& GetUnitIDs() { return unitIDs; }
 
@@ -111,7 +114,6 @@ private:
 #define dgunConHandler GetDGunControllerHandler()
 
 #define ct GetCommandTracker()
-#define logger GetLogHandler()
 #define luaParser GetLuaParser()
 
 #define unitIDs GetUnitIDs()

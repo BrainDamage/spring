@@ -99,6 +99,7 @@
 #include "Sim/Misc/SideParser.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/Wind.h"
+#include "Sim/Misc/ResourceHandler.h"
 #include "Sim/MoveTypes/MoveInfo.h"
 #include "Sim/Path/PathManager.h"
 #include "Sim/Projectiles/Projectile.h"
@@ -401,6 +402,7 @@ CGame::~CGame()
 	SafeDelete(shadowHandler);
 	SafeDelete(moveinfo);
 	SafeDelete(unitDefHandler);
+	CResourceHandler::FreeInstance();
 	SafeDelete(weaponDefHandler);
 	SafeDelete(damageArrayHandler);
 	SafeDelete(vfsHandler);
@@ -440,7 +442,7 @@ void CGame::LoadDefs()
 
 	// run the parser
 	if (!defsParser->Execute()) {
-		throw content_error(defsParser->GetErrorLog());
+		throw content_error("Defs-Parser: " + defsParser->GetErrorLog());
 	}
 	const LuaTable root = defsParser->GetRoot();
 	if (!root.IsValid()) {
@@ -3575,9 +3577,7 @@ void CGame::SimFrame() {
 		m_validateAllAllocUnits();
 #endif
 
-	if (luaUI)    { luaUI->GameFrame(gs->frameNum); }
-	if (luaGaia)  { luaGaia->GameFrame(gs->frameNum); }
-	if (luaRules) { luaRules->GameFrame(gs->frameNum); }
+	eventHandler.GameFrame(gs->frameNum);
 
 	gs->frameNum++;
 
@@ -4398,6 +4398,10 @@ void CGame::ClientReadNet()
 						eventHandler.PlayerChanged(player);
 						break;
 					}
+					case TEAMMSG_TEAM_DIED: {
+						// silently drop since we can calculate this ourself, altho it's useful info to store in replays
+						break;
+					}
 					default: {
 						logOutput.Print("Unknown action in NETMSG_TEAM (%i) from player %i", action, player);
 					}
@@ -5081,17 +5085,17 @@ void CGame::ReloadCOB(const string& msg, int player)
 	}
 	const UnitDef* udef = unitDefHandler->GetUnitDefByName(unitName);
 	if (udef==NULL) {
-		logOutput.Print("Unknown unit name");
+		logOutput.Print("Unknown unit name: \"%s\"", unitName.c_str());
 		return;
 	}
 	const CCobFile* oldScript = GCobFileHandler.GetScriptAddr(udef->scriptPath);
 	if (oldScript == NULL) {
-		logOutput.Print("Unknown cob script: %s", udef->scriptPath.c_str());
+		logOutput.Print("Unknown COB script for unit \"%s\": %s", unitName.c_str(), udef->scriptPath.c_str());
 		return;
 	}
 	CCobFile* newScript = GCobFileHandler.ReloadCobFile(udef->scriptPath);
 	if (newScript == NULL) {
-		logOutput.Print("Could not load COB script from: %s", udef->scriptPath.c_str());
+		logOutput.Print("Could not load COB script for unit \"%s\" from: %s", unitName.c_str(), udef->scriptPath.c_str());
 		return;
 	}
 	int count = 0;

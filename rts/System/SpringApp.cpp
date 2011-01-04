@@ -317,7 +317,8 @@ static bool MultisampleTest(void)
  */
 static bool MultisampleVerify(void)
 {
-	GLint buffers, samples;
+	GLint buffers = 0;
+	GLint samples = 0;
 	glGetIntegerv(GL_SAMPLE_BUFFERS_ARB, &buffers);
 	glGetIntegerv(GL_SAMPLES_ARB, &samples);
 	if (buffers && samples) {
@@ -532,9 +533,7 @@ bool SpringApp::GetDisplayGeometry()
 			case SW_SHOWMAXIMIZED:
 				windowState = 1;
 				break;
-			case SW_SHOWMINIMIZED:
-				windowState = 2;
-				break;
+			case SW_SHOWMINIMIZED: //minimized startup breaks init stuff, so don't store it
 			default:
 				windowState = 0;
 		}
@@ -607,7 +606,8 @@ void SpringApp::RestoreWindowPosition()
 				int wState;
 				switch (windowState) {
 					case 1: wState = SW_SHOWMAXIMIZED; break;
-					case 2: wState = SW_SHOWMINIMIZED; break;
+					//Setting the main-window minimized breaks initialization
+					case 2: // wState = SW_SHOWMINIMIZED; break;
 					default: stateChanged = false;
 				}
 				if (stateChanged) {

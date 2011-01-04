@@ -36,7 +36,6 @@ public:
 
 	bool OnSlope(void);
 
-	float baseTurnRate;
 	float turnRate;
 	float accRate;
 	float decRate;
@@ -48,6 +47,7 @@ public:
 	short int deltaHeading;
 
 	float3 flatFrontDir;
+	float3 waypointDir;
 
 	unsigned int pathId;
 	float goalRadius;
@@ -91,9 +91,6 @@ protected:
 
 	float BreakingDistance(float speed);
 	float3 Here();
-
-	float MinDistanceToWaypoint();
-	float MaxDistanceToWaypoint();
 
 	void StartEngine();
 	void StopEngine();

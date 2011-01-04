@@ -103,7 +103,7 @@ UnitDef::UnitDef()
 , stealth(false)
 , sonarStealth(false)
 , buildRange3D(false)
-, buildDistance(0.0f)
+, buildDistance(16.0f) // 16.0f is the minimum distance between two 1x1 units
 , buildSpeed(0.0f)
 , reclaimSpeed(0.0f)
 , repairSpeed(0.0f)
@@ -374,32 +374,27 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	maxSlope = cos(maxSlope * (PI / 180));
 	minWaterDepth = udTable.GetFloat("minWaterDepth", -10e6f);
 	maxWaterDepth = udTable.GetFloat("maxWaterDepth", +10e6f);
+	waterline = udTable.GetFloat("waterline", 0.0f);
 	minCollisionSpeed = udTable.GetFloat("minCollisionSpeed", 1.0f);
 	slideTolerance = udTable.GetFloat("slideTolerance", 0.0f); // disabled
 	pushResistant = udTable.GetBool("pushResistant", false);
 
-	waterline = udTable.GetFloat("waterline", 0.0f);
-	if ((waterline >= 5.0f) && canmove) {
-		// make subs travel at somewhat larger depths
-		// to reduce vulnerability to surface weapons
-		waterline += 10.0f;
-	}
-
 	canSelfD = udTable.GetBool("canSelfDestruct", true);
 	selfDCountdown = udTable.GetInt("selfDestructCountdown", 5);
 
-	speed  = udTable.GetFloat("maxVelocity",  0.0f) * GAME_SPEED;
+	speed  = udTable.GetFloat("maxVelocity", 0.0f) * GAME_SPEED;
 	rSpeed = udTable.GetFloat("maxReverseVelocity", 0.0f) * GAME_SPEED;
 	speed  = fabs(speed);
 	rSpeed = fabs(rSpeed);
 
 	maxAcc = fabs(udTable.GetFloat("acceleration", 0.5f)); // no negative values
-	maxDec = fabs(udTable.GetFloat("brakeRate",    3.0f * maxAcc)) * (canfly? 0.1f: 1.0f); // no negative values
+	maxDec = fabs(udTable.GetFloat("brakeRate", 3.0f * maxAcc)) * (canfly? 0.1f: 1.0f); // no negative values
 
-	turnRate    = udTable.GetFloat("turnRate",     0.0f);
-	turnInPlace = udTable.GetBool( "turnInPlace",  true);
+	turnRate    = udTable.GetFloat("turnRate", 0.0f);
+	turnInPlace = udTable.GetBool("turnInPlace", true);
 	turnInPlaceDistance = udTable.GetFloat("turnInPlaceDistance", 350.f);
-	turnInPlaceSpeedLimit = udTable.GetFloat("turnInPlaceSpeedLimit", 15.f);
+	turnInPlaceSpeedLimit = ((turnRate / SPRING_CIRCLE_DIVS) * ((PI + PI) * SQUARE_SIZE)) * (speed / GAME_SPEED);
+	turnInPlaceSpeedLimit = udTable.GetFloat("turnInPlaceSpeedLimit", std::min(speed, turnInPlaceSpeedLimit));
 
 	const bool noAutoFire  = udTable.GetBool("noAutoFire",  false);
 	canFireControl = udTable.GetBool("canFireControl", !noAutoFire);
@@ -409,8 +404,11 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	moveState = std::min(moveState,2);
 
 	buildRange3D = udTable.GetBool("buildRange3D", false);
+	// 128.0f is the ancient default
 	buildDistance = udTable.GetFloat("buildDistance", 128.0f);
-	buildDistance = std::max(128.0f, buildDistance);
+	// 38.0f was evaluated by bobthedinosaur and FLOZi to be the bare minimum
+	// to not overlap for a 1x1 constructor building a 1x1 structure
+	buildDistance = std::max(38.0f, buildDistance);
 	buildSpeed = udTable.GetFloat("workerTime", 0.0f);
 
 	repairSpeed    = udTable.GetFloat("repairSpeed",    buildSpeed);

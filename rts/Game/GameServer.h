@@ -61,7 +61,7 @@ class CGameServer
 {
 	friend class CCregLoadSaveHandler;     //For initialize server state after load
 public:
-	CGameServer(int hostport, bool onlyLocal, const GameData* const gameData, const CGameSetup* const setup);
+	CGameServer(const std::string& hostIP, int hostPort, const GameData* const gameData, const CGameSetup* const setup);
 	~CGameServer();
 
 	void AddLocalClient(const std::string& myName, const std::string& myVersion);
@@ -217,9 +217,6 @@ private:
 	UnsyncedRNG rng;
 	boost::thread* thread;
 	mutable boost::recursive_mutex gameServerMutex;
-	typedef std::set<unsigned char> PlayersToForwardMsgvec;
-	typedef std::map<unsigned char, PlayersToForwardMsgvec> MsgToForwardMap;
-	MsgToForwardMap relayingMessagesMap;
 
 	bool canReconnect;
 	bool gameHasStarted;
@@ -228,3 +225,4 @@ private:
 extern CGameServer* gameServer;
 
 #endif // __GAME_SERVER_H__
+

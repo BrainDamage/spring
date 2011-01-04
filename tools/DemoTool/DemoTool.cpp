@@ -30,38 +30,41 @@ int main (int argc, char* argv[])
 {
 	std::string filename;
 	po::variables_map vm;
-	{
-		po::options_description all;
-		all.add_options()("demofile,f", po::value<std::string>(), "Path to demo file");
-		po::positional_options_description p;
-		p.add("demofile", 1);
-		all.add_options()("help,h", "This one");
-		all.add_options()("dump,d", "Only dump networc traffic saved in demo");
-		all.add_options()("stats,s", "Print all game, player and team stats");
-		all.add_options()("header,H", "Print demoheader content");
-		all.add_options()("playerstats,p", "Print playerstats");
-		all.add_options()("teamstats,t", "Print teamstats");
-		all.add_options()("team", po::value<unsigned>(), "Select team");
-		all.add_options()("teamsstatcsv", po::value<std::string>(), "Write teamstats in a csv file");
 
-		po::store(po::command_line_parser(argc, argv).options(all).positional(p).run(), vm);
-		po::notify(vm);
-		
-		if (vm.count("help"))
-		{
-			std::cout << "demotool Usage: " << std::endl;
-			all.print(std::cout);
-			return 0;
-		}
-		if (vm.count("demofile"))
-			filename = vm["demofile"].as<std::string>();
-		else
-		{
-			std::cout << "No demofile given" << std::endl;
-			all.print(std::cout);
-			return 1;
-		}
+	po::options_description all;
+	all.add_options()("demofile,f", po::value<std::string>(), "Path to demo file");
+	po::positional_options_description p;
+	p.add("demofile", 1);
+	all.add_options()("help,h", "This one");
+	all.add_options()("dump,d", "Only dump networc traffic saved in demo");
+	all.add_options()("stats,s", "Print all game, player and team stats");
+	all.add_options()("header,H", "Print demoheader content");
+	all.add_options()("playerstats,p", "Print playerstats");
+	all.add_options()("teamstats,t", "Print teamstats");
+	all.add_options()("team", po::value<unsigned>(), "Select team");
+	all.add_options()("teamsstatcsv", po::value<std::string>(), "Write teamstats in a csv file");
+
+	po::store(po::command_line_parser(argc, argv).options(all).positional(p).run(), vm);
+	po::notify(vm);
+
+	if (vm.count("help"))
+	{
+		std::cout << "demotool Usage: " << std::endl;
+		all.print(std::cout);
+		std::cout << "example: demotool myReplay.sdf -d > myReplay_sdf_demotool.txt" << std::endl;
+		return 0;
 	}
+	if (vm.count("demofile"))
+	{
+		filename = vm["demofile"].as<std::string>();
+	}
+	else
+	{
+		std::cout << "No demofile given" << std::endl;
+		all.print(std::cout);
+		return 1;
+	}
+
 	const bool printStats = vm.count("stats");
 	CDemoReader reader(filename, 0.0f);
 	reader.LoadStats();
@@ -197,12 +200,13 @@ void TrafficDump(CDemoReader& reader, bool trafficStats)
 		delete packet;
 	}
 
+	// how many times did each message appear
 	for (unsigned i = 0; i != trafficCounter.size(); ++i)
 	{
 		if (trafficStats && trafficCounter[i] > 0)
 			std::cout << "Msg " << i << ": " << trafficCounter[i] << std::endl;
 	}
-};
+}
 
 template<typename T>
 void PrintSep(std::ofstream& file, T value)

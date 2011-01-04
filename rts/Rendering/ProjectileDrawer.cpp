@@ -791,10 +791,10 @@ bool CProjectileDrawer::DrawProjectileModel(const CProjectile* p, bool shadowPas
                                                      \
 			updir = rightdir.cross(dir);
 
-		#define TRANSFORM_DRAW(mat)                          \
-			glPushMatrix();                                  \
-				glMultMatrixf(mat);                          \
-				glCallList(wp->model->rootobject->displist); \
+		#define TRANSFORM_DRAW(mat)                                \
+			glPushMatrix();                                        \
+				glMultMatrixf(mat);                                \
+				glCallList(wp->model->GetRootPiece()->dispListID); \
 			glPopMatrix();
 
 		switch (wp->GetProjectileType()) {
@@ -1042,7 +1042,7 @@ void CProjectileDrawer::RenderProjectileCreated(const CProjectile* p)
 {
 #if defined(USE_GML) && GML_ENABLE_SIM
 	if(p->model && TEX_TYPE(p) < 0)
-		TEX_TYPE(p) = texturehandlerS3O->LoadS3OTextureNow(p->model->tex1, p->model->tex2);
+		TEX_TYPE(p) = texturehandlerS3O->LoadS3OTextureNow(p->model);
 #endif
 
 	if (p->model) {

@@ -139,6 +139,7 @@ std::string CreateDefaultSetup(const std::string& map, const std::string& mod, c
 	modopts->AddPair("MaxSpeed", 20);
 
 	game->AddPair("IsHost", 1);
+	game->AddPair("OnlyLocal", 1);
 	game->add_name_value("MyPlayerName", playername);
 
 	game->AddPair("NoHelperAIs", configHandler->Get("NoHelperAIs", 0));
@@ -248,6 +249,7 @@ SelectMenu::~SelectMenu()
 	ShowConnectWindow(false);
 	CleanWindow();
 	delete updWindow;
+	delete mySettings;
 }
 
 bool SelectMenu::Draw()
@@ -416,7 +418,7 @@ void SelectMenu::CleanWindow() {
 void SelectMenu::DirectConnect(const std::string& addr)
 {
 	configHandler->SetString("address", addr);
-	mySettings->hostip = addr;
+	mySettings->hostIP = addr;
 	mySettings->isHost = false;
 	pregame = new CPreGame(mySettings);
 	agui::gui->RmElement(this);

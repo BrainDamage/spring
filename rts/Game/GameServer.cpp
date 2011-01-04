@@ -103,9 +103,9 @@ void SetBoolArg(bool& value, const std::string& str)
 }
 
 
-CGameServer* gameServer=0;
+CGameServer* gameServer = 0;
 
-CGameServer::CGameServer(int hostport, bool onlyLocal, const GameData* const newGameData, const CGameSetup* const mysetup)
+CGameServer::CGameServer(const std::string& hostIP, int hostPort, const GameData* const newGameData, const CGameSetup* const mysetup)
 : setup(mysetup)
 {
 	assert(setup);
@@ -149,17 +149,19 @@ CGameServer::CGameServer(int hostport, bool onlyLocal, const GameData* const new
 	allowAdditionalPlayers = configHandler->Get("AllowAdditionalPlayers", false);
 	whiteListAdditionalPlayers = configHandler->Get("WhiteListAdditionalPlayers", true);
 
-	if (!onlyLocal)
-		UDPNet.reset(new netcode::UDPListener(hostport));
+	if (!setup->onlyLocal) {
+		UDPNet.reset(new netcode::UDPListener(hostPort, hostIP));
+	}
 
-	std::string autohostip = configHandler->Get("AutohostIP", std::string("localhost"));
-	int autohostport = configHandler->Get("AutohostPort", 0);
-	
+	const std::string& autohostip = configHandler->Get("AutohostIP", std::string("localhost"));
+	const int autohostport = configHandler->Get("AutohostPort", 0);
+
 	if (autohostport > 0) {
 		AddAutohostInterface(autohostip, autohostport);
 	}
+
 	rng.Seed(newGameData->GetSetup().length());
-	Message(str( format(ServerStart) %hostport), false);
+	Message(str(format(ServerStart) %hostPort), false);
 
 	lastTick = spring_gettime();
 
@@ -1276,7 +1278,7 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 						}
 						break;
 					}
-					case TEAMMSG_TEAM_DIED: { // don't send to clients, they don't need it
+					case TEAMMSG_TEAM_DIED: {
 						const unsigned team = inbuf[3];
 #ifndef DEDICATED
 						if (players[player].isLocal) // currently only host is allowed
@@ -1293,6 +1295,7 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 									//players[p].team = 0;
 									players[p].spectator = true;
 									if (hostif) hostif->SendPlayerDefeated(p);
+									Broadcast(CBaseNetProtocol::Get().SendTeamDied(player, team));
 								}
 							}
 							// The teams Skirmish AIs destruction process
@@ -1463,42 +1466,6 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 			break;
 		}
 
-		case NETMSG_REGISTER_NETMSG: {
-			const unsigned char player = inbuf[1];
-			const unsigned char msg = inbuf[2];
-			MsgToForwardMap::iterator itor = relayingMessagesMap.find( msg );
-
-			if ( itor != relayingMessagesMap.end() ) { // one entry already exists in the map
-				PlayersToForwardMsgvec &toForward = itor->second;
-				if ( toForward.find( player ) == toForward.end() ) {
-					toForward.insert( player );
-				}
-			}
-			else {
-				PlayersToForwardMsgvec toForward;
-				toForward.insert( player );
-				relayingMessagesMap[msg] = toForward;
-			}
-			break;
-		}
-
-		case NETMSG_UNREGISTER_NETMSG: {
-			const unsigned char player = inbuf[1];
-			const unsigned char msg = inbuf[2];
-			MsgToForwardMap::iterator itor = relayingMessagesMap.find( msg );
-			if ( itor == relayingMessagesMap.end() ) { // no entry already exists in the map
-				break;
-			}
-			PlayersToForwardMsgvec& toForward = itor->second;
-			if ( toForward.find( player ) != toForward.end() ) {
-				toForward.erase( player );
-				if ( toForward.size() == 0 ) {
-					relayingMessagesMap.erase( itor );
-				}
-			}
-			break;
-		}
-
 #ifdef SYNCDEBUG
 		case NETMSG_SD_CHKRESPONSE:
 		case NETMSG_SD_BLKRESPONSE:
@@ -1523,17 +1490,6 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 		break;
 	}
 
-	// forward special messages to the players that request them
-	size_t playersSize = players.size();
-	MsgToForwardMap::iterator toRelay = relayingMessagesMap.find( msgCode );
-	if ( toRelay != relayingMessagesMap.end() ) {
-		PlayersToForwardMsgvec& toRelaySet = toRelay->second;
-		for ( PlayersToForwardMsgvec::iterator playerToRelay = toRelaySet.begin(); playerToRelay != toRelaySet.end(); playerToRelay++ ) {
-			if ( *playerToRelay < playersSize ) {
-				players[*playerToRelay].SendData(packet);
-			}
-		}
-	}
 }
 
 void CGameServer::ServerReadNet()
@@ -1885,18 +1841,24 @@ void CGameServer::PushAction(const Action& action)
 			}
 		}
 	}
-#ifdef DEDICATED // we already have a quit command in the client
-	else if (action.command == "kill")
-	{
+	else if (action.command == "kill") {
 		quitServer = true;
 	}
-	else if (action.command == "pause")
-	{
-		isPaused = !isPaused;
+	else if (action.command == "pause") {
+		bool newPausedState = isPaused;
+		if (action.extra.empty()) {
+			// if no param is given, toggle paused state
+			newPausedState = !isPaused;
+		} else {
+			// if a param is given, interpret it as "bool setPaused"
+			SetBoolArg(newPausedState, action.extra);
+		}
+		if (newPausedState != isPaused) {
+			// the state changed
+			isPaused = newPausedState;
+		}
 	}
-#endif
-	else
-	{
+	else {
 		// only forward to players (send over network)
 		CommandMessage msg(action, SERVER_PLAYER);
 		Broadcast(boost::shared_ptr<const RawPacket>(msg.Pack()));
@@ -2307,3 +2269,4 @@ void CGameServer::AddToPacketCache(boost::shared_ptr<const netcode::RawPacket> &
 	}
 	packetCache.back().push_back(pckt);
 }
+

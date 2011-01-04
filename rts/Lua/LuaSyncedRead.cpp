@@ -2412,7 +2412,8 @@ int LuaSyncedRead::GetUnitArmored(lua_State* L)
 		return 0;
 	}
 	lua_pushboolean(L, unit->armoredState);
-	return 1;
+	lua_pushnumber(L, unit->armoredMultiple);
+	return 2;
 }
 
 
@@ -3344,7 +3345,6 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State *L)
 	if (groundmt) {
 		HSTR_PUSH_STRING(L, "name", "ground");
 
-		HSTR_PUSH_NUMBER(L, "baseTurnRate", groundmt->baseTurnRate);
 		HSTR_PUSH_NUMBER(L, "turnRate", groundmt->turnRate);
 		HSTR_PUSH_NUMBER(L, "accRate", groundmt->accRate);
 		HSTR_PUSH_NUMBER(L, "decRate", groundmt->decRate);

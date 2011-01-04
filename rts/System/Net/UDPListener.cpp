@@ -27,37 +27,85 @@ namespace netcode
 {
 using namespace boost::asio;
 
-UDPListener::UDPListener(int port)
+UDPListener::UDPListener(int port, const std::string& ip)
 {
-	try {
-		SocketPtr temp(new ip::udp::socket(netservice));
+	SocketPtr socket;
 
-		boost::system::error_code err;
-		temp->open(ip::udp::v6(), err); // test v6
-		if (!err)
-		{
-			temp->bind(ip::udp::endpoint(ip::address_v6::any(), port));
-		}
-		else
-		{
-			// fallback to v4
-			temp->open(ip::udp::v4());
-			temp->bind(ip::udp::endpoint(ip::address_v4::any(), port));
-		}
-		boost::asio::socket_base::non_blocking_io command(true);
-		temp->io_control(command);
+	if (UDPListener::TryBindSocket(port, &socket, ip)) {
+		boost::asio::socket_base::non_blocking_io socketCommand(true);
+		socket->io_control(socketCommand);
 
-		mySocket = temp;
+		mySocket = socket;
 		acceptNewConnections = true;
 	}
-	catch(boost::system::system_error &) {
-		handleerror(NULL, "Error: Failed to initialize UDP.\nSpring may already be running.", "Network error", MBF_OK|MBF_EXCL);
+
+	if (!acceptNewConnections) {
+		handleerror(NULL, "[UDPListener] error: unable to bind UDP port, see log for details.", "Network error", MBF_OK | MBF_EXCL);
+	} else {
+		LogObject() << "[UDPListener] succesfully bound socket on port " << port;
 	}
 }
 
-UDPListener::~UDPListener()
-{
+bool UDPListener::TryBindSocket(int port, SocketPtr* socket, const std::string& ip) {
+
+	std::string errorMsg = "";
+
+	ip::address addr;
+	try {
+		boost::system::error_code err;
+
+		socket->reset(new ip::udp::socket(netservice));
+
+		(*socket)->open(ip::udp::v6(), err); // test IP v6 support
+		const bool ipV6Support = !err;
+
+		addr = WrapIP(ip, &err);
+		if (ip.empty()) {
+			if (ipV6Support) {
+				addr = ip::address_v6::any();
+			} else {
+				addr = ip::address_v4::any();
+			}
+		} else if (err) {
+			throw std::runtime_error("Failed to parse address " + ip + ": " + err.message());
+		}
+
+		if (!ipV6Support && addr.is_v6()) {
+			throw std::runtime_error("IP v6 not supported, can not use address " + addr.to_string());
+		}
+
+		if (netcode::IsLoopbackAddress(addr)) {
+			LogObject() << "WARNING: Opening socket on loopback address. Other users will not be able to connect!";
+		}
+
+		if (!addr.is_v6()) {
+			if (ipV6Support) {
+				(*socket)->close();
+			}
+			(*socket)->open(ip::udp::v4(), err);
+			if (err) {
+				throw std::runtime_error("Failed to open IP V4 socket: " + err.message());
+			}
+		}
+
+		LogObject() << "Binding UDP socket to IP " <<  (addr.is_v6() ? "(v6)" : "(v4)") << " " << addr << " Port " << port;
+		(*socket)->bind(ip::udp::endpoint(addr, port));
+	} catch (std::runtime_error& e) { // includes also boost::system::system_error, as it inherits from runtime_error
+		socket->reset();
+		errorMsg = e.what();
+		if (errorMsg.empty()) {
+			errorMsg = "Unknown problem";
+		}
+	}
+	const bool isBound = errorMsg.empty();
+
+	if (!isBound) {
+		LogObject() << "Failed to bind UDP socket on IP " << ip << ", port " << port << ": " << errorMsg;
+	}
+
+	return isBound;
 }
+
 
 void UDPListener::Update()
 {
@@ -128,7 +176,7 @@ void UDPListener::Update()
 
 boost::shared_ptr<UDPConnection> UDPListener::SpawnConnection(const std::string& address, const unsigned port)
 {
-	boost::shared_ptr<UDPConnection> temp(new UDPConnection(mySocket, ip::udp::endpoint(ip::address_v4::from_string(address), port)));
+	boost::shared_ptr<UDPConnection> temp(new UDPConnection(mySocket, ip::udp::endpoint(WrapIP(address), port)));
 	conn.push_back(temp);
 	return temp;
 }
