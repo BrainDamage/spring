@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_PATH_FINDER_H
 #define LUA_PATH_FINDER_H
-// LuaPathFinder.h: interface for the LuaPathFinder class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <vector>
 
@@ -15,6 +14,8 @@ class LuaPathFinder {
 
 	private:
 		static int RequestPath(lua_State* L);
+		static int SetPathNodeCost(lua_State* L);
+		static int GetPathNodeCost(lua_State* L);
 };
 
 

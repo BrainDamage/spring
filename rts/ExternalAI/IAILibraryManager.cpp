@@ -1,19 +1,4 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
-
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "IAILibraryManager.h"
 
@@ -34,6 +19,13 @@ IAILibraryManager* IAILibraryManager::GetInstance() {
 	}
 
 	return myAILibraryManager;
+}
+
+void IAILibraryManager::Destroy() {
+
+	IAILibraryManager* tmp = myAILibraryManager;
+	myAILibraryManager = NULL;
+	delete tmp;
 }
 
 std::string fillUpTo(const std::string& str, unsigned int numChars) {
@@ -57,7 +49,7 @@ void IAILibraryManager::OutputAIInterfacesInfo() {
 	std::cout << "# [Name]              [Version]" << std::endl;
 
 	T_interfaceSpecs::const_iterator key;
-	for (key=keys.begin(); key != keys.end(); key++) {
+	for (key = keys.begin(); key != keys.end(); ++key) {
 		std::cout << "  ";
 		std::cout << key->GetShortName() << fillUpTo(key->GetShortName(), 20);
 		std::cout << key->GetVersion() << fillUpTo(key->GetVersion(), 20)
@@ -72,7 +64,7 @@ SkirmishAIKey IAILibraryManager::ResolveSkirmishAIKey(
 
 	std::vector<SkirmishAIKey> fittingKeys
 			= FittingSkirmishAIKeys(skirmishAIKey);
-	if (fittingKeys.size() > 0) {
+	if (!fittingKeys.empty()) {
 		// look for the one with the highest version number,
 		// in case there are multiple fitting ones.
 		size_t bestIndex = 0;
@@ -102,7 +94,7 @@ void IAILibraryManager::OutputSkirmishAIInfo() {
 			"[Interface-name]    [Interface-version]" << std::endl;
 
 	T_skirmishAIKeys::const_iterator key;
-	for (key=keys.begin(); key != keys.end(); key++) {
+	for (key = keys.begin(); key != keys.end(); ++key) {
 		std::cout << "  ";
 		std::cout << key->GetShortName() << fillUpTo(key->GetShortName(), 20);
 		std::cout << key->GetVersion() << fillUpTo(key->GetVersion(), 20);
@@ -155,8 +147,8 @@ int IAILibraryManager::VersionCompare(
 		const std::string& version1,
 		const std::string& version2) {
 
-	std::vector<std::string> parts1 = split(version1, '.');
-	std::vector<std::string> parts2 = split(version2, '.');
+	const std::vector<std::string> &parts1 = split(version1, '.');
+	const std::vector<std::string> &parts2 = split(version2, '.');
 	unsigned int maxParts = parts1.size() > parts2.size() ? parts1.size() : parts2.size();
 
 	int diff = 0;

@@ -1,6 +1,6 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "StdAfx.h"     // ugh
+#include "StdAfx.h" // TODO: ugh
 #include <assert.h>
 #include "SmfMapFile.h"
 #include "mapfile.h"
@@ -10,20 +10,21 @@
 using std::string;
 
 
-CSmfMapFile::CSmfMapFile(const string& mapname)
-	: ifs(mapname), featureFileOffset(0)
+CSmfMapFile::CSmfMapFile(const string& mapFileName)
+	: ifs(mapFileName), featureFileOffset(0)
 {
 	memset(&header, 0, sizeof(header));
 	memset(&featureHeader, 0, sizeof(featureHeader));
 
 	if (!ifs.FileExists())
-		throw content_error("Couldn't open map file " + mapname);
+		throw content_error("Couldn't open map file " + mapFileName);
+
 	READPTR_MAPHEADER(header, (&ifs));
 
 	if (strcmp(header.magic, "spring map file") != 0 ||
 	    header.version != 1 || header.tilesize != 32 ||
 	    header.texelPerSquare != 8 || header.squareSize != 8)
-		throw content_error("Incorrect map file " + mapname);
+		throw content_error("Incorrect map file " + mapFileName);
 }
 
 

@@ -1,7 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaWeaponDefs.cpp: implementation of the LuaWeaponDefs class.
-//
-//////////////////////////////////////////////////////////////////////
+#include "mmgr.h"
 
 #include <set>
 #include <string>
@@ -9,8 +9,6 @@
 #include <set>
 #include <map>
 #include <cctype>
-
-#include "mmgr.h"
 
 #include "LuaWeaponDefs.h"
 
@@ -69,7 +67,7 @@ bool LuaWeaponDefs::PushEntries(lua_State* L)
 
 	const map<string, int>& weaponMap = weaponDefHandler->weaponID;
 	map<string, int>::const_iterator wit;
-	for (wit = weaponMap.begin(); wit != weaponMap.end(); wit++) {
+	for (wit = weaponMap.begin(); wit != weaponMap.end(); ++wit) {
 		const WeaponDef* wd = &weaponDefHandler->weaponDefs[wit->second];
 		if (wd == NULL) {
 	  	continue;
@@ -231,7 +229,7 @@ static int WeaponDefNewIndex(lua_State* L)
 
 static int WeaponDefMetatable(lua_State* L)
 {
-	const void* userData = lua_touserdata(L, lua_upvalueindex(1));
+	//const void* userData = lua_touserdata(L, lua_upvalueindex(1));
 	//const WeaponDef* wd = (const WeaponDef*)userData;
 	return 0;
 }
@@ -355,7 +353,7 @@ static inline int BuildCategorySet(lua_State* L, const vector<string>& cats)
 static int CategorySetFromBits(lua_State* L, const void* data)
 {
 	const int bits = *((const int*)data);
-	const vector<string> cats =
+	const vector<string> &cats =
 		CCategoryHandler::Instance()->GetCategoryNames(bits);
 	return BuildCategorySet(L, cats);
 }
@@ -365,7 +363,7 @@ static int CategorySetFromBits(lua_State* L, const void* data)
 {
 	const string& str = *((const string*)data);
 	const string lower = StringToLower(str);
-	const vector<string> cats = CSimpleParser::Tokenize(lower, 0);
+	const vector<string> &cats = CSimpleParser::Tokenize(lower, 0);
 	return BuildCategorySet(L, cats);
 }*/
 

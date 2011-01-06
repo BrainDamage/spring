@@ -17,11 +17,10 @@
 
 #include "AIAI.h"
 #include "Event/AIEvents.h"
-#include "ExternalAI/IGlobalAI.h"
+#include "IGlobalAI.h"
 #include "ExternalAI/Interface/AISEvents.h"
 
-CAIAI::CAIAI(int teamId, IGlobalAI* gAI):
-	team(teamId),
+CAIAI::CAIAI(IGlobalAI* gAI):
 	ai(gAI),
 	globalAICallback(NULL) {
 }
@@ -108,6 +107,7 @@ int CAIAI::handleEvent(int topic, const void* data) {
 						*((const SUnitCapturedEvent*) data));
 				break;
 			}
+
 			case EVENT_ENEMY_ENTER_LOS: {
 				e = new CAIEnemyEnterLOSEvent(
 						*((const SEnemyEnterLOSEvent*) data));
@@ -149,6 +149,16 @@ int CAIAI::handleEvent(int topic, const void* data) {
 			}
 			case EVENT_SEISMIC_PING:{
 				e = new CAISeismicPingEvent(*((const SSeismicPingEvent*) data));
+				break;
+			}
+			case EVENT_ENEMY_CREATED: {
+				e = new CAIEnemyCreatedEvent(
+						*((const SEnemyCreatedEvent*) data));
+				break;
+			}
+			case EVENT_ENEMY_FINISHED: {
+				e = new CAIEnemyFinishedEvent(
+						*((const SEnemyFinishedEvent*) data));
 				break;
 			}
 			default: {

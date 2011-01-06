@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef BASICMAPDAMAGE_H
 #define BASICMAPDAMAGE_H
 
@@ -11,8 +13,15 @@ class CUnit;
 class CBasicMapDamage : public IMapDamage
 {
 public:
-	CBasicMapDamage(void);
-	~CBasicMapDamage(void);
+	CBasicMapDamage();
+	~CBasicMapDamage();
+
+	void Explosion(const float3& pos, float strength, float radius);
+	void RecalcArea(int x1, int x2, int y1, int y2);
+	void Update();
+
+private:
+	void UpdateLos();
 
 	struct ExploBuilding {
 		int id;			//searching for building pointers inside these on dependentdied could be messy so we use the id
@@ -45,14 +54,10 @@ public:
 	int neededLosUpdate;
 	std::deque<int> relosUnits;
 
-	float craterTable[10000];
+	static const unsigned int CRATER_TABLE_SIZE = 200;
+
+	float craterTable[CRATER_TABLE_SIZE + 1];
 	float invHardness[/*CMapInfo::NUM_TERRAIN_TYPES*/ 256];
-
-	void Explosion(const float3& pos, float strength,float radius);
-	void RecalcArea(int x1, int x2, int y1, int y2);
-	void Update(void);
-
-	void UpdateLos(void);
 };
 
 #endif /* BASICMAPDAMAGE_H */

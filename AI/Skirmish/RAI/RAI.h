@@ -15,7 +15,7 @@ struct UnitInfo;
 struct EnemyInfo;
 class cRAI;
 
-#include "ExternalAI/IGlobalAI.h"
+#include "LegacyCpp/IGlobalAI.h"
 using std::map;
 #include "BasicArray.h"
 #include "UnitDefHandler.h"
@@ -106,7 +106,7 @@ using namespace std;
 #define FUPDATE_UNITS 900		// 60 seconds, unit is checked for idleness - should never happen, but it does.
 #define FUPDATE_POWER 450		// 15 seconds, all units are checked for on/off or cloak/uncloak tasks
 #define FUPDATE_BUILDLIST 1800	// 600 seconds, redetermines the available build options - half unnecessary since this is also called by events, hence the longer delay
-
+#define EVENT_LIST_SIZE 10000
 class cRAI : public IGlobalAI
 {
 public:
@@ -141,6 +141,8 @@ public:
 	void ValidateAllUnits();
 
 	static bool LocateFile(IAICallback* cb, const string& relFileName, string& absFileName, bool forWriting);
+	/// Converts a string to one that can be used in a file name (eg. "Abc.123 $%^*" -> "Abc.123_____")
+	static std::string MakeFileSystemCompatible(const std::string& str);
 
 	map<int,UnitInfo> Units;	// Complete record of all owned units, key value = unit id
 	map<int,UnitInfo*> UImmobile;
@@ -163,10 +165,11 @@ public:
 	typedef pair<int,EnemyInfo*> iepPair;
 
 private:
+	std::string GetLogFileSubPath(int teamId) const;
 	void RemoveLogFile(string relFileName) const;
 	void UpdateEventRemove(UpdateEvent* e);
 	void UpdateEventReorderFirst();
-	UpdateEvent* eventList[10000];
+	UpdateEvent* eventList[EVENT_LIST_SIZE];
 	int eventSize;
 
 	int DebugEnemyEnterLOS;

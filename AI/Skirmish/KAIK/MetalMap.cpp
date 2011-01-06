@@ -1,6 +1,8 @@
 #include <string>
 #include <sstream>
 
+#include "System/Util.h"
+
 #include "IncExternAI.h"
 #include "IncGlobalAI.h"
 
@@ -123,9 +125,8 @@ void CMetalMap::Init() {
 	}
 
 	std::stringstream msg;
-	msg << "[CMetalMap::Init()] frame " << frame << "\n";
-	msg << "\tnumber of metal spots found:                    " << NumSpotsFound << "\n";
-	L(ai, msg.str());
+		msg << "[CMetalMap::Init()] number of metal spots found: " << NumSpotsFound << "\n";
+	ai->GetLogger()->Log(msg.str());
 }
 
 
@@ -527,10 +528,14 @@ bool CMetalMap::LoadMetalMap() {
 
 
 std::string CMetalMap::GetCacheName() const {
+	// name is used for human readability,
+	// while hash is used for uniqueness
+	// (in case the map maker forgets changing the name inbetween versions)
 	std::string relFile =
 		std::string(METALFOLDER) +
-		std::string(ai->cb->GetMapName()) +
-		"Metal";
+		AIUtil::MakeFileSystemCompatible(ai->cb->GetMapName()) +
+		"-" + IntToString(ai->cb->GetMapHash(), "%x") +
+		".Metal";
 	std::string absFile = AIUtil::GetAbsFileName(ai->cb, relFile);
 
 	return absFile;

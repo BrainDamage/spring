@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -8,18 +10,15 @@
 #include "Sim/Features/Feature.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Misc/InterceptHandler.h"
-#include "Rendering/UnitModels/IModelParser.h"
-#include "Rendering/UnitModels/s3oParser.h"
-#include "Rendering/UnitModels/3DOParser.h"
+#include "Rendering/Colors.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/VertexArray.h"
-#include "Rendering/Colors.h"
-#include "Rendering/UnitModels/UnitDrawer.h"
+#include "Rendering/Models/IModelParser.h"
 #include "Map/Ground.h"
 #include "System/Matrix44f.h"
 #include "System/GlobalUnsynced.h"
-#include "System/Sound/AudioChannel.h"
-#include "LogOutput.h"
+#include "System/Sound/IEffectChannel.h"
+#include "System/LogOutput.h"
 #ifdef TRACE_SYNC
 	#include "Sync/SyncTracer.h"
 #endif
@@ -36,50 +35,53 @@ CR_REG_METADATA(CWeaponProjectile,(
 	CR_MEMBER(target),
 	CR_MEMBER(targetPos),
 	CR_MEMBER(startpos),
-	CR_MEMBER(ttl),
 	CR_MEMBER(colorTeam),
+	CR_MEMBER(ttl),
 	CR_MEMBER(bounces),
 	CR_MEMBER(keepBouncing),
-	CR_MEMBER(ceg),
 	CR_MEMBER(cegTag),
+	CR_MEMBER(cegID),
 	CR_MEMBER(interceptTarget),
 	CR_MEMBER(id),
 	CR_RESERVED(15),
 	CR_POSTLOAD(PostLoad)
 	));
 
-CWeaponProjectile::CWeaponProjectile()
-:	CProjectile()
+CWeaponProjectile::CWeaponProjectile(): CProjectile()
 {
 	targeted = false;
 	weaponDef = 0;
 	target = 0;
+	projectileType = WEAPON_BASE_PROJECTILE;
 	ttl = 0;
 	colorTeam = 0;
 	interceptTarget = 0;
 	bounces = 0;
 	keepBouncing = true;
-	cegTag = "";
+	cegID = -1U;
 }
 
 CWeaponProjectile::CWeaponProjectile(const float3& pos, const float3& speed,
 		CUnit* owner, CUnit* target, const float3 &targetPos,
 		const WeaponDef* weaponDef, CWeaponProjectile* interceptTarget,
-		int ttl GML_PARG_C):
-	CProjectile(pos, speed, owner, true, true, false GML_PARG_P),
+		int ttl):
+	CProjectile(pos, speed, owner, true, true, false),
 	targeted(false),
 	weaponDef(weaponDef),
 	weaponDefName(weaponDef? weaponDef->name: std::string("")),
 	target(target),
 	targetPos(targetPos),
 	cegTag(weaponDef? weaponDef->cegTag: std::string("")),
+	cegID(-1U),
+	colorTeam(0),
 	startpos(pos),
 	ttl(ttl),
-	colorTeam(0),
 	bounces(0),
 	keepBouncing(true),
 	interceptTarget(interceptTarget)
 {
+	projectileType = WEAPON_BASE_PROJECTILE;
+
 	if (owner) {
 		colorTeam = owner->team;
 	}
@@ -99,7 +101,7 @@ CWeaponProjectile::CWeaponProjectile(const float3& pos, const float3& speed,
 
 		alwaysVisible = weaponDef->visuals.alwaysVisible;
 
-		s3domodel = LoadModel(weaponDef);
+		model = LoadModel(weaponDef);
 
 		collisionFlags = weaponDef->collisionFlags;
 	}
@@ -107,12 +109,19 @@ CWeaponProjectile::CWeaponProjectile(const float3& pos, const float3& speed,
 	ph->AddProjectile(this);
 }
 
-CWeaponProjectile::~CWeaponProjectile(void)
-{
-}
+
 
 void CWeaponProjectile::Collision()
 {
+	Collision((CFeature*)NULL);
+}
+
+void CWeaponProjectile::Collision(CFeature* feature)
+{
+	if (feature && (gs->randFloat() < weaponDef->fireStarter)) {
+		feature->StartFire();
+	}
+
 	if (/* !weaponDef->noExplode || gs->frameNum & 1 */ true) {
 		// don't do damage only on odd-numbered frames
 		// for noExplode projectiles (it breaks coldet)
@@ -143,7 +152,8 @@ void CWeaponProjectile::Collision()
 			weaponDef->explosionGenerator,
 			0,
 			impactDir,
-			weaponDef->id
+			weaponDef->id,
+			feature
 		);
 	}
 
@@ -158,15 +168,6 @@ void CWeaponProjectile::Collision()
 			CProjectile::Collision();
 		}
 	}
-
-}
-
-void CWeaponProjectile::Collision(CFeature* feature)
-{
-	if(gs->randFloat() < weaponDef->fireStarter)
-		feature->StartFire();
-
-	Collision();
 }
 
 void CWeaponProjectile::Collision(CUnit* unit)
@@ -214,7 +215,7 @@ void CWeaponProjectile::Collision(CUnit* unit)
 				weaponDef->soundhit.getVolume(0));
 	}
 
-	if(!weaponDef->noExplode)
+	if (!weaponDef->noExplode)
 		CProjectile::Collision(unit);
 	else {
 		if (TraveledRange())
@@ -230,36 +231,41 @@ void CWeaponProjectile::Update()
 
 void CWeaponProjectile::UpdateGroundBounce()
 {
-	if((weaponDef->groundBounce || weaponDef->waterBounce)
+	if (luaMoveCtrl) {
+		return;
+	}
+
+	if ((weaponDef->groundBounce || weaponDef->waterBounce)
 			&& (ttl > 0 || weaponDef->numBounce >= 0))
 	{
 		float wh = 0;
-		if(!weaponDef->waterBounce)
-		{
-			wh = ground->GetHeight2(pos.x, pos.z);
-		} else if(weaponDef->groundBounce)
-		{
-			wh = ground->GetHeight(pos.x, pos.z);
+
+		if (!weaponDef->waterBounce) {
+			wh = ground->GetHeightReal(pos.x, pos.z);
+		} else if (weaponDef->groundBounce) {
+			wh = ground->GetHeightAboveWater(pos.x, pos.z);
 		}
-		if(pos.y < wh)
-		{
+
+		if (pos.y < wh) {
 			bounces++;
-			if(!keepBouncing || (this->weaponDef->numBounce >= 0
-							&& bounces > this->weaponDef->numBounce))
-			{
+
+			if (!keepBouncing || (this->weaponDef->numBounce >= 0
+							&& bounces > this->weaponDef->numBounce)) {
 				//Collision();
 				keepBouncing = false;
 			} else {
-				float3 tempPos = pos;
 				const float3& normal = ground->GetNormal(pos.x, pos.z);
+				const float dot = speed.dot(normal);
+
 				pos -= speed;
-				float dot = speed.dot(normal);
-				speed -= (speed + normal*fabs(dot))*(1 - weaponDef->bounceSlip);
-				speed += (normal*(fabs(dot)))*(1 + weaponDef->bounceRebound);
+				speed -= (speed + normal * fabs(dot)) * (1 - weaponDef->bounceSlip);
+				speed += (normal * (fabs(dot))) * (1 + weaponDef->bounceRebound);
 				pos += speed;
-				if(weaponDef->bounceExplosionGenerator) {
-					weaponDef->bounceExplosionGenerator->Explosion(pos,
-							speed.Length(), 1, owner(), 1, NULL, normal);
+
+				if (weaponDef->bounceExplosionGenerator) {
+					weaponDef->bounceExplosionGenerator->Explosion(
+						-1U, pos, speed.Length(), 1, owner(), 1, NULL, normal
+					);
 				}
 			}
 		}
@@ -275,36 +281,6 @@ bool CWeaponProjectile::TraveledRange()
 
 
 
-void CWeaponProjectile::DrawUnitPart()
-{
-	float3 dir(speed);
-	dir.SafeANormalize();
-
-	float3 rightdir, updir;
-
-	if (fabs(dir.y) < 0.95f) {
-		rightdir = dir.cross(UpVector);
-		rightdir.SafeANormalize();
-	} else {
-		rightdir = float3(1.0f, 0.0f, 0.0f);
-	}
-
-	updir = rightdir.cross(dir);
-
-	CMatrix44f transMatrix(drawPos, -rightdir, updir, dir);
-
-	glPushMatrix();
-		glMultMatrixf(transMatrix);
-		glCallList(s3domodel->rootobject->displist); // dont cache displists because of delayed loading
-	glPopMatrix();
-}
-
-void CWeaponProjectile::DrawS3O(void)
-{
-	unitDrawer->SetTeamColour(colorTeam);
-	DrawUnitPart();
-}
-
 void CWeaponProjectile::DrawOnMinimap(CVertexArray& lines, CVertexArray& points)
 {
 	points.AddVertexQC(pos, color4::yellow);
@@ -312,11 +288,13 @@ void CWeaponProjectile::DrawOnMinimap(CVertexArray& lines, CVertexArray& points)
 
 void CWeaponProjectile::DependentDied(CObject* o)
 {
-	if(o==interceptTarget)
-		interceptTarget=0;
+	if (o == interceptTarget) {
+		interceptTarget = NULL;
+	}
 
-	if(o==target)
-		target=0;
+	if (o == target) {
+		target = NULL;
+	}
 }
 
 void CWeaponProjectile::PostLoad()
@@ -327,7 +305,7 @@ void CWeaponProjectile::PostLoad()
 //		interceptHandler.AddShieldInterceptableProjectile(this);
 
 	if (!weaponDef->visuals.modelName.empty()) {
-		if (weaponDef->visuals.model==NULL) {
+		if (weaponDef->visuals.model == NULL) {
 			std::string modelname = string("objects3d/") + weaponDef->visuals.modelName;
 			if (modelname.find(".") == std::string::npos) {
 				modelname += ".3do";
@@ -335,7 +313,7 @@ void CWeaponProjectile::PostLoad()
 			const_cast<WeaponDef*>(weaponDef)->visuals.model = modelParser->Load3DModel(modelname);
 		}
 		if (weaponDef->visuals.model) {
-			s3domodel = weaponDef->visuals.model;
+			model = weaponDef->visuals.model;
 		}
 	}
 

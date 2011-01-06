@@ -1,7 +1,10 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "Util.h"
 #if defined(_MSC_VER) && (_MSC_VER >= 1310)
 #include <intrin.h>
 #endif
+#include <cstring>
 
 std::string StringReplace(const std::string& text,
                           const std::string& from,
@@ -23,6 +26,70 @@ std::string StringReplace(const std::string& text,
 	return working;
 }
 
+/// @see http://www.codeproject.com/KB/stl/stdstringtrim.aspx
+void StringTrimInPlace(std::string& str)
+{
+	static const std::string whiteSpaces(" \t\n\r");
+	std::string::size_type pos = str.find_last_not_of(whiteSpaces);
+	if (pos != std::string::npos) {
+		str.erase(pos + 1);
+		pos = str.find_first_not_of(whiteSpaces);
+		if (pos != std::string::npos) {
+			str.erase(0, pos);
+		}
+	} else {
+		str.erase(str.begin(), str.end());
+	}
+}
+
+std::string StringTrim(const std::string& str)
+{
+	std::string copy(str);
+	StringTrimInPlace(copy);
+	return copy;
+}
+
+bool StringToBool(std::string str)
+{
+	bool value = true;
+
+	StringTrimInPlace(str);
+	StringToLowerInPlace(str);
+
+	// regex would probably be more appropriate,
+	// but it is better not to rely on any external lib here
+	if (
+			(str == "n")     ||
+			(str == "no")    ||
+			(str == "f")     ||
+			(str == "false") ||
+			(str == "0")
+		) {
+		value = false;
+	}
+
+	return value;
+}
+
+bool StringStartsWith(const std::string& str, const char* prefix)
+{
+	if ((prefix == NULL) || (str.size() < strlen(prefix))) {
+		return false;
+	} else {
+		return (str.compare(0, strlen(prefix), prefix) == 0);
+	}
+}
+
+bool StringEndsWith(const std::string& str, const char* postfix)
+{
+	if ((postfix == NULL) || (str.size() < strlen(postfix))) {
+		return false;
+	} else {
+		return (str.compare(str.size() - strlen(postfix), str.size(), postfix) == 0);
+	}
+}
+
+#if (!defined DEDICATED || defined _MSC_VER) && !defined UNITSYNC && !defined BUILDING_AI
 namespace proc {
 	#if defined(__GNUC__)
 	// function inlining breaks this
@@ -129,3 +196,4 @@ namespace proc {
 		return bits;
 	}
 }
+#endif

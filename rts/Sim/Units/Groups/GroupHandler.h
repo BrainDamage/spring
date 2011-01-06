@@ -1,10 +1,7 @@
-/*
-	@author ???
-	@author Robin Vobruba <hoijui.quaero@gmail.com>
-*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef	_GROUPHANDLER_H
-#define	_GROUPHANDLER_H
+#ifndef	_GROUP_HANDLER_H
+#define	_GROUP_HANDLER_H
 
 #include <map>
 #include <string>
@@ -33,16 +30,12 @@ public:
 //	static CGroupHandler* GetInstance(int teamId);
 //	static void Destroy(int teamId);
 
-	void PostLoad();
-
 	void Update();
 	void DrawCommands();
 	void GroupCommand(int num);
 	void GroupCommand(int num, const std::string& cmd);
 	CGroup* CreateNewGroup();
 	void RemoveGroup(CGroup* group);
-	void Load(std::istream *s);
-	void Save(std::ostream *s);
 
 	std::vector<CGroup*> groups;
 
@@ -52,7 +45,6 @@ protected:
 	int firstUnusedGroup;
 };
 
-//extern CGroupHandler* grouphandler;
 extern std::vector<CGroupHandler*> grouphandlers;
 
-#endif	// _GROUPHANDLER_H
+#endif	// _GROUP_HANDLER_H

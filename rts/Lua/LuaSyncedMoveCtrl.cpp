@@ -1,13 +1,11 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaSyncedMoveCtrl.cpp.cpp: implementation of the CLuaSyncedMoveCtrl class.
-//
-//////////////////////////////////////////////////////////////////////
+#include "mmgr.h"
 
 #include <set>
 #include <list>
 #include <cctype>
-
-#include "mmgr.h"
 
 #include "LuaSyncedMoveCtrl.h"
 
@@ -721,9 +719,7 @@ static inline bool SetGroundMoveTypeValue(CGroundMoveType* mt, const string& key
 	if (SetGenericMoveTypeValue(mt, key, value))
 		return true;
 
-	if (key == "baseTurnRate") {
-		mt->baseTurnRate = value; return true;
-	} else if (key == "turnRate") {
+	if (key == "turnRate") {
 		mt->turnRate = value; return true;
 	} else if (key == "accRate") {
 		mt->accRate = value; return true;
@@ -750,10 +746,6 @@ static inline bool SetGroundMoveTypeValue(CGroundMoveType* mt, const string& key
 {
 	if (SetGenericMoveTypeValue(mt, key, value))
 		return true;
-
-	if (key == "floatOnWater") {
-		mt->floatOnWater = value; return true;
-	}
 
 	return false;
 }

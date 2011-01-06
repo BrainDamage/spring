@@ -1,5 +1,11 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef CR_MAP_TYPE_IMPL_H
 #define CR_MAP_TYPE_IMPL_H
+
+#include "creg_cond.h"
+
+#ifdef USING_CREG
 
 #ifdef _MSC_VER
 	#define SPRING_HASH_MAP stdext::hash_map
@@ -23,8 +29,6 @@
 #include <string>
 #include <map>
 #include <boost/shared_ptr.hpp>
-
-#include "creg_cond.h"
 
 namespace creg
 {
@@ -145,4 +149,6 @@ namespace creg
 	};
 };
 
-#endif
+#endif // USING_CREG
+
+#endif // CR_MAP_TYPE_IMPL_H

@@ -1,6 +1,4 @@
-// Game.h: interface for the CGame class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef __GAME_H__
 #define __GAME_H__
@@ -16,14 +14,13 @@
 #include "lib/gml/gml.h"
 
 class CBaseWater;
-class CAVIGenerator;
 class CConsoleHistory;
 class CWordCompletion;
 class CKeySet;
 class CInfoConsole;
 class LuaParser;
 class LuaInputReceiver;
-class CLoadSaveHandler;
+class ILoadSaveHandler;
 class Action;
 class ChatMessage;
 class SkirmishAIData;
@@ -34,10 +31,21 @@ class CGame : public CGameController
 {
 private:
 	CR_DECLARE(CGame);	// Do not use CGame pointer in CR_MEMBER()!!!
+
+public:
+	void LoadGame(const std::string& mapname);
+
+private:
+	void LoadDefs();
+	void LoadSimulation(const std::string& mapname);
+	void LoadRendering();
+	void LoadInterface();
+	void LoadLua();
+	void LoadFinalize();
 	void PostLoad();
 
 public:
-	CGame(std::string mapname, std::string modName, CLoadSaveHandler *saveFile);
+	CGame(const std::string& mapname, const std::string& modName, ILoadSaveHandler* saveFile);
 
 	bool Draw();
 	bool DrawMT();
@@ -56,6 +64,11 @@ public:
 	
 	bool HasLag() const;
 
+	volatile bool finishedLoading;
+
+	/// show GameEnd-window, calculate mouse movement etc.
+	void GameEnd(const std::vector<unsigned char>& winningAllyTeams);
+
 	enum GameDrawMode {
 		gameNotDrawing     = 0,
 		gameNormalDraw     = 1,
@@ -70,7 +83,6 @@ public:
 
 	LuaParser* defsParser;
 
-	unsigned int oldframenum;
 	unsigned int fps;
 	unsigned int thisFps;
 
@@ -101,35 +113,26 @@ public:
 	bool showFPS;
 	bool showClock;
 	bool showSpeed;
+	bool showMTInfo;
 	/// Prevents spectator msgs from being seen by players
 	bool noSpectatorChat;
-	bool drawMapMarks;
-	/// locked mouse indicator size
-	float crossSize;
-
-	bool drawSky;
-	bool drawWater;
-	bool drawGround;
-
-	bool moveWarnings;
 
 	unsigned char gameID[16];
 
-	CInfoConsole *infoConsole;
+	CInfoConsole* infoConsole;
 
 	void MakeMemDump(void);
 
 	CConsoleHistory* consoleHistory;
 	CWordCompletion* wordCompletion;
 
-	bool creatingVideo;
-	CAVIGenerator* aviGenerator;
-
 	void SetHotBinding(const std::string& action) { hotBinding = action; }
 
 private:
-	/// show GameEnd-window, calculate mouse movement etc.
-	void GameEnd();
+	/// Save the game state to file.
+	void SaveGame(const std::string& filename, bool overwrite);
+	/// Re-load the game.
+	void ReloadGame();
 	/// Send a message to other players (allows prefixed messages with e.g. "a:...")
 	void SendNetChat(std::string message, int destination = -1);
 	/// Format and display a chat message received over network
@@ -147,6 +150,8 @@ private:
 	void ReColorTeams();
 
 	void ReloadCOB(const std::string& msg, int player);
+	void ReloadCEGs(const std::string& tag);
+
 	void StartSkip(int toFrame);
 	void DrawSkip(bool blackscreen = true);
 	void EndSkip();
@@ -191,8 +196,6 @@ private:
 	float consumeSpeed; ///< How fast we should eat NETMSG_NEWFRAMEs.
 	unsigned lastframe; ///< SDL_GetTicks() in previous ClientReadNet() call.
 
-	void SwapTransparentObjects();
-
 	int skipStartFrame;
 	int skipEndFrame;
 	int skipTotalFrames;
@@ -201,6 +204,13 @@ private:
 	float skipOldSpeed;
 	float skipOldUserSpeed;
 	unsigned skipLastDraw;
+
+	int speedControl;
+	int luaDrawTime;
+
+
+	/// for reloading the savefile
+	ILoadSaveHandler* saveFile;
 };
 
 

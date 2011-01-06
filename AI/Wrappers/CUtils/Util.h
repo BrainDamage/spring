@@ -18,10 +18,12 @@
 #ifndef _CUTILS_UTIL_H
 #define _CUTILS_UTIL_H
 
-#include "cutilsdefines.h"
-
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef _MSC_VER
+	#include <stdbool.h>
 #endif
 
 // BEGINN: String realated functions

@@ -1,5 +1,7 @@
-#ifndef GAMEPARTICIPANT_H
-#define GAMEPARTICIPANT_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef _GAME_PARTICIPANT_H
+#define _GAME_PARTICIPANT_H
 
 #include <boost/shared_ptr.hpp>
 
@@ -21,7 +23,7 @@ public:
 	void Connected(boost::shared_ptr<netcode::CConnection> link, bool local);
 	void Kill(const std::string& reason);
 
-	void operator=(const PlayerBase& base) { PlayerBase::operator=(base); };
+	GameParticipant& operator=(const PlayerBase& base) { PlayerBase::operator=(base); return *this; };
 
 	enum State
 	{
@@ -33,13 +35,19 @@ public:
 	State myState;
 	
 	int lastFrameResponse;
+	int speedControl;
+	int luaDrawTime;
 
 	bool isLocal;
+	bool isReconn;
+	bool isMidgameJoin;
 	boost::shared_ptr<netcode::CConnection> link;
 	PlayerStatistics lastStats;
+	int bandwidthUsage;
+
 #ifdef SYNCCHECK
 	std::map<int, unsigned> syncResponse; // syncResponse[frameNum] = checksum
 #endif
 };
 
-#endif // GAMEPARTICIPANT_H
+#endif // _GAME_PARTICIPANT_H

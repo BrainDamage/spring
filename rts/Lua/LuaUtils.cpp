@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaUtils.cpp: implementation of the CLuaUtils class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <cctype>
@@ -97,7 +96,7 @@ int LuaUtils::CopyData(lua_State* dst, lua_State* src, int count)
 	if (srcTop < count) {
 		return 0;
 	}
-	lua_checkstack(dst, dstTop + count); // FIXME: not enough for table chains
+	lua_checkstack(dst, count); // FIXME: not enough for table chains
 
 	depth = 0;
 

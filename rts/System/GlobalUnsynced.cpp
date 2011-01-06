@@ -1,127 +1,98 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /**
- * @file GlobalStuff.cpp
  * @brief Globally accessible stuff
- *
- * Contains implementation of synced and
- * unsynced global stuff
+ * Contains implementation of synced and unsynced global stuff.
  */
+
 #include "StdAfx.h"
-#include "Rendering/GL/myGL.h"
+
 #include "GlobalUnsynced.h"
+#include "Game/PlayerHandler.h"
+#include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/GlobalConstants.h" // for RANDINT_MAX
+#include "Sim/Units/Unit.h" // required by CREG
+#include "System/mmgr.h"
+#include "System/ConfigHandler.h"
+#include "System/Exceptions.h"
+#include "System/Util.h"
+#include "System/creg/creg_cond.h"
 
-#include <cstring>
-#include <assert.h>
-
-#include "mmgr.h"
-#include "Util.h"
-#include "Sim/Projectiles/ProjectileHandler.h"
-#include "Game/GameHelper.h"
-#include "Game/GameSetup.h"
-#include "Sync/SyncTracer.h"
-#include "Sim/Misc/Team.h"
-#include "Game/Player.h"
-#include "Sim/Misc/GlobalConstants.h"
-#include "Rendering/Textures/TAPalette.h"
-#include "Lua/LuaGaia.h"
-#include "Lua/LuaRules.h"
-#include "SDL_timer.h"
+#include <SDL_timer.h>
 
 
 /**
  * @brief global unsynced
  *
- * Global instance of CGlobalUnsyncedStuff
+ * Global instance of CGlobalUnsynced
  */
-CGlobalUnsyncedStuff* gu;
+CGlobalUnsynced* gu;
 
 
-CR_BIND(CGlobalUnsyncedStuff,);
+CR_BIND(CGlobalUnsynced, );
 
-CR_REG_METADATA(CGlobalUnsyncedStuff, (
-				CR_MEMBER(teamNanospray), // ??
-				CR_MEMBER(modGameTime),
-				CR_MEMBER(gameTime),
-				CR_MEMBER(lastFrameTime),
-				CR_MEMBER(lastFrameStart),
-				CR_MEMBER(weightedSpeedFactor), // ??
-				CR_MEMBER(drawFrame), // ??
-				CR_MEMBER(myPlayerNum),
-				CR_MEMBER(myTeam),
-				CR_MEMBER(myAllyTeam),
-				CR_MEMBER(spectating),
-				CR_MEMBER(spectatingFullView),
-				CR_MEMBER(spectatingFullSelect),
-				CR_MEMBER(drawdebug), // ??
-				CR_MEMBER(active),
-				CR_MEMBER(viewRange),
-				CR_MEMBER(timeOffset),
-//				CR_MEMBER(compressTextures),
-				CR_MEMBER(drawFog),
-				CR_MEMBER(usRandSeed),
-				CR_RESERVED(64)
-				));
+CR_REG_METADATA(CGlobalUnsynced, (
+	CR_MEMBER(modGameTime),
+	CR_MEMBER(gameTime),
+	CR_MEMBER(startTime),
+	CR_MEMBER(myPlayerNum),
+	CR_MEMBER(myTeam),
+	CR_MEMBER(myAllyTeam),
+	CR_MEMBER(spectating),
+	CR_MEMBER(spectatingFullView),
+	CR_MEMBER(spectatingFullSelect),
+	CR_MEMBER(directControl),
+	CR_MEMBER(usRandSeed),
+	CR_RESERVED(64)
+));
 
-/**
- * Initializes variables in CGlobalUnsyncedStuff
- */
-CGlobalUnsyncedStuff::CGlobalUnsyncedStuff()
+CGlobalUnsynced::CGlobalUnsynced()
 {
-	boost::uint64_t randnum;
-	randnum = SDL_GetTicks();
-	usRandSeed = randnum&0xffffffff;
+	usRandSeed = time(NULL) % ((SDL_GetTicks() + 1) * 9007);
+
 	modGameTime = 0;
 	gameTime = 0;
-	lastFrameTime = 0;
-	drawFrame = 1;
-	viewSizeX = 100;
-	viewSizeY = 100;
-	pixelX = 0.01f;
-	pixelY = 0.01f;
-	aspectRatio = 1.0f;
+	startTime = 0;
+
 	myPlayerNum = 0;
 	myTeam = 1;
 	myAllyTeam = 1;
+	myPlayingTeam = -1;
+	myPlayingAllyTeam = -1;
+
 	spectating           = false;
 	spectatingFullView   = false;
 	spectatingFullSelect = false;
-	drawdebug = false;
-	active = true;
-	viewRange = MAX_VIEW_RANGE;
-	timeOffset = 0;
-	drawFog = true;
-	teamNanospray = false;
-	directControl = 0;
-	compressTextures = false;
-	atiHacks = false;
-	supportNPOTs = GLEW_ARB_texture_non_power_of_two;
-	{
-		std::string vendor = std::string((char*)glGetString(GL_VENDOR));
-		StringToLowerInPlace(vendor);
-		bool isATi = (vendor.find("ati ") != string::npos);
-		if (isATi) {
-			std::string renderer = std::string((char*)glGetString(GL_RENDERER));
-			StringToLowerInPlace(renderer);
-			supportNPOTs = (renderer.find(" x") == string::npos && renderer.find(" 9") == string::npos); //! x-series doesn't support NPOTs (but hd-series does)
-		}
-	}
+
+	directControl = NULL;
+	playerHandler = new CPlayerHandler();
+
+	globalQuit = false;
 }
 
-/**
- * Destroys variables in CGlobalUnsyncedStuff
- */
-CGlobalUnsyncedStuff::~CGlobalUnsyncedStuff()
+CGlobalUnsynced::~CGlobalUnsynced()
 {
+	SafeDelete(playerHandler);
 }
+
+
+
+void CGlobalUnsynced::LoadFromSetup(const CGameSetup* setup)
+{
+	playerHandler->LoadFromSetup(setup);
+}
+
+
 
 /**
  * @return unsynced random integer
  *
  * Returns an unsynced random integer
  */
-int CGlobalUnsyncedStuff::usRandInt()
+int CGlobalUnsynced::usRandInt()
 {
 	usRandSeed = (usRandSeed * 214013L + 2531011L);
-	return usRandSeed & RANDINT_MAX;
+	return (usRandSeed >> 16) & RANDINT_MAX;
 }
 
 /**
@@ -129,10 +100,10 @@ int CGlobalUnsyncedStuff::usRandInt()
  *
  * returns an unsynced random float
  */
-float CGlobalUnsyncedStuff::usRandFloat()
+float CGlobalUnsynced::usRandFloat()
 {
 	usRandSeed = (usRandSeed * 214013L + 2531011L);
-	return float(usRandSeed & RANDINT_MAX)/RANDINT_MAX;
+	return float((usRandSeed >> 16) & RANDINT_MAX) / RANDINT_MAX;
 }
 
 /**
@@ -140,7 +111,7 @@ float CGlobalUnsyncedStuff::usRandFloat()
  *
  * returns an unsynced random vector
  */
-float3 CGlobalUnsyncedStuff::usRandVector()
+float3 CGlobalUnsynced::usRandVector()
 {
 	float3 ret;
 	do {
@@ -152,21 +123,28 @@ float3 CGlobalUnsyncedStuff::usRandVector()
 	return ret;
 }
 
-void CGlobalUnsyncedStuff::SetMyPlayer(const int mynumber)
+void CGlobalUnsynced::SetMyPlayer(const int myNumber)
 {
-	myPlayerNum = mynumber;
-	if (gameSetup && gameSetup->playerStartingData.size() > mynumber)
-	{
-		myTeam = gameSetup->playerStartingData[myPlayerNum].team;
-		myAllyTeam = gameSetup->teamStartingData[myTeam].teamAllyteam;
+	myPlayerNum = myNumber;
 
-		spectating = gameSetup->playerStartingData[myPlayerNum].spectator;
-		spectatingFullView   = gameSetup->playerStartingData[myPlayerNum].spectator;
-		spectatingFullSelect = gameSetup->playerStartingData[myPlayerNum].spectator;
+	const CPlayer* myPlayer = playerHandler->Player(myPlayerNum);
 
-		assert(myPlayerNum >= 0
-				&& gameSetup->playerStartingData.size() >= static_cast<size_t>(myPlayerNum)
-				&& myTeam >= 0
-				&& gameSetup->teamStartingData.size() >= myTeam);
+	myTeam = myPlayer->team;
+	if (!teamHandler->IsValidTeam(myTeam)) {
+		throw content_error("Invalid MyTeam in player setup");
+	}
+
+	myAllyTeam = teamHandler->AllyTeam(myTeam);
+	if (!teamHandler->IsValidAllyTeam(myAllyTeam)) {
+		throw content_error("Invalid MyAllyTeam in player setup");
+	}
+
+	spectating           = myPlayer->spectator;
+	spectatingFullView   = myPlayer->spectator;
+	spectatingFullSelect = myPlayer->spectator;
+
+	if (!spectating) {
+		myPlayingTeam = myTeam;
+		myPlayingAllyTeam = myAllyTeam;
 	}
 }

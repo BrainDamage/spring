@@ -1,22 +1,26 @@
-#ifndef REPULSEGFX_H
-#define REPULSEGFX_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef REPULSE_GFX_H
+#define REPULSE_GFX_H
 
 #include "Sim/Projectiles/Projectile.h"
 
 class CUnit;
 
-class CRepulseGfx :
-	public CProjectile
+class CRepulseGfx : public CProjectile
 {
 	CR_DECLARE(CRepulseGfx);
 public:
-	CRepulseGfx(CUnit* owner,CProjectile* repulsed,float maxDist,float3 color GML_PARG_H);
-	~CRepulseGfx(void);
+	CRepulseGfx(CUnit* owner, CProjectile* repulsed, float maxDist,
+			const float3& color);
+	~CRepulseGfx();
+
+	void Draw();
+	void Update();
 
 	void DependentDied(CObject* o);
-	void Draw(void);
-	void Update(void);
 
+private:
 	CProjectile* repulsed;
 	float sqMaxDist;
 	int age;
@@ -25,4 +29,4 @@ public:
 	float difs[25];
 };
 
-#endif
+#endif // REPULSE_GFX_H

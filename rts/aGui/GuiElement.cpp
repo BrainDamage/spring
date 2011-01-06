@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "GuiElement.h"
 
 #include "Rendering/GL/myGL.h"
@@ -10,6 +12,9 @@ int GuiElement::screenoffset[2];
 
 GuiElement::GuiElement(GuiElement* _parent) : parent(_parent), fixedSize(false), weight(1)
 {
+	size[0] = size[1] = 0.0f;
+	pos[0] = pos[1] = 0.0f;
+
 	if (parent)
 		parent->AddChild(this);
 }

@@ -1,10 +1,10 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef SIDE_PARSER_H
 #define SIDE_PARSER_H
 
 #include <string>
 #include <vector>
-
 
 class SideParser
 {
@@ -34,9 +34,9 @@ class SideParser
 
 	private:
 		struct Data {
-			std::string caseName;  // full  case
-			std::string sideName;  // lower case
-			std::string startUnit; // lower case
+			std::string caseName;  ///< full  case
+			std::string sideName;  ///< lower case
+			std::string startUnit; ///< lower case
 		};
 		typedef std::vector<Data> DataVec;
 

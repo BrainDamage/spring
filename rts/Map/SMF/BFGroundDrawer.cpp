@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "SmfReadMap.h"
 #include "BFGroundDrawer.h"
@@ -5,13 +7,15 @@
 #include "Game/Camera.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
+#include "Rendering/GroundDecalHandler.h"
+#include "Rendering/GlobalRendering.h"
+#include "Rendering/ProjectileDrawer.hpp"
+#include "Rendering/ShadowHandler.h"
+#include "Rendering/Env/CubeMapHandler.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/VertexArray.h"
-#include "Rendering/ShadowHandler.h"
-#include "Rendering/GroundDecalHandler.h"
 #include "Rendering/Shaders/ShaderHandler.hpp"
 #include "Rendering/Shaders/Shader.hpp"
-#include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "System/ConfigHandler.h"
 #include "System/FastMath.h"
@@ -41,56 +45,7 @@ CBFGroundDrawer::CBFGroundDrawer(CSmfReadMap* rm):
 	map = rm;
 	heightData = map->heightmap;
 
-	{
-		CShaderHandler* sh = shaderHandler;
-
-		smfShaderBaseARB = sh->CreateProgramObject("[SMFGroundDrawer]", "smfShaderBaseARB", true);
-		smfShaderReflARB = sh->CreateProgramObject("[SMFGroundDrawer]", "SMFShaderReflARB", true);
-		smfShaderRefrARB = sh->CreateProgramObject("[SMFGroundDrawer]", "SMFShaderRefrARB", true);
-		smfShaderCurrARB = smfShaderBaseARB;
-		smfShaderGLSL    = sh->CreateProgramObject("[SMFGroundDrawer]", "SMFShaderGLSL", false);
-
-		if (shadowHandler->canUseShadows) {
-			if (!map->haveSpecularLighting) {
-				// always use FP shadows (shadowHandler->useFPShadows is short
-				// for "this graphics card supports ARB_FRAGMENT_PROGRAM", and
-				// canUseShadows can not be true while useFPShadows is false)
-				smfShaderBaseARB->AttachShaderObject(sh->CreateShaderObject("ground.vp", GL_VERTEX_PROGRAM_ARB));
-				smfShaderBaseARB->AttachShaderObject(sh->CreateShaderObject("groundFPshadow.fp", GL_FRAGMENT_PROGRAM_ARB));
-				smfShaderBaseARB->Link();
-
-				smfShaderReflARB->AttachShaderObject(sh->CreateShaderObject("dwgroundreflectinverted.vp", GL_VERTEX_PROGRAM_ARB));
-				smfShaderReflARB->AttachShaderObject(sh->CreateShaderObject("groundFPshadow.fp", GL_FRAGMENT_PROGRAM_ARB));
-				smfShaderReflARB->Link();
-
-				smfShaderRefrARB->AttachShaderObject(sh->CreateShaderObject("dwgroundrefract.vp", GL_VERTEX_PROGRAM_ARB));
-				smfShaderRefrARB->AttachShaderObject(sh->CreateShaderObject("groundFPshadow.fp", GL_FRAGMENT_PROGRAM_ARB));
-				smfShaderRefrARB->Link();
-			} else {
-				smfShaderGLSL->AttachShaderObject(sh->CreateShaderObject("SMFVertProg.glsl", GL_VERTEX_SHADER));
-				smfShaderGLSL->AttachShaderObject(sh->CreateShaderObject("SMFFragProg.glsl", GL_FRAGMENT_SHADER));
-				smfShaderGLSL->Link();
-				smfShaderGLSL->SetUniformLocation("diffuseTex");          // idx  0
-				smfShaderGLSL->SetUniformLocation("normalsTex");          // idx  1
-				smfShaderGLSL->SetUniformLocation("shadowTex");           // idx  2
-				smfShaderGLSL->SetUniformLocation("detailTex");           // idx  3
-				smfShaderGLSL->SetUniformLocation("specularTex");         // idx  4
-				smfShaderGLSL->SetUniformLocation("mapSizeX");            // idx  5
-				smfShaderGLSL->SetUniformLocation("mapSizeZ");            // idx  6
-				smfShaderGLSL->SetUniformLocation("texSquareX");          // idx  7
-				smfShaderGLSL->SetUniformLocation("texSquareZ");          // idx  8
-				smfShaderGLSL->SetUniformLocation("lightDir");            // idx  9
-				smfShaderGLSL->SetUniformLocation("cameraPos");           // idx 10
-				smfShaderGLSL->SetUniformLocation("cameraMatInv");        // idx 11
-				smfShaderGLSL->SetUniformLocation("shadowMat");           // idx 12
-				smfShaderGLSL->SetUniformLocation("shadowParams");        // idx 13
-				smfShaderGLSL->SetUniformLocation("groundAmbientColor");  // idx 14
-				smfShaderGLSL->SetUniformLocation("groundDiffuseColor");  // idx 15
-				smfShaderGLSL->SetUniformLocation("groundSpecularColor"); // idx 16
-				smfShaderGLSL->SetUniformLocation("groundShadowDensity"); // idx 17
-			}
-		}
-	}
+	LoadMapShaders();
 
 	textures = new CBFGroundTextures(map);
 
@@ -115,8 +70,8 @@ CBFGroundDrawer::CBFGroundDrawer(CSmfReadMap* rm):
 	}
 
 #ifdef USE_GML
-	multiThreadDrawGround=configHandler->Get("MultiThreadDrawGround", 1);
-	multiThreadDrawGroundShadow=configHandler->Get("MultiThreadDrawGroundShadow", 0);
+	multiThreadDrawGround = configHandler->Get("MultiThreadDrawGround", 1);
+	multiThreadDrawGroundShadow = configHandler->Get("MultiThreadDrawGroundShadow", 0);
 #endif
 }
 
@@ -124,9 +79,7 @@ CBFGroundDrawer::~CBFGroundDrawer(void)
 {
 	delete textures;
 
-	if (shadowHandler->canUseShadows) {
-		shaderHandler->ReleaseProgramObjects("[SMFGroundDrawer]");
-	}
+	shaderHandler->ReleaseProgramObjects("[SMFGroundDrawer]");
 
 	configHandler->Set("GroundDetail", viewRadius);
 
@@ -140,6 +93,110 @@ CBFGroundDrawer::~CBFGroundDrawer(void)
 	configHandler->Set("MultiThreadDrawGroundShadow", multiThreadDrawGroundShadow);
 #endif
 }
+
+bool CBFGroundDrawer::LoadMapShaders() {
+	CShaderHandler* sh = shaderHandler;
+
+	smfShaderBaseARB = sh->CreateProgramObject("[SMFGroundDrawer]", "SMFShaderBaseARB", true);
+	smfShaderReflARB = sh->CreateProgramObject("[SMFGroundDrawer]", "SMFShaderReflARB", true);
+	smfShaderRefrARB = sh->CreateProgramObject("[SMFGroundDrawer]", "SMFShaderRefrARB", true);
+	smfShaderCurrARB = smfShaderBaseARB;
+	smfShaderGLSL    = sh->CreateProgramObject("[SMFGroundDrawer]", "SMFShaderGLSL", false);
+
+	if (shadowHandler->canUseShadows) {
+		if (!map->haveSpecularLighting) {
+			// always use FP shadows (shadowHandler->useFPShadows is short
+			// for "this graphics card supports ARB_FRAGMENT_PROGRAM", and
+			// canUseShadows can not be true while useFPShadows is false)
+			smfShaderBaseARB->AttachShaderObject(sh->CreateShaderObject("ARB/ground.vp", "", GL_VERTEX_PROGRAM_ARB));
+			smfShaderBaseARB->AttachShaderObject(sh->CreateShaderObject("ARB/groundFPshadow.fp", "", GL_FRAGMENT_PROGRAM_ARB));
+			smfShaderBaseARB->Link();
+
+			smfShaderReflARB->AttachShaderObject(sh->CreateShaderObject("ARB/dwgroundreflectinverted.vp", "", GL_VERTEX_PROGRAM_ARB));
+			smfShaderReflARB->AttachShaderObject(sh->CreateShaderObject("ARB/groundFPshadow.fp", "", GL_FRAGMENT_PROGRAM_ARB));
+			smfShaderReflARB->Link();
+
+			smfShaderRefrARB->AttachShaderObject(sh->CreateShaderObject("ARB/dwgroundrefract.vp", "", GL_VERTEX_PROGRAM_ARB));
+			smfShaderRefrARB->AttachShaderObject(sh->CreateShaderObject("ARB/groundFPshadow.fp", "", GL_FRAGMENT_PROGRAM_ARB));
+			smfShaderRefrARB->Link();
+		} else {
+			std::string defs;
+				defs += (map->haveSplatTexture)?
+					"#define SMF_DETAIL_TEXTURE_SPLATTING 1\n":
+					"#define SMF_DETAIL_TEXTURE_SPLATTING 0\n";
+				defs += (map->minheight > 0.0f || mapInfo->map.voidWater)?
+					"#define SMF_WATER_ABSORPTION 0\n":
+					"#define SMF_WATER_ABSORPTION 1\n";
+				defs += (map->GetSkyReflectModTexture() != 0)?
+					"#define SMF_SKY_REFLECTIONS 1\n":
+					"#define SMF_SKY_REFLECTIONS 0\n";
+
+			smfShaderGLSL->AttachShaderObject(sh->CreateShaderObject("GLSL/SMFVertProg.glsl", defs, GL_VERTEX_SHADER));
+			smfShaderGLSL->AttachShaderObject(sh->CreateShaderObject("GLSL/SMFFragProg.glsl", defs, GL_FRAGMENT_SHADER));
+			smfShaderGLSL->Link();
+			smfShaderGLSL->SetUniformLocation("diffuseTex");          // idx  0
+			smfShaderGLSL->SetUniformLocation("normalsTex");          // idx  1
+			smfShaderGLSL->SetUniformLocation("shadowTex");           // idx  2
+			smfShaderGLSL->SetUniformLocation("detailTex");           // idx  3
+			smfShaderGLSL->SetUniformLocation("specularTex");         // idx  4
+			smfShaderGLSL->SetUniformLocation("mapSizePO2");          // idx  5
+			smfShaderGLSL->SetUniformLocation("mapSize");             // idx  6
+			smfShaderGLSL->SetUniformLocation("texSquareX");          // idx  7
+			smfShaderGLSL->SetUniformLocation("texSquareZ");          // idx  8
+			smfShaderGLSL->SetUniformLocation("lightDir");            // idx  9
+			smfShaderGLSL->SetUniformLocation("cameraPos");           // idx 10
+			smfShaderGLSL->SetUniformLocation("$UNUSED$");            // idx 11
+			smfShaderGLSL->SetUniformLocation("shadowMat");           // idx 12
+			smfShaderGLSL->SetUniformLocation("shadowParams");        // idx 13
+			smfShaderGLSL->SetUniformLocation("groundAmbientColor");  // idx 14
+			smfShaderGLSL->SetUniformLocation("groundDiffuseColor");  // idx 15
+			smfShaderGLSL->SetUniformLocation("groundSpecularColor"); // idx 16
+			smfShaderGLSL->SetUniformLocation("groundShadowDensity"); // idx 17
+			smfShaderGLSL->SetUniformLocation("waterMinColor");       // idx 18
+			smfShaderGLSL->SetUniformLocation("waterBaseColor");      // idx 19
+			smfShaderGLSL->SetUniformLocation("waterAbsorbColor");    // idx 20
+			smfShaderGLSL->SetUniformLocation("splatDetailTex");      // idx 21
+			smfShaderGLSL->SetUniformLocation("splatDistrTex");       // idx 22
+			smfShaderGLSL->SetUniformLocation("splatTexScales");      // idx 23
+			smfShaderGLSL->SetUniformLocation("splatTexMults");       // idx 24
+			smfShaderGLSL->SetUniformLocation("skyReflectTex");       // idx 25
+			smfShaderGLSL->SetUniformLocation("skyReflectModTex");    // idx 26
+
+			smfShaderGLSL->Enable();
+			smfShaderGLSL->SetUniform1i(0, 0); // diffuseTex  (idx 0, texunit 0)
+			smfShaderGLSL->SetUniform1i(1, 5); // normalsTex  (idx 1, texunit 5)
+			smfShaderGLSL->SetUniform1i(2, 4); // shadowTex   (idx 2, texunit 4)
+			smfShaderGLSL->SetUniform1i(3, 2); // detailTex   (idx 3, texunit 2)
+			smfShaderGLSL->SetUniform1i(4, 6); // specularTex (idx 4, texunit 6)
+			smfShaderGLSL->SetUniform2f(5, (gs->pwr2mapx * SQUARE_SIZE), (gs->pwr2mapy * SQUARE_SIZE));
+			smfShaderGLSL->SetUniform2f(6, (gs->mapx * SQUARE_SIZE), (gs->mapy * SQUARE_SIZE));
+			smfShaderGLSL->SetUniform4fv(9, &mapInfo->light.sunDir[0]);
+			smfShaderGLSL->SetUniform3fv(14, &mapInfo->light.groundAmbientColor[0]);
+			smfShaderGLSL->SetUniform3fv(15, &mapInfo->light.groundSunColor[0]);
+			smfShaderGLSL->SetUniform3fv(16, &mapInfo->light.groundSpecularColor[0]);
+			smfShaderGLSL->SetUniform1f(17, mapInfo->light.groundShadowDensity);
+			smfShaderGLSL->SetUniform3fv(18, &mapInfo->water.minColor[0]);
+			smfShaderGLSL->SetUniform3fv(19, &mapInfo->water.baseColor[0]);
+			smfShaderGLSL->SetUniform3fv(20, &mapInfo->water.absorb[0]);
+			smfShaderGLSL->SetUniform1i(21, 7); // splatDetailTex (idx 21, texunit 7)
+			smfShaderGLSL->SetUniform1i(22, 8); // splatDistrTex (idx 22, texunit 8)
+			smfShaderGLSL->SetUniform4fv(23, &mapInfo->splats.texScales[0]);
+			smfShaderGLSL->SetUniform4fv(24, &mapInfo->splats.texMults[0]);
+			smfShaderGLSL->SetUniform1i(25,  9); // skyReflectTex (idx 25, texunit 9)
+			smfShaderGLSL->SetUniform1i(26, 10); // skyReflectModTex (idx 26, texunit 10)
+
+			smfShaderGLSL->Disable();
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+
+
+
 
 void CBFGroundDrawer::CreateWaterPlanes(const bool &camOufOfMap) {
 	glDisable(GL_TEXTURE_2D);
@@ -209,21 +266,17 @@ inline void CBFGroundDrawer::DrawWaterPlane(bool drawWaterReflection) {
 
 inline void CBFGroundDrawer::DrawVertexAQ(CVertexArray* ma, int x, int y)
 {
-	float height = heightData[y * heightDataX + x];
-	if (waterDrawn && height < 0.0f) {
-		height *= 2;
-	}
-
 	//! don't send the normals as vertex attributes
 	//! (DLOD'ed triangles mess with interpolation)
 	//! const float3& n = readmap->vertexNormals[(y * heightDataX) + x];
-	ma->AddVertexQ0(x * SQUARE_SIZE, height, y * SQUARE_SIZE);
+
+	DrawVertexAQ(ma, x, y, heightData[y * heightDataX + x]);
 }
 
 inline void CBFGroundDrawer::DrawVertexAQ(CVertexArray* ma, int x, int y, float height)
 {
 	if (waterDrawn && height < 0.0f) {
-		height *= 2;
+		height *= 2.0f;
 	}
 
 	ma->AddVertexQ0(x * SQUARE_SIZE, height, y * SQUARE_SIZE);
@@ -262,7 +315,7 @@ inline void CBFGroundDrawer::FindRange(int &xs, int &xe, const std::vector<fline
 	int xt0, xt1;
 	std::vector<fline>::const_iterator fli;
 
-	for (fli = left.begin(); fli != left.end(); fli++) {
+	for (fli = left.begin(); fli != left.end(); ++fli) {
 		float xtf = fli->base + fli->dir * y;
 		xt0 = (int)xtf;
 		xt1 = (int)(xtf + fli->dir * lod);
@@ -275,7 +328,7 @@ inline void CBFGroundDrawer::FindRange(int &xs, int &xe, const std::vector<fline
 		if (xt0 > xs)
 			xs = xt0;
 	}
-	for (fli = right.begin(); fli != right.end(); fli++) {
+	for (fli = right.begin(); fli != right.end(); ++fli) {
 		float xtf = fli->base + fli->dir * y;
 		xt0 = (int)xtf;
 		xt1 = (int)(xtf + fli->dir * lod);
@@ -310,7 +363,7 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 
 	//! only process the necessary big squares in the x direction
 	int bigSquareSizeY = bty * bigSquareSize;
-	for (fli = left.begin(); fli != left.end(); fli++) {
+	for (fli = left.begin(); fli != left.end(); ++fli) {
 		x0 = fli->base + fli->dir * bigSquareSizeY;
 		x1 = x0 + fli->dir * bigSquareSize;
 
@@ -322,7 +375,7 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 		if (x0 > sx)
 			sx = (int) x0;
 	}
-	for (fli = right.begin(); fli != right.end(); fli++) {
+	for (fli = right.begin(); fli != right.end(); ++fli) {
 		x0 = fli->base + fli->dir * bigSquareSizeY + bigSquareSize;
 		x1 = x0 + fli->dir * bigSquareSize;
 
@@ -335,8 +388,8 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 			ex = (int) x0;
 	}
 
-	float cx2 = cam2->pos.x / SQUARE_SIZE;
-	float cy2 = cam2->pos.z / SQUARE_SIZE;
+	const float cx2 = cam2->pos.x / SQUARE_SIZE;
+	const float cy2 = cam2->pos.z / SQUARE_SIZE;
 
 	for (int btx = sx; btx < ex; ++btx) {
 		ma->Initialize();
@@ -345,13 +398,13 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 			float oldcamxpart = 0.0f;
 			float oldcamypart = 0.0f;
 
-			int hlod = lod >> 1;
-			int dlod = lod << 1;
+			const int hlod = lod >> 1;
+			const int dlod = lod << 1;
 
-			int cx = (int)cx2;
-			int cy = (int)cy2;
+			int cx = cx2;
+			int cy = cy2;
 
-			if(lod>1) {
+			if (lod>1) {
 				int cxo = (cx / hlod) * hlod;
 				int cyo = (cy / hlod) * hlod;
 				float cx2o = (cxo / lod) * lod;
@@ -362,48 +415,38 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 
 			cx = (cx / lod) * lod;
 			cy = (cy / lod) * lod;
-			int ysquaremod = (cy % dlod) / lod;
-			int xsquaremod = (cx % dlod) / lod;
 
-			float camxpart = (cx2 - ((cx / dlod) * dlod)) / dlod;
-			float camypart = (cy2 - ((cy / dlod) * dlod)) / dlod;
+			const int ysquaremod = (cy % dlod) / lod;
+			const int xsquaremod = (cx % dlod) / lod;
 
-			float mcxp=1.0f-camxpart;
-			float hcxp=0.5f*camxpart;
-			float hmcxp=0.5f*mcxp;
+			const float camxpart = (cx2 - ((cx / dlod) * dlod)) / dlod;
+			const float camypart = (cy2 - ((cy / dlod) * dlod)) / dlod;
 
-			float mcyp=1.0f-camypart;
-			float hcyp=0.5f*camypart;
-			float hmcyp=0.5f*mcyp;
+			const float mcxp  = 1.0f - camxpart, mcyp  = 1.0f - camypart;
+			const float hcxp  = 0.5f * camxpart, hcyp  = 0.5f * camypart;
+			const float hmcxp = 0.5f * mcxp,     hmcyp = 0.5f * mcyp;
 
-			float mocxp=1.0f-oldcamxpart;
-			float hocxp=0.5f*oldcamxpart;
-			float hmocxp=0.5f*mocxp;
+			const float mocxp  = 1.0f - oldcamxpart, mocyp  = 1.0f - oldcamypart;
+			const float hocxp  = 0.5f * oldcamxpart, hocyp  = 0.5f * oldcamypart;
+			const float hmocxp = 0.5f * mocxp,       hmocyp = 0.5f * mocyp;
 
-			float mocyp=1.0f-oldcamypart;
-			float hocyp=0.5f*oldcamypart;
-			float hmocyp=0.5f*mocyp;
+			const int minty = bty * bigSquareSize, maxty = minty + bigSquareSize;
+			const int mintx = btx * bigSquareSize, maxtx = mintx + bigSquareSize;
 
-			int minty = bty * bigSquareSize;
-			int maxty = minty + bigSquareSize;
-			int mintx = btx * bigSquareSize;
-			int maxtx = mintx + bigSquareSize;
+			const int minly = cy + (-viewRadius + 3 - ysquaremod) * lod;
+			const int maxly = cy + ( viewRadius - 1 - ysquaremod) * lod;
+			const int minlx = cx + (-viewRadius + 3 - xsquaremod) * lod;
+			const int maxlx = cx + ( viewRadius - 1 - xsquaremod) * lod;
 
-			int minly = cy + (-viewRadius + 3 - ysquaremod) * lod;
-			int maxly = cy + ( viewRadius - 1 - ysquaremod) * lod;
-			int minlx = cx + (-viewRadius + 3 - xsquaremod) * lod;
-			int maxlx = cx + ( viewRadius - 1 - xsquaremod) * lod;
+			const int xstart = std::max(minlx, mintx), xend = std::min(maxlx, maxtx);
+			const int ystart = std::max(minly, minty), yend = std::min(maxly, maxty);
 
-			int xstart = max(minlx, mintx);
-			int xend   = min(maxlx, maxtx);
-			int ystart = max(minly, minty);
-			int yend   = min(maxly, maxty);
-
-			int vrhlod = viewRadius * hlod;
+			const int vrhlod = viewRadius * hlod;
 
 			for (y = ystart; y < yend; y += lod) {
 				int xs = xstart;
 				int xe = xend;
+
 				FindRange(/*inout*/ xs, /*inout*/ xe, left, right, y, lod);
 
 				// If FindRange modifies (xs, xe) to a (less then) empty range,
@@ -572,8 +615,8 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 				}
 			} //for (y = ystart; y < yend; y += lod)
 
-			int yst = max(ystart - lod, minty);
-			int yed = min(yend + lod, maxty);
+			const int yst = std::max(ystart - lod, minty);
+			const int yed = std::min(yend + lod, maxty);
 			int nloop = (yed - yst) / lod + 1;
 
 			if (nloop > 0)
@@ -633,8 +676,8 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 
 			if (maxly < maxty && maxly > minty) {
 				y = maxly;
-				int xs = max(xstart - lod, mintx);
-				int xe = min(xend + lod,   maxtx);
+				int xs = std::max(xstart - lod, mintx);
+				int xe = std::min(xend + lod,   maxtx);
 				FindRange(xs, xe, left, right, y, lod);
 
 				if (xs < xe) {
@@ -671,8 +714,8 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 
 			if (minly > minty && minly < maxty) {
 				y = minly - lod;
-				int xs = max(xstart - lod, mintx);
-				int xe = min(xend + lod,   maxtx);
+				int xs = std::max(xstart - lod, mintx);
+				int xe = std::min(xend + lod,   maxtx);
 				FindRange(xs, xe, left, right, y, lod);
 
 				if (xs < xe) {
@@ -729,23 +772,23 @@ void CBFGroundDrawer::Draw(bool drawWaterReflection, bool drawUnitReflection)
 	waterDrawn = drawWaterReflection;
 
 
-	const int baseViewRadius = max(4, viewRadius);
+	const int baseViewRadius = std::max(4, viewRadius);
 
 	if (drawUnitReflection) {
-		viewRadius = ((int)(viewRadius * LODScaleUnitReflection)) & 0xfffffe;
+		viewRadius = (int(viewRadius * LODScaleUnitReflection)) & 0xfffffe;
 	}
 	if (drawWaterReflection) {
-		viewRadius = ((int)(viewRadius * LODScaleReflection)) & 0xfffffe;
+		viewRadius = (int(viewRadius * LODScaleReflection)) & 0xfffffe;
 	}
 	//if (drawWaterRefraction) {
-	//	viewRadius = ((int)(viewRadius * LODScaleRefraction)) & 0xfffffe;
+	//	viewRadius = (int(viewRadius * LODScaleRefraction)) & 0xfffffe;
 	//}
 
-	float zoom  = 45.0f / camera->GetFov();
-	viewRadius  = (int) (viewRadius * fastmath::apxsqrt(zoom));
-	viewRadius  = max(max(numBigTexY,numBigTexX), viewRadius);
+	viewRadius  = int(viewRadius * fastmath::apxsqrt(45.0f / camera->GetFov()));
+	viewRadius  = std::max(std::max(numBigTexY, numBigTexX), viewRadius);
 	viewRadius += (viewRadius & 1); //! we need a multiple of 2
-	neededLod   = int((gu->viewRange * 0.125f) / viewRadius) << 1;
+	neededLod   = std::max(1, int((globalRendering->viewRange * 0.125f) / viewRadius) << 1);
+	neededLod   = std::min(neededLod, std::min(gs->mapx, gs->mapy));
 
 	UpdateCamRestraints();
 
@@ -764,14 +807,14 @@ void CBFGroundDrawer::Draw(bool drawWaterReflection, bool drawUnitReflection)
 	}
 
 #ifdef USE_GML
-	if(multiThreadDrawGround) {
+	if (multiThreadDrawGround) {
 		gmlProcessor->Work(NULL,&CBFGroundDrawer::DoDrawGroundRowMT,NULL,this,gmlThreadCount,FALSE,NULL,numBigTexY,50,100,TRUE,NULL);
 	}
 	else
 #endif
 	{
-		int camBty = (int)math::floor(cam2->pos.z / (bigSquareSize * SQUARE_SIZE));
-		camBty = std::max(0,std::min(numBigTexY-1, camBty ));
+		int camBty = math::floor(cam2->pos.z / (bigSquareSize * SQUARE_SIZE));
+		camBty = std::max(0, std::min(numBigTexY - 1, camBty));
 
 		//! try to render in "front to back" (so start with the camera nearest BigGroundLines)
 		for (int bty = camBty; bty >= 0; --bty) {
@@ -798,11 +841,9 @@ void CBFGroundDrawer::Draw(bool drawWaterReflection, bool drawUnitReflection)
 			DrawWaterPlane(drawWaterReflection);
 		}
 
-		if (groundDecals) {
-			groundDecals->Draw();
-			ph->DrawGroundFlashes();
-			glDepthMask(1);
-		}
+		groundDecals->Draw();
+		projectileDrawer->DrawGroundFlashes();
+		glDepthMask(1);
 	}
 
 //	sky->SetCloudShadow(1);
@@ -841,48 +882,34 @@ inline void CBFGroundDrawer::DoDrawGroundShadowLOD(int nlod) {
 
 	cx = (cx / lod) * lod;
 	cy = (cy / lod) * lod;
-	int ysquaremod = (cy % dlod) / lod;
-	int xsquaremod = (cx % dlod) / lod;
+	const int ysquaremod = (cy % dlod) / lod;
+	const int xsquaremod = (cx % dlod) / lod;
 
-	float camxpart = (cx2 - (cx / dlod) * dlod) / dlod;
-	float camypart = (cy2 - (cy / dlod) * dlod) / dlod;
+	const float camxpart = (cx2 - (cx / dlod) * dlod) / dlod;
+	const float camypart = (cy2 - (cy / dlod) * dlod) / dlod;
 
-	int minty = 0;
-	int maxty = gs->mapy;
-	int mintx = 0;
-	int maxtx = gs->mapx;
+	const int minty = 0, maxty = gs->mapy;
+	const int mintx = 0, maxtx = gs->mapx;
 
-	int minly = cy + (-viewRadius + 3 - ysquaremod) * lod;
-	int maxly = cy + ( viewRadius - 1 - ysquaremod) * lod;
-	int minlx = cx + (-viewRadius + 3 - xsquaremod) * lod;
-	int maxlx = cx + ( viewRadius - 1 - xsquaremod) * lod;
+	const int minly = cy + (-viewRadius + 3 - ysquaremod) * lod, maxly = cy + ( viewRadius - 1 - ysquaremod) * lod;
+	const int minlx = cx + (-viewRadius + 3 - xsquaremod) * lod, maxlx = cx + ( viewRadius - 1 - xsquaremod) * lod;
 
-	int xstart = max(minlx, mintx);
-	int xend   = min(maxlx, maxtx);
-	int ystart = max(minly, minty);
-	int yend   = min(maxly, maxty);
+	const int xstart = std::max(minlx, mintx), xend   = std::min(maxlx, maxtx);
+	const int ystart = std::max(minly, minty), yend   = std::min(maxly, maxty);
 
-	int lhdx=lod*heightDataX;
-	int hhdx=hlod*heightDataX;
-	int dhdx=dlod*heightDataX;
+	const int lhdx = lod * heightDataX;
+	const int hhdx = hlod * heightDataX;
+	const int dhdx = dlod * heightDataX;
 
-	float mcxp=1.0f-camxpart;
-	float hcxp=0.5f*camxpart;
-	float hmcxp=0.5f*mcxp;
+	const float mcxp  = 1.0f - camxpart, mcyp  = 1.0f - camypart;
+	const float hcxp  = 0.5f * camxpart, hcyp  = 0.5f * camypart;
+	const float hmcxp = 0.5f * mcxp,     hmcyp = 0.5f * mcyp;
 
-	float mcyp=1.0f-camypart;
-	float hcyp=0.5f*camypart;
-	float hmcyp=0.5f*mcyp;
+	const float mocxp  = 1.0f - oldcamxpart, mocyp  = 1.0f - oldcamypart;
+	const float hocxp  = 0.5f * oldcamxpart, hocyp  = 0.5f * oldcamypart;
+	const float hmocxp = 0.5f * mocxp,       hmocyp = 0.5f * mocyp;
 
-	float mocxp=1.0f-oldcamxpart;
-	float hocxp=0.5f*oldcamxpart;
-	float hmocxp=0.5f*mocxp;
-
-	float mocyp=1.0f-oldcamypart;
-	float hocyp=0.5f*oldcamypart;
-	float hmocyp=0.5f*mocyp;
-
-	int vrhlod = viewRadius * hlod;
+	const int vrhlod = viewRadius * hlod;
 
 	for (y = ystart; y < yend; y += lod) {
 		int xs = xstart;
@@ -1028,9 +1055,9 @@ inline void CBFGroundDrawer::DoDrawGroundShadowLOD(int nlod) {
 		}
 	}
 
-	int yst=max(ystart - lod, minty);
-	int yed=min(yend + lod, maxty);
-	int nloop=(yed-yst)/lod+1;
+	int yst = std::max(ystart - lod, minty);
+	int yed = std::min(yend + lod, maxty);
+	int nloop = (yed - yst) / lod + 1;
 
 	if (nloop > 0)
 		ma->EnlargeArrays((8 * nloop), 2 * nloop);
@@ -1080,8 +1107,8 @@ inline void CBFGroundDrawer::DoDrawGroundShadowLOD(int nlod) {
 	}
 	if(maxly<maxty && maxly>minty){
 		y=maxly;
-		int xs=max(xstart-lod,mintx);
-		int xe=min(xend+lod,maxtx);
+		int xs = std::max(xstart -lod, mintx);
+		int xe = std::min(xend + lod, maxtx);
 		if (xs < xe) {
 			x = xs;
 			int ylod = y + lod;
@@ -1115,8 +1142,8 @@ inline void CBFGroundDrawer::DoDrawGroundShadowLOD(int nlod) {
 	}
 	if(minly>minty && minly<maxty){
 		y=minly-lod;
-		int xs=max(xstart-lod,mintx);
-		int xe=min(xend+lod,maxtx);
+		int xs = std::max(xstart - lod, mintx);
+		int xe = std::min(xend + lod, maxtx);
 		if(xs<xe){
 			x=xs;
 			int ylod = y + lod;
@@ -1160,9 +1187,9 @@ void CBFGroundDrawer::DrawShadowPass(void)
 
 	const int NUM_LODS = 4;
 
-	Shader::IProgramObject* po = shadowHandler->GetMapShadowGenShader();
+	Shader::IProgramObject* po =
+		shadowHandler->GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MAP);
 
-	// glEnable(GL_CULL_FACE);
 	glPolygonOffset(1, 1);
 	glEnable(GL_POLYGON_OFFSET_FILL);
 
@@ -1183,7 +1210,6 @@ void CBFGroundDrawer::DrawShadowPass(void)
 	po->Disable();
 
 	glDisable(GL_POLYGON_OFFSET_FILL);
-	glDisable(GL_CULL_FACE);
 }
 
 
@@ -1191,15 +1217,14 @@ inline void CBFGroundDrawer::SetupBigSquare(const int bigSquareX, const int bigS
 {
 	textures->SetTexture(bigSquareX, bigSquareY);
 
-	//! must be in drawLos mode or shadows must be off
-	if (DrawExtraTex() || !shadowHandler->drawShadows) {
-		SetTexGen(1.0f / 1024, 1.0f / 1024, -bigSquareX, -bigSquareY);
-	}
-
-	if (map->haveSpecularLighting) {
+	if ((map->haveSpecularLighting && shadowHandler->drawShadows) && !DrawExtraTex()) {
 		smfShaderGLSL->SetUniform1i(7, bigSquareX);
 		smfShaderGLSL->SetUniform1i(8, bigSquareY);
 	} else {
+		if (!shadowHandler->drawShadows || DrawExtraTex()) {
+			SetTexGen(1.0f / 1024, 1.0f / 1024, -bigSquareX, -bigSquareY);
+		}
+
 		smfShaderCurrARB->SetUniformTarget(GL_VERTEX_PROGRAM_ARB);
 		smfShaderCurrARB->SetUniform4f(11, -bigSquareX, -bigSquareY, 0, 0);
 	}
@@ -1215,34 +1240,41 @@ void CBFGroundDrawer::SetupTextureUnits(bool drawReflection)
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
 	if (DrawExtraTex()) {
-		glActiveTextureARB(GL_TEXTURE1_ARB);
+		glActiveTexture(GL_TEXTURE1);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, infoTex);
-		glMultiTexCoord4f(GL_TEXTURE1_ARB, 1,1,1,1); //fixes a nvidia bug with gltexgen
+		glMultiTexCoord4f(GL_TEXTURE1_ARB, 1.0f, 1.0f, 1.0f, 1.0f); //fixes a nvidia bug with gltexgen
 		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_ADD_SIGNED_ARB);
 		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
 		SetTexGen(1.0f / (gs->pwr2mapx * SQUARE_SIZE), 1.0f / (gs->pwr2mapy * SQUARE_SIZE), 0, 0);
 
-		glActiveTextureARB(GL_TEXTURE2_ARB);
+		glActiveTexture(GL_TEXTURE2);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, map->GetShadingTexture());
+		glMultiTexCoord4f(GL_TEXTURE2_ARB, 1.0f, 1.0f, 1.0f, 1.0f); //fixes a nvidia bug with gltexgen
+		if (drawMode == drawMetal) { // increased brightness for metal spots
+			glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_ADD_SIGNED_ARB);
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
+		}
 		SetTexGen(1.0f / (gs->pwr2mapx * SQUARE_SIZE), 1.0f / (gs->pwr2mapy * SQUARE_SIZE), 0, 0);
-		glMultiTexCoord4f(GL_TEXTURE2_ARB, 1,1,1,1); //fixes a nvidia bug with gltexgen
 
-		glActiveTextureARB(GL_TEXTURE3_ARB);
+		glActiveTexture(GL_TEXTURE3);
 		if (map->detailTex) {
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, map->detailTex);
-			glMultiTexCoord4f(GL_TEXTURE3_ARB, 1,1,1,1); //fixes a nvidia bug with gltexgen
+			glMultiTexCoord4f(GL_TEXTURE3_ARB, 1.0f, 1.0f, 1.0f, 1.0f); //fixes a nvidia bug with gltexgen
 			glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_ADD_SIGNED_ARB);
 			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-			GLfloat plan[]={0.02f,0,0,0};
-			glTexGeni(GL_S,GL_TEXTURE_GEN_MODE,GL_OBJECT_LINEAR);
-			glTexGenfv(GL_S,GL_OBJECT_PLANE,plan);
+
+			static const GLfloat planeX[] = {0.02f, 0.0f, 0.0f, 0.0f};
+			static const GLfloat planeZ[] = {0.0f, 0.0f, 0.02f, 0.0f};
+
+			glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+			glTexGenfv(GL_S, GL_OBJECT_PLANE, planeX);
 			glEnable(GL_TEXTURE_GEN_S);
-			GLfloat plan2[]={0,0,0.02f,0};
-			glTexGeni(GL_T,GL_TEXTURE_GEN_MODE,GL_OBJECT_LINEAR);
-			glTexGenfv(GL_T,GL_OBJECT_PLANE,plan2);
+
+			glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+			glTexGenfv(GL_T, GL_OBJECT_PLANE, planeZ);
 			glEnable(GL_TEXTURE_GEN_T);
 		} else {
 			glDisable(GL_TEXTURE_2D);
@@ -1268,11 +1300,10 @@ void CBFGroundDrawer::SetupTextureUnits(bool drawReflection)
 
 	else if (shadowHandler->drawShadows) {
 		const float3 ambientColor = mapInfo->light.groundAmbientColor * (210.0f / 255.0f);
-		const float4 shadowParams = float4(shadowHandler->xmid, shadowHandler->ymid, shadowHandler->p17, shadowHandler->p18);
 
-		glActiveTextureARB(GL_TEXTURE1_ARB);
+		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, map->GetShadingTexture());
-		glActiveTextureARB(GL_TEXTURE2_ARB);
+		glActiveTexture(GL_TEXTURE2);
 
 		if (map->detailTex) {
 			glBindTexture(GL_TEXTURE_2D, map->detailTex);
@@ -1301,35 +1332,26 @@ void CBFGroundDrawer::SetupTextureUnits(bool drawReflection)
 			glLoadMatrixf(shadowHandler->shadowMatrix.m);
 			glMatrixMode(GL_MODELVIEW);
 
-			glActiveTextureARB(GL_TEXTURE4_ARB);
+			glActiveTexture(GL_TEXTURE4);
 			glBindTexture(GL_TEXTURE_2D, shadowHandler->shadowTexture);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_COMPARE_R_TO_TEXTURE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC_ARB, GL_LEQUAL);
 			glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE_ARB, GL_LUMINANCE);
-			glActiveTextureARB(GL_TEXTURE0_ARB);
+			glActiveTexture(GL_TEXTURE0);
 		} else {
 			smfShaderGLSL->Enable();
-			smfShaderGLSL->SetUniform1i(0, 0); // diffuseTex  (idx 0, texunit 0)
-			smfShaderGLSL->SetUniform1i(1, 5); // normalsTex  (idx 1, texunit 5)
-			smfShaderGLSL->SetUniform1i(2, 4); // shadowTex   (idx 2, texunit 4)
-			smfShaderGLSL->SetUniform1i(3, 2); // detailTex   (idx 3, texunit 2)
-			smfShaderGLSL->SetUniform1i(4, 6); // specularTex (idx 4, texunit 6)
-			smfShaderGLSL->SetUniform1f(5, (gs->pwr2mapx * SQUARE_SIZE));
-			smfShaderGLSL->SetUniform1f(6, (gs->pwr2mapy * SQUARE_SIZE));
-			smfShaderGLSL->SetUniform4fv(9, const_cast<float*>(&mapInfo->light.sunDir[0]));
 			smfShaderGLSL->SetUniform3fv(10, &camera->pos[0]);
-			smfShaderGLSL->SetUniform4fv(11, (float*) camera->modelviewInverse);
 			smfShaderGLSL->SetUniformMatrix4fv(12, false, &shadowHandler->shadowMatrix.m[0]);
-			smfShaderGLSL->SetUniform4fv(13, const_cast<float*>(&shadowParams[0]));
-			smfShaderGLSL->SetUniform3fv(14, const_cast<float*>(&mapInfo->light.groundAmbientColor[0]));
-			smfShaderGLSL->SetUniform3fv(15, const_cast<float*>(&mapInfo->light.groundSunColor[0]));
-			smfShaderGLSL->SetUniform3fv(16, const_cast<float*>(&mapInfo->light.groundSpecularColor[0]));
-			smfShaderGLSL->SetUniform1f(17, mapInfo->light.groundShadowDensity);
+			smfShaderGLSL->SetUniform4fv(13, &(shadowHandler->GetShadowParams().x));
 
-			glActiveTexture(GL_TEXTURE5);
-			glBindTexture(GL_TEXTURE_2D, map->GetNormalsTexture());
-			glActiveTexture(GL_TEXTURE6);
-			glBindTexture(GL_TEXTURE_2D, map->GetSpecularTexture());
+			glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, map->GetNormalsTexture());
+			glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, map->GetSpecularTexture());
+			glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, map->GetSplatDetailTexture());
+			glActiveTexture(GL_TEXTURE8); glBindTexture(GL_TEXTURE_2D, map->GetSplatDistrTexture());
+			glActiveTexture(GL_TEXTURE9);
+				glEnable(GL_TEXTURE_CUBE_MAP_ARB);
+				glBindTexture(GL_TEXTURE_CUBE_MAP_ARB, cubeMapHandler->GetSkyReflectionTextureID());
+			glActiveTexture(GL_TEXTURE10); glBindTexture(GL_TEXTURE_2D, map->GetSkyReflectModTexture());
 
 			// setup for shadow2DProj
 			glActiveTexture(GL_TEXTURE4);
@@ -1343,50 +1365,56 @@ void CBFGroundDrawer::SetupTextureUnits(bool drawReflection)
 
 	else {
 		if (map->detailTex) {
-			glActiveTextureARB(GL_TEXTURE1_ARB);
+			glActiveTexture(GL_TEXTURE1);
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, map->detailTex);
-			glMultiTexCoord4f(GL_TEXTURE1_ARB, 1,1,1,1); //fixes a nvidia bug with gltexgen
+			glMultiTexCoord4f(GL_TEXTURE1_ARB, 1.0f, 1.0f, 1.0f, 1.0f); //fixes a nvidia bug with gltexgen
 			glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_ADD_SIGNED_ARB);
 			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-			GLfloat plan[]={0.02f,0,0,0};
-			glTexGeni(GL_S,GL_TEXTURE_GEN_MODE,GL_OBJECT_LINEAR);
-			glTexGenfv(GL_S,GL_OBJECT_PLANE,plan);
+
+			static const GLfloat planeX[] = {0.02f, 0.0f, 0.00f, 0.0f};
+			static const GLfloat planeZ[] = {0.00f, 0.0f, 0.02f, 0.0f};
+
+			glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+			glTexGenfv(GL_S, GL_OBJECT_PLANE, planeX);
 			glEnable(GL_TEXTURE_GEN_S);
-			GLfloat plan2[]={0,0,0.02f,0};
-			glTexGeni(GL_T,GL_TEXTURE_GEN_MODE,GL_OBJECT_LINEAR);
-			glTexGenfv(GL_T,GL_OBJECT_PLANE,plan2);
+
+			glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+			glTexGenfv(GL_T, GL_OBJECT_PLANE, planeZ);
 			glEnable(GL_TEXTURE_GEN_T);
 		} else {
-			glActiveTextureARB(GL_TEXTURE1_ARB);
+			glActiveTexture(GL_TEXTURE1);
 			glDisable(GL_TEXTURE_2D);
 		}
 
-		glActiveTextureARB(GL_TEXTURE2_ARB);
+		glActiveTexture(GL_TEXTURE2);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, map->GetShadingTexture());
-		glMultiTexCoord4f(GL_TEXTURE2_ARB, 1,1,1,1); //fixes a nvidia bug with gltexgen
+		glMultiTexCoord4f(GL_TEXTURE2_ARB, 1.0f, 1.0f, 1.0f, 1.0f); //fixes a nvidia bug with gltexgen
 		SetTexGen(1.0f / (gs->pwr2mapx * SQUARE_SIZE), 1.0f / (gs->pwr2mapy * SQUARE_SIZE), 0, 0);
 
 		//! bind the detail texture a 2nd time to increase the details (-> GL_ADD_SIGNED_ARB is limited -0.5 to +0.5)
 		//! (also do this after the shading texture cause of color clamping issues)
 		if (map->detailTex) {
-			glActiveTextureARB(GL_TEXTURE3_ARB);
+			glActiveTexture(GL_TEXTURE3);
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, map->detailTex);
 			glMultiTexCoord4f(GL_TEXTURE3_ARB, 1,1,1,1); //fixes a nvidia bug with gltexgen
 			glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_ADD_SIGNED_ARB);
 			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-			GLfloat plan[]={0.02f,0,0,0};
-			glTexGeni(GL_S,GL_TEXTURE_GEN_MODE,GL_OBJECT_LINEAR);
-			glTexGenfv(GL_S,GL_OBJECT_PLANE,plan);
+
+			static const GLfloat planeX[] = {0.02f, 0.0f, 0.0f, 0.0f};
+			static const GLfloat planeZ[] = {0.0f, 0.0f, 0.02f, 0.0f};
+
+			glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+			glTexGenfv(GL_S, GL_OBJECT_PLANE, planeX);
 			glEnable(GL_TEXTURE_GEN_S);
-			GLfloat plan2[]={0,0,0.02f,0};
-			glTexGeni(GL_T,GL_TEXTURE_GEN_MODE,GL_OBJECT_LINEAR);
-			glTexGenfv(GL_T,GL_OBJECT_PLANE,plan2);
+
+			glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+			glTexGenfv(GL_T, GL_OBJECT_PLANE, planeZ);
 			glEnable(GL_TEXTURE_GEN_T);
 		} else {
-			glActiveTextureARB(GL_TEXTURE3_ARB);
+			glActiveTexture(GL_TEXTURE3);
 			glDisable(GL_TEXTURE_2D);
 		}
 
@@ -1408,45 +1436,55 @@ void CBFGroundDrawer::SetupTextureUnits(bool drawReflection)
 		}*/
 	}
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 }
 
 
 void CBFGroundDrawer::ResetTextureUnits(bool drawReflection)
 {
 	if (DrawExtraTex() || !shadowHandler->drawShadows) {
-		glActiveTextureARB(GL_TEXTURE0_ARB);
+		glActiveTexture(GL_TEXTURE0);
 		glDisable(GL_TEXTURE_GEN_S);
 		glDisable(GL_TEXTURE_GEN_T);
 		glDisable(GL_TEXTURE_2D);
 
-		glActiveTextureARB(GL_TEXTURE1_ARB);
+		glActiveTexture(GL_TEXTURE1);
 		glDisable(GL_TEXTURE_2D);
 		glDisable(GL_TEXTURE_GEN_S);
 		glDisable(GL_TEXTURE_GEN_T);
-		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-		glActiveTextureARB(GL_TEXTURE2_ARB);
+		glActiveTexture(GL_TEXTURE2);
 		glDisable(GL_TEXTURE_2D);
 		glDisable(GL_TEXTURE_GEN_S);
 		glDisable(GL_TEXTURE_GEN_T);
-		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-		glActiveTextureARB(GL_TEXTURE3_ARB);
+		glActiveTexture(GL_TEXTURE3);
 		glDisable(GL_TEXTURE_2D);
 		glDisable(GL_TEXTURE_GEN_S);
 		glDisable(GL_TEXTURE_GEN_T);
-		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-		glActiveTextureARB(GL_TEXTURE0_ARB);
+		glActiveTexture(GL_TEXTURE0);
 
 		if (drawReflection) {
 			glDisable(GL_ALPHA_TEST);
 		}
 	} else {
-		glActiveTextureARB(GL_TEXTURE4_ARB);
+		glActiveTexture(GL_TEXTURE4);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_NONE);
-		glActiveTextureARB(GL_TEXTURE0_ARB);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE8); glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE9);
+			glDisable(GL_TEXTURE_CUBE_MAP_ARB);
+			glBindTexture(GL_TEXTURE_CUBE_MAP_ARB, 0);
+		glActiveTexture(GL_TEXTURE10); glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE0);
 
 		if (drawReflection) {
 			glDisable(GL_ALPHA_TEST);
@@ -1467,7 +1505,6 @@ void CBFGroundDrawer::ResetTextureUnits(bool drawReflection)
 
 void CBFGroundDrawer::AddFrustumRestraint(const float3& side)
 {
-	fline temp;
 
 	// get vector for collision between frustum and horizontal plane
 	float3 b = UpVector.cross(side);
@@ -1476,6 +1513,7 @@ void CBFGroundDrawer::AddFrustumRestraint(const float3& side)
 		b.z = 0.0001f;
 
 	{
+		fline temp;
 		temp.dir = b.x / b.z;      // set direction to that
 		float3 c = b.cross(side);  // get vector from camera to collision line
 		float3 colpoint;           // a point on the collision line
@@ -1508,7 +1546,6 @@ void CBFGroundDrawer::UpdateCamRestraints(void)
 	AddFrustumRestraint(cam2->leftside);
 
 	// add restraint for maximum view distance
-	fline temp;
 	float3 side = cam2->forward;
 	float3 camHorizontal = cam2->forward;
 	camHorizontal.y = 0.0f;
@@ -1518,14 +1555,15 @@ void CBFGroundDrawer::UpdateCamRestraints(void)
 	float3 b = UpVector.cross(camHorizontal);
 
 	if (fabs(b.z) > 0.0001f) {
+		fline temp;
 		temp.dir = b.x / b.z;               // set direction to that
 		float3 c = b.cross(camHorizontal);  // get vector from camera to collision line
 		float3 colpoint;                    // a point on the collision line
 
 		if (side.y > 0.0f)
-			colpoint = cam2->pos + camHorizontal * gu->viewRange * 1.05f - c * (cam2->pos.y / c.y);
+			colpoint = cam2->pos + camHorizontal * globalRendering->viewRange * 1.05f - c * (cam2->pos.y / c.y);
 		else
-			colpoint = cam2->pos + camHorizontal * gu->viewRange * 1.05f - c * ((cam2->pos.y - 255 / 3.5f) / c.y);
+			colpoint = cam2->pos + camHorizontal * globalRendering->viewRange * 1.05f - c * ((cam2->pos.y - 255 / 3.5f) / c.y);
 
 		// get intersection between colpoint and z axis
 		temp.base = (colpoint.x - colpoint.z * temp.dir) / SQUARE_SIZE;

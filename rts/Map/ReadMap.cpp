@@ -1,30 +1,26 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// ReadMap.cpp: implementation of the CReadMap class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <stdlib.h>
 #include <string>
 #include "mmgr.h"
 
 #include "ReadMap.h"
-#include "Rendering/Textures/Bitmap.h"
-#include "Ground.h"
-#include "ConfigHandler.h"
 #include "MapDamage.h"
 #include "MapInfo.h"
 #include "MetalMap.h"
-#include "Sim/Path/PathManager.h"
-#include "Sim/Units/UnitDef.h"
-#include "Sim/Units/Unit.h"
 #include "SM3/Sm3Map.h"
 #include "SMF/SmfReadMap.h"
-#include "FileSystem/FileHandler.h"
-#include "FileSystem/ArchiveScanner.h"
-#include "LoadSaveInterface.h"
-#include "LogOutput.h"
-#include "Platform/errorhandler.h"
-#include "Exceptions.h"
+#include "Game/LoadScreen.h"
+#include "System/bitops.h"
+#include "System/ConfigHandler.h"
+#include "System/Exceptions.h"
+#include "System/LogOutput.h"
+#include "System/LoadSave/LoadSaveInterface.h"
+#include "System/FileSystem/ArchiveScanner.h"
+#include "System/FileSystem/FileHandler.h"
+#include "System/FileSystem/FileSystem.h"
 
 using namespace std;
 
@@ -44,15 +40,14 @@ CR_REG_METADATA(CReadMap, (
 CReadMap* CReadMap::LoadMap(const std::string& mapname)
 {
 	if (mapname.length() < 3)
-		throw std::runtime_error("CReadMap::LoadMap(): mapname '" + mapname + "' too short");
+		throw content_error("CReadMap::LoadMap(): mapname '" + mapname + "' too short");
 
-	string extension = mapname.substr(mapname.length() - 3);
+	const string extension = filesystem.GetExtension(mapname);
 
 	CReadMap* rm = 0;
 
 	if (extension == "sm3") {
-		rm = new CSm3ReadMap();
-		((CSm3ReadMap*)rm)->Initialize (mapname.c_str());
+		rm = new CSm3ReadMap(mapname);
 	} else {
 		rm = new CSmfReadMap(mapname);
 	}
@@ -60,7 +55,6 @@ CReadMap* CReadMap::LoadMap(const std::string& mapname)
 	if (!rm) {
 		return 0;
 	}
-
 
 	/* Read metal map */
 	MapBitmapInfo mbi;
@@ -118,9 +112,16 @@ CReadMap::CReadMap():
 	facenormals(NULL),
 	centernormals(NULL),
 	typemap(NULL),
-	metalMap(NULL)
+	metalMap(NULL),
+	width(0),
+	height(0),
+	minheight(0.0f),
+	maxheight(0.0f),
+	currMinHeight(0.0f),
+	currMaxHeight(0.0f),
+	mapChecksum(0)
 {
-	memset(mipHeightmap, 0, sizeof(mipHeightmap));
+	memset(mipHeightmap, NULL, sizeof(mipHeightmap));
 }
 
 
@@ -147,15 +148,28 @@ CReadMap::~CReadMap()
 
 void CReadMap::Initialize()
 {
-	PrintLoadMsg("Loading Map");
+	loadscreen->SetLoadMessage("Loading Map");
+
+	// set global map info
+	gs->mapx = width;
+	gs->mapy = height;
+	gs->mapSquares = gs->mapx * gs->mapy;
+	gs->hmapx = gs->mapx >> 1;
+	gs->hmapy = gs->mapy >> 1;
+	gs->pwr2mapx = next_power_of_2(gs->mapx);
+	gs->pwr2mapy = next_power_of_2(gs->mapy);
+
+	float3::maxxpos = gs->mapx * SQUARE_SIZE - 1;
+	float3::maxzpos = gs->mapy * SQUARE_SIZE - 1;
 
 	orgheightmap = new float[(gs->mapx + 1) * (gs->mapy + 1)];
 	facenormals = new float3[gs->mapx * gs->mapy * 2];
 	centernormals = new float3[gs->mapx * gs->mapy];
 	centerheightmap = new float[gs->mapx * gs->mapy];
 	mipHeightmap[0] = centerheightmap;
-	for (int i = 1; i < numHeightMipMaps; i++)
+	for (int i = 1; i < numHeightMipMaps; i++) {
 		mipHeightmap[i] = new float[(gs->mapx >> i) * (gs->mapy >> i)];
+	}
 
 	slopemap = new float[gs->hmapx * gs->hmapy];
 	vertexNormals.resize((gs->mapx + 1) * (gs->mapy + 1));

@@ -1,3 +1,4 @@
+#include <cassert>
 #include <sstream>
 
 #include "IncExternAI.h"
@@ -7,7 +8,8 @@
 
 CR_BIND(CThreatMap, (NULL))
 CR_REG_METADATA(CThreatMap, (
-	CR_MEMBER(ThreatArray),
+	CR_MEMBER(threatCellsRaw),
+	CR_MEMBER(threatCellsVis),
 	CR_MEMBER(ai),
 	CR_RESERVED(8),
 	CR_POSTLOAD(PostLoad)
@@ -15,10 +17,7 @@ CR_REG_METADATA(CThreatMap, (
 
 CThreatMap::CThreatMap(AIClasses* aic): ai(aic) {
 	if (ai) {
-		ThreatMapWidth  = ai->cb->GetMapWidth()  / THREATRES;
-		ThreatMapHeight = ai->cb->GetMapHeight() / THREATRES;
-		TotalCells = ThreatMapWidth * ThreatMapHeight;
-		ThreatArray.resize(TotalCells);
+		PostLoad();
 
 		#if (LUA_THREATMAP_DEBUG == 1)
 		std::stringstream luaDataStream;
@@ -27,12 +26,12 @@ CThreatMap::CThreatMap(AIClasses* aic): ai(aic) {
 			// means transferring the threatmap values requires an extra
 			// temporary table
 			//
-			// luaDataStream << "threatMapW = " << ThreatMapWidth  << ";\n";
-			// luaDataStream << "threatMapH = " << ThreatMapHeight << ";\n";
+			// luaDataStream << "threatMapW = " << width  << ";\n";
+			// luaDataStream << "threatMapH = " << height << ";\n";
 			//
 			// however, writing to a table declared in GG is fine
-			luaDataStream << "GG.AIThreatMap[\"threatMapSizeX\"] = " << ThreatMapWidth << ";\n";
-			luaDataStream << "GG.AIThreatMap[\"threatMapSizeZ\"] = " << ThreatMapHeight << ";\n";
+			luaDataStream << "GG.AIThreatMap[\"threatMapSizeX\"] = " << width << ";\n";
+			luaDataStream << "GG.AIThreatMap[\"threatMapSizeZ\"] = " << height << ";\n";
 			luaDataStream << "GG.AIThreatMap[\"threatMapResX\"]  = " << THREATRES << ";\n";
 			luaDataStream << "GG.AIThreatMap[\"threatMapResZ\"]  = " << THREATRES << ";\n";
 			luaDataStream << "\n";
@@ -51,126 +50,228 @@ CThreatMap::CThreatMap(AIClasses* aic): ai(aic) {
 		ai->cb->CallLuaRules(luaDataStr.c_str(), -1, NULL);
 		#endif
 	}
+
+	currMaxThreat = 0.0f; // maximum threat (normalizer)
+	currSumThreat = 0.0f; // threat summed over all cells
+	currAvgThreat = 0.0f; // average threat over all cells
+}
+
+CThreatMap::~CThreatMap() {
+	threatCellsRaw.clear();
+	threatCellsVis.clear();
+
+	if (threatMapTexID >= 0) {
+		ai->cb->DebugDrawerDelOverlayTexture(threatMapTexID);
+	}
 }
 
 void CThreatMap::PostLoad() {
-	ThreatMapWidth = ai->cb->GetMapWidth() / THREATRES;
-	ThreatMapHeight = ai->cb->GetMapHeight() / THREATRES;
-	TotalCells = ThreatMapWidth * ThreatMapHeight;
+	width  = ai->cb->GetMapWidth() / THREATRES;
+	height = ai->cb->GetMapHeight() / THREATRES;
+	area   = width * height;
+
+	assert(threatCellsRaw.empty());
+	assert(threatCellsVis.empty());
+	threatCellsRaw.resize(area, THREATVAL_BASE);
+	threatCellsVis.resize(area, THREATVAL_BASE);
+
+	threatMapTexID = -1;
+}
+
+void CThreatMap::ToggleVisOverlay() {
+	if (threatMapTexID < 0) {
+		std::stringstream threatMapLabel;
+			threatMapLabel << "[KAIK][";
+			threatMapLabel << ai->cb->GetMyTeam();
+			threatMapLabel << "][ThreatMap]";
+
+		// /cheat
+		// /debugdrawai
+		// /team N
+		// /spectator
+		// "KAIK::ThreatMap::DBG"
+		threatMapTexID = ai->cb->DebugDrawerAddOverlayTexture(&threatCellsVis[0], width, height);
+
+		ai->cb->DebugDrawerSetOverlayTexturePos(threatMapTexID, 0.50f, 0.25f);
+		ai->cb->DebugDrawerSetOverlayTextureSize(threatMapTexID, 0.40f, 0.40f);
+		ai->cb->DebugDrawerSetOverlayTextureLabel(threatMapTexID, (threatMapLabel.str()).c_str());
+	} else {
+		ai->cb->DebugDrawerDelOverlayTexture(threatMapTexID);
+		threatMapTexID = -1;
+	}
+}
+
+
+
+void CThreatMap::EnemyCreated(int enemyUnitID) {
+	assert(!threatCellsRaw.empty());
+	assert(ai->ccb->GetUnitDef(enemyUnitID) != NULL);
+
+	EnemyUnit enemyUnit;
+		enemyUnit.id     = enemyUnitID;
+		enemyUnit.pos    = ai->ccb->GetUnitPos(enemyUnitID);
+		enemyUnit.threat = GetEnemyUnitThreat(enemyUnit);
+		enemyUnit.range  = (ai->ut->GetMaxRange(ai->ccb->GetUnitDef(enemyUnitID)) + 100.0f) / (SQUARE_SIZE * THREATRES);
+	enemyUnits[enemyUnitID] = enemyUnit;
+
+	AddEnemyUnit(enemyUnit, 1.0f);
+}
+
+void CThreatMap::EnemyFinished(int enemyUnitID) {
+	// no-op
+}
+
+void CThreatMap::EnemyDamaged(int enemyUnitID, int) {
+	assert(!threatCellsRaw.empty());
+
+	std::map<int, EnemyUnit>::iterator it = enemyUnits.find(enemyUnitID);
+
+	if (it != enemyUnits.end()) {
+		EnemyUnit& enemyUnit = it->second;
+
+		DelEnemyUnit(enemyUnit);
+			enemyUnit.threat = GetEnemyUnitThreat(enemyUnit);
+		AddEnemyUnit(enemyUnit, 1.0f);
+	}
+}
+
+void CThreatMap::EnemyDestroyed(int enemyUnitID, int) {
+	assert(!threatCellsRaw.empty());
+	std::map<int, EnemyUnit>::const_iterator it = enemyUnits.find(enemyUnitID);
+
+	if (it != enemyUnits.end()) {
+		const EnemyUnit& enemyUnit = it->second;
+
+		DelEnemyUnit(enemyUnit);
+		enemyUnits.erase(enemyUnitID);
+	}
+}
+
+
+
+void CThreatMap::AddEnemyUnit(const EnemyUnit& e, const float scale) {
+	const int posx = e.pos.x / (SQUARE_SIZE * THREATRES);
+	const int posy = e.pos.z / (SQUARE_SIZE * THREATRES);
+
+	assert(!threatCellsRaw.empty());
+
+	if (!MAPPOS_IN_BOUNDS(e.pos)) {
+		std::stringstream msg;
+			msg << "[CThreatMap::AddEnemyUnit][frame=" << ai->cb->GetCurrentFrame() << "][scale=" << scale << "]\n";
+			msg << "\tposition <" << e.pos.x << ", " << e.pos.z << "> of unit " << e.id;
+			msg << " (health " << ai->ccb->GetUnitHealth(e.id) << ") is out-of-bounds\n";
+		ai->GetLogger()->Log(msg.str());
+	}
+
+	const float threat = e.threat * scale;
+	const float rangeSq = e.range * e.range;
+
+	for (int myx = int(posx - e.range); myx < (posx + e.range); myx++) {
+		if (myx < 0 || myx >= width) {
+			continue;
+		}
+
+		for (int myy = int(posy - e.range); myy < (posy + e.range); myy++) {
+			if (myy < 0 || myy >= height) {
+				continue;
+			}
+
+			const int dxSq = (posx - myx) * (posx - myx);
+			const int dySq = (posy - myy) * (posy - myy);
+
+			if ((dxSq + dySq - 0.5) <= rangeSq) {
+				assert((myy * width + myx) < threatCellsRaw.size());
+				assert((myy * width + myx) < threatCellsVis.size());
+
+				// MicroPather cannot deal with negative costs
+				// (which may arise due to floating-point drift)
+				// nor with zero-cost nodes (see MP::SetMapData,
+				// threat is not used as an additive overlay)
+				threatCellsRaw[myy * width + myx] = std::max(threatCellsRaw[myy * width + myx] + threat, THREATVAL_BASE);
+				threatCellsVis[myy * width + myx] = std::max(threatCellsVis[myy * width + myx] + threat, THREATVAL_BASE);
+
+				currSumThreat += threat;
+			}
+		}
+	}
+
+	currAvgThreat = currSumThreat / area;
+}
+
+void CThreatMap::DelEnemyUnit(const EnemyUnit& e) {
+	AddEnemyUnit(e, -1.0f);
 }
 
 
 
 void CThreatMap::Update() {
-	for (int i = 0; i < TotalCells; i++) {
-		ThreatArray[i] = 0.0f;
+	currMaxThreat = 0.0f;
+
+	// account for moving units
+	for (std::map<int, EnemyUnit>::iterator it = enemyUnits.begin(); it != enemyUnits.end(); ++it) {
+		EnemyUnit& e = it->second;
+
+		DelEnemyUnit(e);
+			e.pos    = ai->ccb->GetUnitPos(e.id);
+			e.threat = GetEnemyUnitThreat(e);
+		AddEnemyUnit(e, 1.0f);
+
+		currMaxThreat = std::max(currMaxThreat, e.threat);
 	}
 
-	currMaxThreat = 0.0f; // maximum threat (normalizer)
-	currSumThreat = 0.0f; // threat summed over all cells
+	// TODO: staggered updates
+	if (threatMapTexID >= 0) {
+		if (currMaxThreat > 0.0f) {
+			for (int i = 0; i < area; i++) {
+				threatCellsVis[i] = (threatCellsRaw[i] - THREATVAL_BASE) / currMaxThreat;
+			}
 
-	const int numEnemies = ai->ccb->GetEnemyUnits(&ai->unitIDs[0]);
-
-	for (int i = 0; i < numEnemies; i++) {
-		AddEnemyUnit(ai->unitIDs[i]);
-	}
-
-	for (int i = 0; i < TotalCells; i++) {
-		currSumThreat += ThreatArray[i];
-		currMaxThreat = std::max(ThreatArray[i], currMaxThreat);
-	}
-
-	currAvgThreat = currSumThreat / TotalCells;
-
-
-	#if (LUA_THREATMAP_DEBUG == 1)
-	std::string luaDataStr;
-	std::stringstream luaDataStream;
-		luaDataStream << "local threatMapArray = GG.AIThreatMap;\n";
-	#endif
-
-	for (int i = 0; i < TotalCells; i++) {
-		#if (LUA_THREATMAP_DEBUG == 1)
-		luaDataStream << "threatMapArray[" << i << "]";
-		luaDataStream << " = ";
-		luaDataStream << ThreatArray[i];
-		luaDataStream << " / ";
-		luaDataStream << currMaxThreat;
-		luaDataStream << ";\n";
-		#endif
-
-		ThreatArray[i] += currAvgThreat; // ?
+			ai->cb->DebugDrawerUpdateOverlayTexture(threatMapTexID, &threatCellsVis[0], 0, 0, width, height);
+		}
 	}
 
 	#if (LUA_THREATMAP_DEBUG == 1)
-	luaDataStr = luaDataStream.str();
+	{
+		std::string luaDataStr;
+		std::stringstream luaDataStream;
+			luaDataStream << "local threatMapArray = GG.AIThreatMap;\n";
 
-	// note: the gadget would need to reset its threatmap table to stay
-	// in sync anyway (because the values are re-initialized to 0 here)
-	// if we were to only send the deltas, so just copy the entire map
-	ai->cb->CallLuaRules("[AI::KAIK::ThreatMap::Update]", -1, NULL);
-	ai->cb->CallLuaRules(luaDataStr.c_str(), -1, NULL);
+		// just copy the entire map
+		for (int i = 0; i < area; i++) {
+			luaDataStream << "threatMapArray[" << i << "]";
+			luaDataStream << " = ";
+			luaDataStream << (threatCellsRaw[i] - THREATVAL_BASE);
+			luaDataStream << " / ";
+			luaDataStream << currMaxThreat;
+			luaDataStream << ";\n";
+		}
+
+		luaDataStr = luaDataStream.str();
+
+		ai->cb->CallLuaRules("[AI::KAIK::ThreatMap::Update]", -1, NULL);
+		ai->cb->CallLuaRules(luaDataStr.c_str(), -1, NULL);
+	}
 	#endif
 }
 
 
-void CThreatMap::AddEnemyUnit(int unitID) {
-	const UnitDef* ud = ai->ccb->GetUnitDef(unitID);
+
+float CThreatMap::GetEnemyUnitThreat(const EnemyUnit& e) const {
+	const UnitDef* ud = ai->ccb->GetUnitDef(e.id);
 
 	// only unarmed units do not register on the threat-map
-	if (ud && !ud->weapons.empty()) {
-		const float3& pos = ai->ccb->GetUnitPos(unitID);
-		const int posx = int(pos.x / (8.0f * THREATRES));
-		const int posy = int(pos.z / (8.0f * THREATRES));
-
-		const float Range = (ai->ut->GetMaxRange(ud) + 100.0f) / (8.0f * THREATRES);
-		const float SQRange = Range * Range;
-
-		float DPS = ai->ut->GetDPS(ud);
-		float DPSmod = ai->ccb->GetUnitHealth(unitID) / ai->ccb->GetUnitMaxHealth(unitID);
-
-		if (DPS > 2000.0f)
-			DPS = 2000.0f;
-
-		for (int myx = int(posx - Range); myx < (posx + Range); myx++) {
-			if (myx >= 0 && myx < ThreatMapWidth) {
-				for (int myy = int(posy - Range); myy < (posy + Range); myy++) {
-					if ((myy >= 0) && (myy < ThreatMapHeight) && (((posx - myx) * (posx - myx) + (posy - myy) * (posy - myy) - 0.5) <= SQRange)) {
-						ThreatArray[myy * ThreatMapWidth + myx] += (DPS * DPSmod);
-					}
-				}
-			}
-		}
+	if (ud == NULL || ud->weapons.empty()) {
+		return 0.0f;
 	}
-}
 
-/*
-void CThreatMap::RemoveEnemyUnit(int unitid) {
-	float3 pos = ai->ccb->GetUnitPos(unitid);
-	int posx = int(pos.x / (8 * THREATRES));
-	int posy = int(pos.z / (8 * THREATRES));
+	const float dps = std::min(ai->ut->GetDPS(ud), 2000.0f);
+	const float dpsMod = ai->ccb->GetUnitHealth(e.id) / ai->ccb->GetUnitMaxHealth(e.id);
 
-	const UnitDef* Def = ai->ccb->GetUnitDef(unitid);
-	float Range = ai->ut->GetMaxRange(Def) / (8 * THREATRES);
-	float SQRange = Range * Range;
-	float DPS = ai->ut->GetDPS(Def);
-
-	for (int myx = int(posx - Range); myx < posx + Range; myx++) {
-		if (myx >= 0 && myx < ThreatMapWidth) {
-			for (int myy = int(posy - Range); myy < posy + Range; myy++) {
-				if ((myy >= 0) && (myy < ThreatMapHeight) && (((posx - myx) * (posx - myx) + (posy - myy) * (posy - myy)) <= SQRange)) {
-					ThreatArray[myy * ThreatMapWidth + myx] -= DPS;
-				}
-			}
-		}
-	}
-}
-*/
-
-float CThreatMap::GetAverageThreat() const {
-	return (currAvgThreat + 1.0f);
+	return (dps * dpsMod);
 }
 
 float CThreatMap::ThreatAtThisPoint(const float3& pos) const {
-	return ThreatArray[int(pos.z / (8 * THREATRES)) * ThreatMapWidth + int(pos.x / (8 * THREATRES))];
+	const int z = int(pos.z / (SQUARE_SIZE * THREATRES));
+	const int x = int(pos.x / (SQUARE_SIZE * THREATRES));
+	return (threatCellsRaw[z * width + x] - THREATVAL_BASE);
 }

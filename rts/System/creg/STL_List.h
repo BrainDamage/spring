@@ -1,9 +1,13 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef CR_LIST_TYPE_IMPL_H
 #define CR_LIST_TYPE_IMPL_H
 
-#include <list>
-
 #include "creg_cond.h"
+
+#ifdef USING_CREG
+
+#include <list>
 
 namespace creg {
 
@@ -45,5 +49,7 @@ namespace creg {
 	};
 };
 
+#endif // USING_CREG
 
-#endif
+#endif // CR_LIST_TYPE_IMPL_H
+

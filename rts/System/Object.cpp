@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// Object.cpp: implementation of the CObject class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include "Object.h"
 #include "mmgr.h"
@@ -73,7 +72,7 @@ void CObject::Serialize(creg::ISerializer *s)
 
 void CObject::PostLoad()
 {
-	for (std::list<CObject*>::iterator i=listening.begin();i!=listening.end();i++) {
+	for (std::list<CObject*>::iterator i=listening.begin();i!=listening.end();++i) {
 		m_setOwner(__FILE__, __LINE__, __FUNCTION__);
 		(*i)->listeners.insert((*i)->listeners.end(),this);
 	}

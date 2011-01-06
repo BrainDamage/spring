@@ -1,9 +1,5 @@
-/**
- * @file SyncedFloat3.h
- * @brief SyncedFloat3 header
- *
- * Declaration of SyncedFloat3 class
- */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef SYNCEDFLOAT3_H
 #define SYNCEDFLOAT3_H
 
@@ -13,6 +9,7 @@
 
 #include "lib/streflop/streflop_cond.h"
 #include "SyncedPrimitive.h"
+#include "FastMath.h" //SSE (I)SQRT
 
 /**
  * @brief SyncedFloat3 class
@@ -301,10 +298,16 @@ public:
 	 * checking each x/y/z component individually.
 	 */
 	inline bool operator== (const SyncedFloat3 &f) const {
-		return fabs(x-f.x) <= fabs(1.0E-4f*x) && fabs(y-f.y) <= fabs(1.0E-4f*y) && fabs(z-f.z) <= fabs(1.0E-4f*z);
+		return
+			streflop::fabs(x - f.x) <= streflop::fabs(1.0E-4f * x) &&
+			streflop::fabs(y - f.y) <= streflop::fabs(1.0E-4f * y) &&
+			streflop::fabs(z - f.z) <= streflop::fabs(1.0E-4f * z);
 	}
 	inline bool operator== (const float3 &f) const {
-		return fabs(x-f.x) <= fabs(1.0E-4f*x) && fabs(y-f.y) <= fabs(1.0E-4f*y) && fabs(z-f.z) <= fabs(1.0E-4f*z);
+		return
+			streflop::fabs(x - f.x) <= streflop::fabs(1.0E-4f * x) &&
+			streflop::fabs(y - f.y) <= streflop::fabs(1.0E-4f * y) &&
+			streflop::fabs(z - f.z) <= streflop::fabs(1.0E-4f * z);
 	}
 	inline friend bool operator== (const float3 &f, const SyncedFloat3 &g)  {
 		return g == f;
@@ -400,13 +403,13 @@ public:
 		const float dx = x - f.x;
 		const float dy = y - f.y;
 		const float dz = z - f.z;
-		return (float) sqrt(dx*dx + dy*dy + dz*dz);
+		return (float) math::sqrt(dx*dx + dy*dy + dz*dz);
 	}
 	inline float distance(const float3 &f) const{
 		const float dx = x - f.x;
 		const float dy = y - f.y;
 		const float dz = z - f.z;
-		return (float) sqrt(dx*dx + dy*dy + dz*dz);
+		return (float) math::sqrt(dx*dx + dy*dy + dz*dz);
 	}
 
 	/**
@@ -423,12 +426,12 @@ public:
 	inline float distance2D(const SyncedFloat3 &f) const{
 		const float dx = x - f.x;
 		const float dz = z - f.z;
-		return (float) sqrt(dx*dx + dz*dz);
+		return (float) math::sqrt(dx*dx + dz*dz);
 	}
 	inline float distance2D(const float3 &f) const{
 		const float dx = x - f.x;
 		const float dz = z - f.z;
-		return (float) sqrt(dx*dx + dz*dz);
+		return (float) math::sqrt(dx*dx + dz*dz);
 	}
 
 	/**
@@ -440,7 +443,7 @@ public:
 	 * square root for pythagorean theorem)
 	 */
 	inline float Length() const{
-		return (float) sqrt(x*x+y*y+z*z);
+		return (float) math::sqrt(x*x+y*y+z*z);
 	}
 
 	/**
@@ -452,7 +455,7 @@ public:
 	 * square root for pythagorean theorem)
 	 */
 	inline float Length2D() const{
-		return (float) sqrt(x*x+z*z);
+		return (float) math::sqrt(x*x+z*z);
 	}
 
 	/**
@@ -466,12 +469,10 @@ public:
 	{
 		// contrary to most other operations we can make this synced
 		// because the results are always written in the synced x,y,z components
-		const SyncedFloat L = sqrt(x*x + y*y + z*z);
-		if(L != 0.f){
-			const SyncedFloat invL = (float) 1.f / L;
-			x *= invL;
-			y *= invL;
-			z *= invL;
+		const SyncedFloat len = SqLength();
+		if(len != 0.f){
+			const SyncedFloat invL = math::isqrt(len);
+			*this *= invL;
 		}
 		return *this;
 	}

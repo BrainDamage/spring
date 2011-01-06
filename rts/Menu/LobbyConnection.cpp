@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifdef _MSC_VER
 #include "StdAfx.h"
 #endif
@@ -73,7 +75,7 @@ void LobbyConnection::Denied(const std::string& reason)
 	upwin->ServerLabel(reason);
 }
 
-void LobbyConnection::Aggreement(const std::string text)
+void LobbyConnection::Aggreement(const std::string& text)
 {
 	upwin->ShowAggreement(text);
 }

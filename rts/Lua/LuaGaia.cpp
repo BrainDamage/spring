@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaGaia.cpp: implementation of the CLuaGaia class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <cctype>
@@ -19,7 +18,7 @@
 #include "LuaWeaponDefs.h"
 #include "LuaOpenGL.h"
 
-#include "Rendering/UnitModels/UnitDrawer.h"
+#include "Rendering/UnitDrawer.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Units/Unit.h"
@@ -32,8 +31,6 @@
 
 
 CLuaGaia* luaGaia = NULL;
-
-string CLuaGaia::configString;
 
 static const char* LuaGaiaSyncedFilename   = "LuaGaia/main.lua";
 static const char* LuaGaiaUnsyncedFilename = "LuaGaia/draw.lua";
@@ -62,21 +59,11 @@ void CLuaGaia::FreeHandler()
 }
 
 
-bool CLuaGaia::SetConfigString(const string& cfg)
-{
-	configString = cfg;
-	if ((cfg == "0") || (cfg == "disabled")) {
-		return false;
-	}
-	return true;
-}
-
-
 /******************************************************************************/
 /******************************************************************************/
 
 CLuaGaia::CLuaGaia()
-: CLuaHandleSynced("LuaGaia", LUA_HANDLE_ORDER_GAIA, ".luagaia ")
+: CLuaHandleSynced("LuaGaia", LUA_HANDLE_ORDER_GAIA)
 {
 	luaGaia = this;
 
@@ -109,35 +96,17 @@ CLuaGaia::~CLuaGaia()
 
 bool CLuaGaia::AddSyncedCode()
 {
-	lua_getglobal(L, "Script");
-	LuaPushNamedCFunc(L, "GetConfigString", GetConfigString);
-	lua_pop(L, 1);
-
 	return true;
 }
 
 
 bool CLuaGaia::AddUnsyncedCode()
 {
-	lua_pushstring(L, "UNSYNCED");
-	lua_gettable(L, LUA_REGISTRYINDEX);
-	lua_pushstring(L, "Script");
-	lua_rawget(L, -2);
-	LuaPushNamedCFunc(L, "GetConfigString", GetConfigString);
-	lua_pop(L, 1);
+	/*lua_pushstring(L, "UNSYNCED");
+	lua_gettable(L, LUA_REGISTRYINDEX);*/
 
 	return true;
 }
-
-
-/******************************************************************************/
-
-int CLuaGaia::GetConfigString(lua_State* L)
-{
-	lua_pushlstring(L, configString.c_str(), configString.size());
-	return 1;
-}
-
 
 /******************************************************************************/
 /******************************************************************************/

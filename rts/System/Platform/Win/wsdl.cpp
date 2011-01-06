@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /* Copyright (C) 2009 Wildfire Games.
  * This file is part of 0 A.D.
  *
@@ -18,22 +20,23 @@
 /*
  * emulate SDL on Windows.
  */
-#include "GlobalUnsynced.h"
+
+#include "Rendering/GlobalRendering.h"
 #include <stdio.h>
 #include "wsdl.h"
 #include <queue>
 #include <algorithm>
 
-
 namespace wsdl
 {
 
 static HWND g_hWnd = (HWND)INVALID_HANDLE_VALUE;
+static int outstanding_press_events = 0;
 
-void SetHandle(HWND hWnd)
-{
-	g_hWnd = hWnd;
+void ResetMouseButtons() {
+	outstanding_press_events = 0;
 }
+
 
 static void queue_event(SDL_Event& ev)
 {
@@ -105,14 +108,9 @@ LRESULT OnActivate(HWND hWnd, UINT state, HWND hWndActDeact, BOOL fMinimized)
 
 Uint8 SDL_GetAppState()
 {
-	return app_state;
-}
-
-static void queue_quit_event()
-{
-	SDL_Event ev;
-	ev.type = SDL_QUIT;
-	queue_event(ev);
+	Uint8 sdl_app_state = ::SDL_GetAppState();
+	sdl_app_state &= ~(SDL_APPACTIVE | SDL_APPINPUTFOCUS); // we handle those ourself
+	return sdl_app_state | app_state;
 }
 
 
@@ -200,38 +198,13 @@ static bool GetCoords(int screen_x, int screen_y, int& x, int& y)
 			return false;
 	}
 
+	/* causes bigslowdown
 	if(WindowFromPoint(screen_pt) != g_hWnd)
-		return false;
+		return false;*/
 
 	x = client_pt.x;
 	y = client_pt.y;
 	return true;
-}
-
-void mouse_update()
-{
-	// window not created yet or already shut down. no sense reporting
-	// mouse position, and bail now to avoid ScreenToClient failing.
-	if (g_hWnd == 0 || g_hWnd == INVALID_HANDLE_VALUE)
-		return;
-
-	// don't use DirectInput, because we want to respect the user's mouse
-	// sensitivity settings. Windows messages are laggy, so query current
-	// position directly.
-	// note: GetCursorPos fails if the desktop is switched (e.g. after
-	// pressing Ctrl+Alt+Del), which can be ignored.
-	POINT screen_pt;
-	if(!GetCursorPos(&screen_pt))
-		return;
-	int x, y;
-	if(GetCoords(screen_pt.x, screen_pt.y, x, y))
-	{
-		active_change_state(GAIN, SDL_APPMOUSEFOCUS);
-		mouse_moved(x, y);
-	}
-	// moved outside of window
-	else
-		active_change_state(LOSE, SDL_APPMOUSEFOCUS);
 }
 
 
@@ -267,13 +240,14 @@ LRESULT OnMouseButton(HWND hWnd, UINT uMsg, int client_x, int client_y, UINT fla
 		button = SDL_BUTTON_MIDDLE;
 		state = SDL_RELEASED;
 		break;
+	default:
+		return 0;
 	}
 
 	//! mouse capture
-	if (!fullscreen) {
+	if (!globalRendering->fullScreen) {
 		const POINT screen_pt = ScreenFromClient(client_x, client_y);
 
-		static int outstanding_press_events = 0;
 		static SDL_GrabMode oldMode;
 		static bool saveMode = false;
 		if(state == SDL_PRESSED) {
@@ -312,7 +286,7 @@ LRESULT OnMouseButton(HWND hWnd, UINT uMsg, int client_x, int client_y, UINT fla
 		if(GetCoords(screen_pt.x, screen_pt.y, x, y))
 			queue_button_event(button, state, x, y);
 	} else {
-		//! no outside checking needed for fullscreen
+		//! no outside checking needed for full-screen
 		queue_button_event(button, state, client_x, client_y);
 	}
 
@@ -335,12 +309,29 @@ LRESULT OnMouseWheel(HWND hWnd, int screen_x, int screen_y, int zDelta, UINT fwK
 	return 0;	// handled
 }
 
+
+LRESULT OnMouseMotion(HWND hWnd, int x, int y, UINT flags)
+{
+	mouse_moved(x, y);
+	return 0;
+}
+
+
 void SDL_WarpMouse(int x, int y)
 {
 	const int client_x = x, client_y = y;
 	const POINT screen_pt = ScreenFromClient(client_x, client_y);
 	SetCursorPos(screen_pt.x, screen_pt.y);
-	mouse_x = screen_pt.x;
-	mouse_y = screen_pt.y;
+	mouse_x = x;
+	mouse_y = y;
+}
+
+
+//----------------------------------------------------------------------------
+// Framework initialization
+
+void Init(HWND hWnd)
+{
+	g_hWnd = hWnd;
 }
 }

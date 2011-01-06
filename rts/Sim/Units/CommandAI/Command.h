@@ -1,10 +1,12 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef COMMAND_H
 #define COMMAND_H
 
 #include <string>
 #include <vector>
 #include <limits.h> // for INT_MAX
-#include "creg/creg_cond.h"
+#include "System/creg/creg_cond.h"
 
 // cmds lower than 0 is reserved for build options (cmd -x = unitdefs[x])
 #define CMD_STOP                   0
@@ -89,6 +91,19 @@
 
 #define INTERNAL_ORDER  (DONT_REPEAT)
 
+enum {
+	MOVESTATE_NONE     = -1,
+	MOVESTATE_HOLDPOS  =  0,
+	MOVESTATE_MANEUVER =  1,
+	MOVESTATE_ROAM     =  2,
+};
+enum {
+	FIRESTATE_NONE       = -1,
+	FIRESTATE_HOLDFIRE   =  0,
+	FIRESTATE_RETURNFIRE =  1,
+	FIRESTATE_FIREATWILL =  2,
+};
+
 
 struct Command
 {
@@ -97,12 +112,39 @@ private:
 
 public:
 	Command():
+		id(0),
+		aiCommandId(-1),
 		options(0),
 		tag(0),
 		timeOut(INT_MAX) {}
+	~Command() { params.clear(); }
+
+	bool IsAreaCommand() const {
+		if (id == CMD_REPAIR ||
+			id == CMD_RECLAIM ||
+			id == CMD_CAPTURE ||
+			id == CMD_RESURRECT ||
+			id == CMD_LOAD_UNITS) {
+			// params[0..2] always holds the position, params[3] the radius
+			return (params.size() == 4);
+		}
+		if (id == CMD_UNLOAD_UNITS) {
+			return (params.size() == 5);
+		}
+		if (id == CMD_AREA_ATTACK) {
+			return true;
+		}
+
+		return false;
+	}
 
 	/// CMD_xxx code  (custom codes can also be used)
 	int id;
+	/**
+	 * AI Command callback id (passed in on handleCommand, returned
+	 * in CommandFinished event)
+	 */
+	int aiCommandId;
 	/// option bits
 	unsigned char options;
 	/// command parameters
@@ -116,9 +158,13 @@ public:
 	unsigned int tag;
 
 	/**
-	 * Remove this command after this frame
-	 * can only be set locally, not sent over net
+	 * Remove this command after this frame (absolute).
+	 * This can only be set locally and is not sent over the network.
 	 * (used for temporary orders)
+	 * Examples:
+	 * - 0
+	 * - MAX_INT
+	 * - currenFrame + 60
 	 */
 	int timeOut;
 };
@@ -130,6 +176,8 @@ private:
 
 public:
 	CommandDescription():
+		id(0),
+		type(CMDTYPE_ICON),
 		hidden(false),
 		disabled(false),
 		showUnique(false),

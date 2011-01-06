@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef WEAPON_H
 #define WEAPON_H
-// Weapon.h: interface for the CWeapon class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <list>
 
@@ -13,7 +12,6 @@
 class CUnit;
 class CWeaponProjectile;
 struct WeaponDef;
-class UnitDefWeapon;
 
 enum TargetType {
 	Target_None,
@@ -52,7 +50,7 @@ public:
 
 	void AimReady(int value);
 
-	bool ShouldCheckForNewTarget() const;
+	bool AllowWeaponTargetCheck() const;
 
 	void Fire();
 

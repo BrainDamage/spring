@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaConstGame.cpp: implementation of the LuaConstGame class.
-//
-//////////////////////////////////////////////////////////////////////
 #include "mmgr.h"
 
 #include "LuaConstGame.h"
@@ -42,12 +41,9 @@ static void LuaPushNamedColor(lua_State* L,
 
 bool LuaConstGame::PushEntries(lua_State* L)
 {
-
 	// FIXME  --  this is getting silly, convert to userdata?
 
 	const float gravity = -(mapInfo->map.gravity * GAME_SPEED * GAME_SPEED);
-	const bool limitDGun        = gameSetup ? gameSetup->limitDgun        : false;
-	const bool diminishingMMs   = gameSetup ? gameSetup->diminishingMMs   : false;
 	const bool ghostedBuildings = gameSetup ? gameSetup->ghostedBuildings : false;
 	const int  startPosType     = gameSetup ? gameSetup->startPosType     : 0;
 
@@ -64,12 +60,8 @@ bool LuaConstGame::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "gameSpeed",     GAME_SPEED);
 	LuaPushNamedNumber(L, "squareSize",    SQUARE_SIZE);
 
-	LuaPushNamedNumber(L, "gameMode",      gameSetup->gameMode);
 	LuaPushNamedNumber(L, "startPosType",  startPosType);
 
-	LuaPushNamedBool(L,   "commEnds",         (gameSetup->gameMode >= 1));
-	LuaPushNamedBool(L,   "limitDGun",        limitDGun);
-	LuaPushNamedBool(L,   "diminishingMetal", diminishingMMs);
 	LuaPushNamedBool(L,   "ghostedBuildings", ghostedBuildings);
 
 	const CMapInfo* mi = mapInfo;
@@ -79,7 +71,8 @@ bool LuaConstGame::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "windMin",             wind.GetMinWind());
 	LuaPushNamedNumber(L, "windMax",             wind.GetMaxWind());
 	LuaPushNamedString(L, "mapName",             mi->map.name);
-	LuaPushNamedString(L, "mapHumanName",        mi->map.humanName);
+	LuaPushNamedString(L, "mapHumanName",        mi->map.description); //! deprecated
+	LuaPushNamedString(L, "mapDescription",      mi->map.description);
 	LuaPushNamedNumber(L, "mapX",                readmap->width  / 64);
 	LuaPushNamedNumber(L, "mapY",                readmap->height / 64);
 	LuaPushNamedNumber(L, "mapSizeX",            readmap->width  * SQUARE_SIZE);
@@ -169,7 +162,7 @@ bool LuaConstGame::PushEntries(lua_State* L)
 	         archiveScanner->GetArchiveCompleteChecksum(modInfo.filename));
 	LuaPushNamedString(L, "modChecksum", buf);
 
-	const vector<string> cats =
+	const vector<string> &cats =
 		CCategoryHandler::Instance()->GetCategoryNames(~0);
 	lua_pushstring(L, "springCategories");
 	lua_newtable(L);

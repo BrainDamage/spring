@@ -13,11 +13,6 @@ class cUnitManager;
 #include "RAI.h"
 using std::map;
 using std::set;
-//#include "LogFile.h"
-//#include "ExternalAI/IAICallback.h"
-//#include "Sim/Units/UnitDef.h"
-//#include "Sim/Weapons/WeaponDefHandler.h"
-//#include <map>
 
 struct sRAIGroupMilitary
 {
@@ -60,6 +55,8 @@ struct sRAIGroup
 //	UnitInfo* Engineer;
 };
 
+#define SCOUT_POSITON_LIST_SIZE 20
+#define RAI_GROUP_SIZE 25
 class cUnitManager
 {
 public:
@@ -82,7 +79,7 @@ public:
 
 //	bool AssaultScouts;
 
-	sRAIGroup* Group[25];
+	sRAIGroup* Group[RAI_GROUP_SIZE];
 //	sRAIGroup* Commander;
 	int GroupSize;
 private:
@@ -111,11 +108,14 @@ private:
 		int ScoutID;
 		float3 position;
 	};
-	sScoutPosition *SL[20];
+	sScoutPosition *SL[SCOUT_POSITON_LIST_SIZE];
 	int SLSize;
 	struct sScoutUnitInfo
 	{
-		sScoutUnitInfo() { ScoutLocAssigned=false; };
+		sScoutUnitInfo() {
+			ScoutLocAssigned=false; 
+			SL = NULL;
+		};
 		sScoutPosition *SL;
 		bool ScoutLocAssigned;
 	};

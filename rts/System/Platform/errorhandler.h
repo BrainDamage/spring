@@ -1,27 +1,32 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /**
- * @file errorhandler.h
  * @brief error messages
- * @author Christopher Han <xiphux@gmail.com>
- * @author Tobi Vollebregt <tobivollebregt@gmail.com>
- * @author Robin Vobruba <hoijui.quaero@gmail.com>
- *
- * Error handling based on platform
- * Copyright (C) 2005.  Licensed under the terms of the
- * GNU GPL, v2 or later.
+ * Platform specific error handling
  */
+
 #ifndef ERRORHANDLER_H
 #define ERRORHANDLER_H
 
 #include <string>
+#include <boost/system/system_error.hpp>
+#include "Exceptions.h"
 
-#define MBF_OK		1
-#define MBF_INFO	2
-#define MBF_EXCL	4
+#define MBF_OK    1
+#define MBF_INFO  2
+#define MBF_EXCL  4
+#define MBF_MAIN  8
 
 #if defined __GNUC__ && (__GNUC__ >= 4)
-	#define NO_RETURN __attribute__ ((noreturn))
+	#define NO_RETURN_POSTFIX __attribute__ ((noreturn))
 #else
-	#define NO_RETURN
+	#define NO_RETURN_POSTFIX
+#endif
+
+#if defined _MSC_VER
+	#define NO_RETURN_PREFIX __declspec(noreturn)
+#else
+	#define NO_RETURN_PREFIX
 #endif
 
 // legacy support define
@@ -36,15 +41,40 @@
  *                 - MB_EXCL : Warning
  *                 - MB_INFO : Info
  */
-void ErrorMessageBox(const char* msg, const char* caption, unsigned int flags) NO_RETURN;
+NO_RETURN_PREFIX void ErrorMessageBox(const std::string& msg, const std::string& caption, unsigned int flags = MBF_OK) NO_RETURN_POSTFIX;
+
 
 /**
- * Will pop up an error message window and exit (C++ version).
- * @see ErrorMessageBox(const char* msg, const char* caption, unsigned int flags)
+ * Spring's common error handler.
  */
-inline void ErrorMessageBox(const std::string& msg, const std::string& caption, unsigned int flags = MBF_OK)
-{
-	ErrorMessageBox(msg.c_str(), caption.c_str(), flags);
-};
+#ifdef NO_CATCH_EXCEPTIONS
+	#define CATCH_SPRING_ERRORS \
+		catch (const content_error& e) {                                                        \
+			ErrorMessageBox(e.what(), "Incorrect/Missing content:", MBF_OK | MBF_EXCL);     \
+		}                                                                                       \
+		catch (const opengl_error& e) {                                                         \
+			ErrorMessageBox(e.what(), "OpenGL content:", MBF_OK | MBF_EXCL);                \
+		}
+#else
+	#define CATCH_SPRING_ERRORS \
+		catch (const content_error& e) {                                                        \
+			ErrorMessageBox(e.what(), "Incorrect/Missing content:", MBF_OK | MBF_EXCL);     \
+		}                                                                                       \
+		catch (const opengl_error& e) {                                                         \
+			ErrorMessageBox(e.what(), "OpenGL content:", MBF_OK | MBF_EXCL);                \
+		}                                                                                       \
+		catch (const boost::system::system_error& e) {                                          \
+			std::stringstream ss;                                                           \
+			ss << e.code().value() << ": " << e.what();                                     \
+			std::string tmp = ss.str();                                                     \
+			ErrorMessageBox(tmp, "Fatal Error", MBF_OK | MBF_EXCL);                         \
+		}                                                                                       \
+		catch (const std::exception& e) {                                                       \
+			ErrorMessageBox(e.what(), "Fatal Error", MBF_OK | MBF_EXCL);                    \
+		}                                                                                       \
+		catch (const char* e) {                                                                 \
+			ErrorMessageBox(e, "Fatal Error", MBF_OK | MBF_EXCL);                           \
+		}
+#endif
 
 #endif // ERRORHANDLER_H

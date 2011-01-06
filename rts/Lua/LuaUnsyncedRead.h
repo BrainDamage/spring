@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_UNSYNCED_INFO_H
 #define LUA_UNSYNCED_INFO_H
-// LuaUnsyncedRead.h: interface for the LuaUnsyncedRead class.
-//
-//////////////////////////////////////////////////////////////////////
 
 struct lua_State;
 
@@ -40,6 +39,7 @@ class LuaUnsyncedRead {
 		static int GetUnitNoDraw(lua_State* L);
 		static int GetUnitNoMinimap(lua_State* L);
 		static int GetUnitNoSelect(lua_State* L);
+		static int GetFeatureLuaDraw(lua_State* L);
 
 		static int GetUnitTransformMatrix(lua_State* L);
 		static int GetUnitViewPosition(lua_State* L);

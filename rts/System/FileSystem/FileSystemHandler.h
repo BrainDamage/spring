@@ -1,5 +1,7 @@
-#ifndef FILESYSTEMHANDLER_H
-#define FILESYSTEMHANDLER_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef FILE_SYSTEM_HANDLER_H
+#define FILE_SYSTEM_HANDLER_H
 
 #include <vector>
 #include <string>
@@ -11,12 +13,13 @@
  */
 class FileSystemHandler
 {
+	~FileSystemHandler();
+	FileSystemHandler();
+
 public:
 	static FileSystemHandler& GetInstance();
 	static void Initialize(bool verbose);
 	static void Cleanup();
-
-	void Initialize();
 
 	// almost direct wrappers to system calls
 	static bool mkdir(const std::string& dir);
@@ -28,12 +31,72 @@ public:
 
 	static std::string GetCwd();
 	static void Chdir(const std::string& dir);
+
+	/**
+	 * Removes "./" or ".\" from the start of a path string.
+	 */
+	static std::string RemoveLocalPathPrefix(const std::string& path);
+
 	/**
 	 * Returns true if path matches regex ...
 	 * on windows:          ^[a-zA-Z]\:[\\/]?$
 	 * on all other systems: ^/$
 	 */
 	static bool IsFSRoot(const std::string& path);
+
+	/**
+	 * Returns true if the supplied char is a path separator,
+	 * that is either '\' or '/'.
+	 */
+	static bool IsPathSeparator(char aChar);
+
+	/**
+	 * Returns true if the supplied char is a platform native path separator,
+	 * that is '\' on windows and '/' on POSIX.
+	 */
+	static bool IsNativePathSeparator(char aChar);
+
+	/**
+	 * Returns true if the path ends with the platform native path separator.
+	 * That is '\' on windows and '/' on POSIX.
+	 */
+	static bool HasPathSepAtEnd(const std::string& path);
+
+	/**
+	 * Ensures the path ends with the platform native path separator.
+	 * Converts the empty string to ".\" or "./" respectively.
+	 * @see #HasPathSepAtEnd()
+	 */
+	static void EnsurePathSepAtEnd(std::string& path);
+	/// @see #EnsurePathSepAtEnd(std::string&)
+	static std::string EnsurePathSepAtEnd(const std::string& path);
+
+	/**
+	 * Ensures the path does not end with the platform native path separator.
+	 * @see #HasPathSepAtEnd()
+	 */
+	static void EnsureNoPathSepAtEnd(std::string& path);
+	/// @see #EnsureNoPathSepAtEnd(std::string&)
+	static std::string EnsureNoPathSepAtEnd(const std::string& path);
+
+	/**
+	 * Ensures the path does not end with a path separator.
+	 */
+	static std::string StripTrailingSlashes(const std::string& path);
+
+	/**
+	 * Returns the path to the parent of the given path element.
+	 * @return the paths parent, including the trailing path separator,
+	 *         or "" on error
+	 */
+	static std::string GetParent(const std::string& path);
+
+	/**
+	 * @brief get filesize
+	 *
+	 * @return the files size or 0, if the file does not exist.
+	 */
+	static size_t GetFileSize(const std::string& file);
 
 	// custom functions
 	/**
@@ -65,6 +128,9 @@ public:
 	 *          (relative path) on failure
 	 */
 	std::string LocateFile(const std::string& file) const;
+	/**
+	 * @brief returns the highest priority writable directory, aka the writedir
+	 */
 	std::string GetWriteDir() const;
 	std::vector<std::string> GetDataDirectories() const;
 
@@ -72,9 +138,6 @@ public:
 	static bool IsAbsolutePath(const std::string& path);
 
 private:
-	~FileSystemHandler();
-	FileSystemHandler();
-
 	/**
 	 * @brief internal find-files-in-a-single-datadir-function
 	 * @param absolute paths to the dirs found will be added to this
@@ -94,4 +157,4 @@ private:
 	static const int native_path_separator;
 };
 
-#endif // !FILESYSTEMHANDLER_H
+#endif // !FILE_SYSTEM_HANDLER_H

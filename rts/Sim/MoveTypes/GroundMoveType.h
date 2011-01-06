@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef GROUNDMOVETYPE_H
 #define GROUNDMOVETYPE_H
 
@@ -12,7 +14,7 @@ class CGroundMoveType : public AMoveType
 
 public:
 	CGroundMoveType(CUnit* owner);
-	~CGroundMoveType(void);
+	~CGroundMoveType();
 
 	void PostLoad();
 
@@ -25,16 +27,15 @@ public:
 	void StartMoving(float3 pos, float goalRadius, float speed);
 	void StopMoving();
 
-	virtual void SetMaxSpeed(float speed);
+	void SetMaxSpeed(float speed);
 
-	void ImpulseAdded(void);
+	void ImpulseAdded();
 
 	void KeepPointingTo(float3 pos, float distance, bool aggressive);
 	void KeepPointingTo(CUnit* unit, float distance, bool aggressive);
 
-	bool OnSlope(void);
+	bool OnSlope();
 
-	float baseTurnRate;
 	float turnRate;
 	float accRate;
 	float decRate;
@@ -45,43 +46,35 @@ public:
 	float deltaSpeed;
 	short int deltaHeading;
 
-	float3 oldPos;
-	float3 oldSlowUpdatePos;
 	float3 flatFrontDir;
+	float3 waypointDir;
 
 	unsigned int pathId;
 	float goalRadius;
 
 	SyncedFloat3 waypoint;
 	SyncedFloat3 nextWaypoint;
-	/// by this time it really should have gotten there genereate new path otherwise
-	int etaWaypoint;
-	/// by this time we get suspicious, check if goal is clogged if we are close
-	int etaWaypoint2;
+
 	bool atGoal;
 	bool haveFinalWaypoint;
-	float terrainSpeed;
 
+	float terrainSpeed;
 	float requestedSpeed;
 	short requestedTurnRate;
 
 	float currentDistanceToWaypoint;
 
-	float3 avoidanceVec;
-
 	unsigned int restartDelay;
 	float3 lastGetPathPos;
 
-	unsigned int pathFailures;
 	/// how many times we havent gotten to a waypoint in time
 	unsigned int etaFailures;
 	/// how many times we have requested a path from the same place
 	unsigned int nonMovingFailures;
 
-	bool floatOnWater;
-
 	int moveSquareX;
 	int moveSquareY;
+
 protected:
 	int nextDeltaSpeedUpdate;
 	int nextObstacleAvoidanceUpdate;
@@ -97,36 +90,32 @@ protected:
 	float BreakingDistance(float speed);
 	float3 Here();
 
-	float MinDistanceToWaypoint();
-	float MaxDistanceToWaypoint();
-
 	void StartEngine();
 	void StopEngine();
 
 	void Arrived();
 	void Fail();
-	void CheckCollision(void);
+	void HandleObjectCollisions();
 
 	void ChangeHeading(short wantedHeading);
 
-	void UpdateSkid(void);
-	void UpdateControlledDrop(void);
-	void CheckCollisionSkid(void);
-	float GetFlyTime(float3 pos, float3 speed);
-	void CalcSkidRot(void);
+	void UpdateSkid();
+	void UpdateControlledDrop();
+	void CheckCollisionSkid();
+	void CalcSkidRot();
 
+	float GetGroundHeight(const float3&) const;
 	void AdjustPosToWaterLine();
 	bool UpdateDirectControl();
 	void UpdateOwnerPos(bool);
 	bool WantReverse(const float3&) const;
 
-	unsigned int lastHeatRequestFrame;
-	unsigned int RequestPath(float3 startPos, float3 goalPos, float goalRadius = 8);
-	void UpdateHeatMap();
-
 	bool skidding;
 	bool flying;
 	bool reversing;
+	bool idling;
+	bool canReverse;
+
 	float skidRotSpeed;
 	float dropSpeed;
 	float dropHeight;
@@ -136,24 +125,23 @@ protected:
 	float skidRotPos2;
 	CSolidObject::PhysicalState oldPhysState;
 
-	bool CheckColH(int x, int y1, int y2, float xmove, int squareTestX);
-	bool CheckColV(int y, int x1, int x2, float zmove, int squareTestY);
-
-	static std::vector<int2> (*lineTable)[11];
+	// number of grid-cells along each dimension; should be an odd number
+	static const int LINETABLE_SIZE = 11;
+	static std::vector<int2> lineTable[LINETABLE_SIZE][LINETABLE_SIZE];
 
 	float3 mainHeadingPos;
 	bool useMainHeading;
 	void SetMainHeading();
 
 public:
-	static void CreateLineTable(void);
-	static void DeleteLineTable(void);
-	void TestNewTerrainSquare(void);
-	bool CheckGoalFeasability(void);
-	virtual void LeaveTransport(void);
+	static void CreateLineTable();
+	static void DeleteLineTable();
 
-	void StartSkidding(void);
-	void StartFlying(void);
+	void TestNewTerrainSquare();
+	void LeaveTransport();
+
+	void StartSkidding();
+	void StartFlying();
 
 	bool IsSkidding() const { return skidding; }
 	bool IsFlying() const { return flying; }

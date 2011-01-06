@@ -1,13 +1,18 @@
-#ifndef COMMONDEFHANDLER_H
-#define COMMONDEFHANDLER_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef COMMON_DEF_HANDLER_H
+#define COMMON_DEF_HANDLER_H
 
 #include <string>
 
 class CommonDefHandler
 {
 public:
-	/// Loads a soundfile, does add sounds/ and wav extension if necessary
+	/**
+	 * Loads a soundfile, does add "sounds/" prefix
+	 * and ".wav" extension if necessary.
+	 */
 	int LoadSoundFile(const std::string& fileName);
 };
 
-#endif
+#endif // COMMON_DEF_HANDLER

@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef __GAME_SETUP_H__
 #define __GAME_SETUP_H__
 
@@ -12,14 +14,6 @@
 #include "ExternalAI/SkirmishAIData.h"
 
 class TdfParser;
-
-namespace GameMode
-{
-	const int ComContinue = 0;
-	const int ComEnd = 1;
-	const int Lineage = 2;
-	const int OpenEnd = 3;
-};
 
 class CGameSetup
 {
@@ -54,8 +48,6 @@ public:
 	std::string mapName;
 	std::string modName;
 	bool useLuaGaia;
-	std::string luaGaiaStr;
-	std::string luaRulesStr;
 
 	std::string gameSetupText;
 
@@ -79,12 +71,13 @@ public:
 	int maxUnits;
 
 	bool ghostedBuildings;
-	bool limitDgun;
-	bool diminishingMMs;
 	bool disableMapDamage;
 
 	float maxSpeed;
 	float minSpeed;
+
+	/** if true, this is a non-network game (one local client, eg. when watching a demo) */
+	bool onlyLocal;
 
 	bool hostDemo;
 	std::string demoName;
@@ -94,7 +87,13 @@ public:
 
 	int mapgenSeed;
 
-	int gameMode;
+	/**
+	 * The number of seconds till the game starts,
+	 * counting from the moment when all players are connected and ready.
+	 * Default: 4 (seconds)
+	 */
+	unsigned int gameStartDelay;
+
 	int noHelperAIs;
 
 private:

@@ -1,10 +1,12 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef MOVEINFO_H
 #define MOVEINFO_H
 
 #include <vector>
 #include <map>
 #include <string>
-#include "creg/creg_cond.h"
+#include "System/creg/creg_cond.h"
 #include "Sim/Misc/GlobalConstants.h"
 
 class CMoveMath;
@@ -19,7 +21,8 @@ struct MoveData {
 		maxSpeed        = udefMD? udefMD->maxSpeed / GAME_SPEED:   0.0f;
 		maxTurnRate     = udefMD? (short int) udefMD->maxTurnRate: 0;
 
-		size            = udefMD? udefMD->size:                    0;
+		xsize           = udefMD? udefMD->xsize:                   0;
+		zsize           = udefMD? udefMD->zsize:                   0;
 		depth           = udefMD? udefMD->depth:                   0.0f;
 		maxSlope        = udefMD? udefMD->maxSlope:                0.0f;
 		slopeMod        = udefMD? udefMD->slopeMod:                0.0f;
@@ -68,7 +71,8 @@ struct MoveData {
 	bool followGround;
 
 	/// of the footprint
-	int size;
+	int xsize;
+	int zsize;
 	/// minWaterDepth for ships, maxWaterDepth otherwise
 	float depth;
 	float maxSlope;

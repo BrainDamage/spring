@@ -1,6 +1,5 @@
-// Sky.cpp: implementation of the CBasicSky class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifdef _MSC_VER
 #pragma warning(disable:4258)
 #endif
@@ -14,6 +13,7 @@
 #include "Game/Camera.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "TimeProfiler.h"
 #include "ConfigHandler.h"
@@ -34,8 +34,6 @@
 
 CBasicSky::CBasicSky()
 {
-	PrintLoadMsg("Creating sky");
-
 	randMatrix=newmat3<int>(16,32,32);
 	rawClouds=newmat2<int>(CLOUD_SIZE,CLOUD_SIZE);
 	blendMatrix=newmat3<int>(CLOUD_DETAIL,32,32);
@@ -64,7 +62,7 @@ CBasicSky::CBasicSky()
 	skyColor = mapInfo->atmosphere.skyColor;
 	sunColor = mapInfo->atmosphere.sunColor;
 	fogStart = mapInfo->atmosphere.fogStart;
-	if (fogStart>0.99f) gu->drawFog = false;
+	if (fogStart>0.99f) globalRendering->drawFog = false;
 
 	for(int a=0;a<CLOUD_DETAIL;a++)
 		cloudDown[a]=false;
@@ -262,10 +260,10 @@ void CBasicSky::Draw()
 
 	glFogfv(GL_FOG_COLOR,mapInfo->atmosphere.fogColor);
 	glFogi(GL_FOG_MODE,GL_LINEAR);
-	glFogf(GL_FOG_START,gu->viewRange*fogStart);
-	glFogf(GL_FOG_END,gu->viewRange);
+	glFogf(GL_FOG_START,globalRendering->viewRange*fogStart);
+	glFogf(GL_FOG_END,globalRendering->viewRange);
 	glFogf(GL_FOG_DENSITY,1.00f);
-	if (gu->drawFog) {
+	if (globalRendering->drawFog) {
 		glEnable(GL_FOG);
 	} else {
 		glDisable(GL_FOG);
@@ -366,7 +364,7 @@ inline void CBasicSky::UpdatePart(int ast, int aed, int a3cstart, int a4cstart) 
 
 	int yam2 = ydif[(ast - 2) & CLOUD_MASK];
 	int yam1 = ydif[(ast - 1) & CLOUD_MASK];
-	int yaa  = ydif[(ast) & CLOUD_MASK];
+	int yaa  = ydif[(ast)     & CLOUD_MASK];
 	int ap1 = (ast + 1) & CLOUD_MASK;
 
 	aed = aed * 4 + 3;
@@ -378,12 +376,19 @@ inline void CBasicSky::UpdatePart(int ast, int aed, int a3cstart, int a4cstart) 
 	for (int a = ast; a < aed; ++rc, ++ct) {
 		int yap1 = ydif[ap1] += (int) cloudThickness[a3c += 4] - cloudThickness[a += 4] * 2 + cloudThickness[a4c += 4];
 
-		int dif = (yam2 >> 2) +
-			((yam2 = yam1) >> 1) +
-			(yam1 = yaa) +
-			((yaa = yap1) >> 1) +
-			(ydif[(++ap1) &= CLOUD_MASK] >> 2);
+		ap1++;
+		ap1 = (ap1 & CLOUD_MASK);
+		int dif =
+			(yam2 >> 2) +
+			(yam1 >> 1) +
+			(yaa) +
+			(yap1 >> 1) +
+			(ydif[ap1] >> 2);
 		dif >>= 4;
+
+		yam2 = yam1;
+		yam1 = yaa;
+		yaa  = yap1;
 
 		*ct++ = 128 + dif;
 		*ct++ = thicknessTransform[(*rc) >> 7];
@@ -405,10 +410,10 @@ void CBasicSky::Update()
 	switch(updatepart) { // smoothen out the workload across draw frames
 	case 0: {
 		for(int a=0; a<CLOUD_DETAIL; a++) {
-			float fade=(gs->frameNum/(70.0f*(2<<(CLOUD_DETAIL-1-a))));
-			fade-=floor(fade/2)*2;
+			float fade = gs->frameNum / (70.0f * (2<<(CLOUD_DETAIL-1-a)));
+			fade -= floor(fade/2)*2;
 			if(fade>1) {
-				fade=2-fade;
+				fade = 2 - fade;
 				if(!cloudDown[a]) {
 					cloudDown[a]=true;
 					CreateRandMatrix(randMatrix[a+8],1-a*0.03f);
@@ -467,7 +472,7 @@ void CBasicSky::Update()
 			int blend=bm[by&31][31&31], **prcy=prc, *pkernel=kernel;
 			for(int y2=0; y2<cs4a; ++y2, ++prcy, pkernel+=CLOUD_SIZE/4) {
 				int *prcx=(*prcy)+cmcs8a, *pkrn=pkernel;
-				for(int x2=cmcs8a; x2<std::min(CLOUD_SIZE, cs4a+cmcs8a); ++x2)
+				for(int x2=cmcs8a; x2 < std::min(CLOUD_SIZE, cs4a+cmcs8a); ++x2)
 					(*prcx++)+=blend*(*pkrn++); // prcx = rawClouds[y2+y][x2+cmcs8a], x2<CLOUD_SIZE
 				prcx-=CLOUD_SIZE;
 				for(int x2=std::max(CLOUD_SIZE,cmcs8a); x2<cs4a+cmcs8a; ++x2)
@@ -488,15 +493,22 @@ void CBasicSky::Update()
 		for(int a=0;a<CLOUD_SIZE*CLOUD_SIZE;a++)
 			cloudThickness[a*4+3]=alphaTransform[rawClouds[0][a]>>7];
 
-		cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+3]=alphaTransform[rawClouds[0][0]>>7];
+		cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+3] = alphaTransform[rawClouds[0][0]>>7];
 		// next line unused
-		cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+0]=cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+1]=cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+2]=0;
+		cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+0] = 0;
+		cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+1] = 0;
+		cloudThickness[CLOUD_SIZE*CLOUD_SIZE*4+2] = 0;
 
-		//create the cloud shading
-		for(int a=0, a4=3; a<CLOUD_SIZE; ++a, a4+=4) {
-			ydif[a]=(int)cloudThickness[(a4+3*CLOUD_SIZE*4)] + cloudThickness[(a4+2*CLOUD_SIZE*4)] + cloudThickness[(a4+1*CLOUD_SIZE*4)] + 
-				cloudThickness[(a4+0*CLOUD_SIZE*4)] - cloudThickness[(a4+(CLOUD_SIZE-1)*CLOUD_SIZE*4)] - 
-				cloudThickness[(a4+CLOUD_SIZE*(CLOUD_SIZE-2)*4)] - cloudThickness[(a4+CLOUD_SIZE*(CLOUD_SIZE-3)*4)];
+		// create the cloud shading
+		for (int a = 0, a4 = 3; a < CLOUD_SIZE; ++a, a4 += 4) {
+			ydif[a] =
+				(int)cloudThickness[(a4+3*CLOUD_SIZE*4)]
+				+    cloudThickness[(a4+2*CLOUD_SIZE*4)]
+				+    cloudThickness[(a4+1*CLOUD_SIZE*4)]
+				+    cloudThickness[(a4+0*CLOUD_SIZE*4)]
+				-    cloudThickness[(a4+(CLOUD_SIZE-1)*CLOUD_SIZE*4)]
+				-    cloudThickness[(a4+CLOUD_SIZE*(CLOUD_SIZE-2)*4)]
+				-    cloudThickness[(a4+CLOUD_SIZE*(CLOUD_SIZE-3)*4)];
 		}
 
 		ydif[0] += cloudThickness[(0+CLOUD_SIZE*(CLOUD_SIZE-3))*4+3] - cloudThickness[0*4+3]*2 + cloudThickness[(0+4*CLOUD_SIZE)*4+3];
@@ -516,13 +528,13 @@ void CBasicSky::Update()
 	}
 	case CLOUD_DETAIL+5: {
 		/*
-		for(int a=0; a<CLOUD_SIZE; ++a) {
-		cloudThickness[((int(48+camera->pos.z*CLOUD_SIZE*0.000025f)%256)*CLOUD_SIZE+a)*4+3]=0;
+		for (int a = 0; a < CLOUD_SIZE; ++a) {
+			cloudThickness[((int(48+camera->pos.z*CLOUD_SIZE*0.000025f)%256)*CLOUD_SIZE+a)*4+3]=0;
 		}
-		for(int a=0; a<CLOUD_SIZE; ++a) {
-		cloudThickness[(a*CLOUD_SIZE+int(gs->frameNum*0.00009f*256+camera->pos.x*CLOUD_SIZE*0.000025f))*4+3]=0;
+		for (int a = 0; a < CLOUD_SIZE; ++a) {
+			cloudThickness[(a*CLOUD_SIZE+int(gs->frameNum*0.00009f*256+camera->pos.x*CLOUD_SIZE*0.000025f))*4+3]=0;
 		}
-		/**/
+		*/
 		glBindTexture(GL_TEXTURE_2D, cloudDot3Tex);
 		glTexSubImage2D(GL_TEXTURE_2D,0, 0,0,CLOUD_SIZE, CLOUD_SIZE,GL_RGBA, GL_UNSIGNED_BYTE, cloudThickness);
 		break;
@@ -684,7 +696,7 @@ void CBasicSky::InitSun()
 			glVertexf3(modSunDir*5+ldir*dx*4+udir*dy*4);
 		}
 		glEnd();
-		if (gu->drawFog) glEnable(GL_FOG);
+		if (globalRendering->drawFog) glEnable(GL_FOG);
 
 	glEndList();
 }

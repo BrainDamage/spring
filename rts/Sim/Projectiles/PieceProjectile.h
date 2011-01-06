@@ -1,5 +1,7 @@
-#ifndef PIECEPROJECTILE_H
-#define PIECEPROJECTILE_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef PIECE_PROJECTILE_H
+#define PIECE_PROJECTILE_H
 
 #include "Projectile.h"
 #include "Sim/Misc/DamageArray.h"
@@ -26,14 +28,33 @@ class CPieceProjectile: public CProjectile
 
 	void creg_Serialize(creg::ISerializer& s);
 
-	int flags;
-	int dispList;
-	S3DOPiece* piece3do;
-	SS3OPiece* pieces3o;
-	S3DModelPiece* omp;
+public:
+	CPieceProjectile(const float3& pos, const float3& speed, LocalModelPiece* piece, int flags, CUnit* owner, float radius);
+	virtual ~CPieceProjectile();
+
+	void Update();
+	void Draw();
+	virtual void DrawOnMinimap(CVertexArray& lines, CVertexArray& points);
+	void Collision();
+	void Collision(CUnit* unit);
+
+	void DrawCallback();
+
+private:
+	bool HasVertices() const;
+	float3 RandomVertexPos();
+
+public:
+	unsigned int flags;
+	unsigned int dispList;
+	unsigned int cegID;
+
+	const S3DModelPiece* omp;
+
 	float3 spinVec;
 	float spinSpeed;
 	float spinAngle;
+
 	float alphaThreshold;
 
 	float3 oldSmoke, oldSmokeDir;
@@ -42,33 +63,13 @@ class CPieceProjectile: public CProjectile
 	int* numCallback;
 	int age;
 
-	CCustomExplosionGenerator ceg;
-
 	struct OldInfo {
 		float3 pos;
 		float size;
 	};
 	OldInfo* oldInfos[8];
+
 	int colorTeam;
-
-public:
-	CPieceProjectile(const float3& pos, const float3& speed, LocalModelPiece* piece, int flags, CUnit* owner, float radius GML_PARG_H);
-	virtual ~CPieceProjectile(void);
-	void Update();
-	void Draw();
-	virtual void DrawOnMinimap(CVertexArray& lines, CVertexArray& points);
-	void Collision();
-	void Collision(CUnit* unit);
-
-	void DrawUnitPart(void);
-	void DrawCallback(void);
-
-	// should not be here
-	void DrawS3O(void);
-private:
-	bool HasVertices();
-	float3 RandomVertexPos();
 };
 
-
-#endif /* PIECEPROJECTILE_H */
+#endif /* PIECE_PROJECTILE_H */

@@ -1,23 +1,25 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_HANDLE_SYNCED
 #define LUA_HANDLE_SYNCED
-// LuaHandleSynced.h: interface for the CLuaHandleSynced class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <map>
 #include <string>
 using std::map;
 using std::string;
 
-
 #include "LuaHandle.h"
-
+#include "LuaRulesParams.h"
 
 struct lua_State;
-
+class LuaSyncedCtrl;
 
 class CLuaHandleSynced : public CLuaHandle
 {
+	public:
+		static const LuaRulesParams::Params&  GetGameParams() {return gameParams;};
+		static const LuaRulesParams::HashMap& GetGameParamsMap() {return gameParamsMap;};
+
 	public:
 		bool Initialize(const string& syncData);
 		string GetSyncData();
@@ -29,7 +31,6 @@ class CLuaHandleSynced : public CLuaHandle
 		virtual bool SyncedUpdateCallIn(const string& name);
 		virtual bool UnsyncedUpdateCallIn(const string& name);
 
-		void GameFrame(int frameNumber);
 		bool GotChatMsg(const string& msg, int playerID);
 		bool RecvLuaMsg(const string& msg, int playerID);
 		void RecvFromSynced(int args); // not an engine call-in
@@ -44,7 +45,7 @@ class CLuaHandleSynced : public CLuaHandle
 		int UnsyncedXCall(lua_State* srcState, const string& funcName);
 
 	protected:
-		CLuaHandleSynced(const string& name, int order, const string& msgPrefix);
+		CLuaHandleSynced(const string& name, int order);
 		virtual ~CLuaHandleSynced();
 		void Init(const string& syncedFile,
 		          const string& unsyncedFile,
@@ -71,9 +72,7 @@ class CLuaHandleSynced : public CLuaHandle
 		}
 
 	protected:
-		const string messagePrefix;
 		bool allowChanges;
-		bool allowUnsafeChanges;
 		bool teamsLocked; // disables CallAsTeam()
 		map<string, string> textCommands; // name, help
 
@@ -93,6 +92,12 @@ class CLuaHandleSynced : public CLuaHandle
 
 		static int GetWatchWeapon(lua_State* L);
 		static int SetWatchWeapon(lua_State* L);
+
+	private:
+		//FIXME: add to CREG?
+		static LuaRulesParams::Params  gameParams;
+		static LuaRulesParams::HashMap gameParamsMap;
+		friend class LuaSyncedCtrl;
 };
 
 

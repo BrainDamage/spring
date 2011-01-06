@@ -1,5 +1,5 @@
 // GML - OpenGL Multithreading Library
-// for Spring http://spring.clan-sy.com
+// for Spring http://springrts.com
 // Author: Mattias "zerver" Radeskog
 // (C) Ware Zerver Tech. http://zerver.net
 // Ware Zerver Tech. licenses this library
@@ -57,6 +57,9 @@
 #define GML_MSC_TLS_OPT 1 // use the Win32 TIB for TLS in MSVC (possibly faster)
 #define GML_64BIT_USE_GS 1 // 64-bit OS will use the GS register for TLS (untested feature)
 #define GML_LOCKED_GMLCOUNT_ASSIGNMENT 0 // experimental feature, probably not needed
+#define GML_SHARE_LISTS 1 // use glShareLists to allow opengl calls in sim thread
+#define GML_DRAW_THREAD_NUM 0 // thread number of draw thread
+#define GML_SIM_THREAD_NUM 1 // thread number of sim thread
 //#define BOOST_AC_USE_PTHREADS
 
 // memory barriers for different platforms
@@ -200,7 +203,7 @@ extern unsigned gmlCPUCount();
 #	define GML_CPU_COUNT (gmlThreadCountOverride ? gmlThreadCountOverride : gmlCPUCount() )
 #endif
 #define GML_MAX_NUM_THREADS (32+1) // one extra for the aux (Sim) thread
-#define GML_IF_SERVER_THREAD(thread) if(!GML_ENABLE || thread == 0)
+#define GML_IF_SERVER_THREAD(thread) if(!GML_ENABLE || ((GML_SHARE_LISTS && thread <= GML_SIM_THREAD_NUM) || (!GML_SHARE_LISTS && thread == GML_DRAW_THREAD_NUM)))
 extern int gmlItemsConsumed;
 
 typedef unsigned char BYTE;
@@ -376,6 +379,10 @@ public:
 	long size() const {
 		return added;
 	}
+
+	const bool empty() const {
+		return !added;
+	}
 	
 	const T &operator[](int i) const {
 		return data[i];
@@ -539,11 +546,14 @@ class gmlVector {
 	int shrinksize;
 	
 public:
-	gmlVector():doshrink(0),shrinksize(0),
+	gmlVector() :
 #if GML_ORDERED_VOLATILE
 		count(0),
 #endif
-		added(0) {
+		added(0),
+		doshrink(0),
+		shrinksize(0)
+	{
 		data=(T *)malloc(1*sizeof(T));
 		maxsize=1;
 	}
@@ -614,6 +624,10 @@ public:
 	
 	const long size() const {
 		return added;
+	}
+
+	const bool empty() const {
+		return !added;
 	}
 	
 	const T &operator[](const int i) const {
@@ -1010,7 +1024,7 @@ public:
 	}
 	~gmlCircularQueue() {
 	}
-	void push_back(T &a) {
+	void push_back(const T &a) {
 		elements[back] = a;
 		if(csize == msize) {
 			if(front == msize)
@@ -1025,7 +1039,7 @@ public:
 		else
 			++back;
 	}
-	void push_front(T &a) {
+	void push_front(const T &a) {
 		int newfront = (front == 0) ? msize : front - 1;
 		elements[newfront] = a;
 		front = newfront;

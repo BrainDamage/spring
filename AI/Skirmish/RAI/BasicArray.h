@@ -12,17 +12,21 @@ template <typename basicArrayType>
 struct basicArray
 {
 	basicArray()
-	{	elementList = 0;
+	{
+		elementList = 0;
 		elementSize = 0;
+		elementIndex = 0;
 	};
 	void setSize(const int &size) { elementList = new basicArrayType[size]; };
 	basicArray(const int &size)
-	{	elementList = new basicArrayType[size];
+	{
+		elementList = new basicArrayType[size];
 		elementSize = 0;
+		elementIndex = 0;
 	};
 	~basicArray()
-	{	if( elementList != 0 )
-			delete [] elementList;
+	{
+		delete [] elementList;
 	};
 	basicArrayType* operator[] (int index) { return &elementList[index]; };
 	void begin() { elementIndex = -1; };

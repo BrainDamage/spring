@@ -1,22 +1,20 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-#include <assert.h>
-#include <cstdio>
 #include "mmgr.h"
 
 #include "MapInfo.h"
+
+#include <assert.h>
 
 #include "Sim/Misc/GlobalConstants.h"
 #include "MapParser.h"
 #include "Lua/LuaParser.h"
 #include "LogOutput.h"
-#include "FileSystem/FileHandler.h"
 #include "Exceptions.h"
 
 
 using namespace std;
-
-
-static CLogSubsystem LOG_MAPINFO("mapinfo");
 
 
 // Before delete, the const is const_cast'ed away. There are
@@ -26,20 +24,16 @@ static CLogSubsystem LOG_MAPINFO("mapinfo");
 const CMapInfo* mapInfo;
 
 
-CMapInfo::CMapInfo(const string& mapName)
+CMapInfo::CMapInfo(const std::string& _mapInfoFile, const string& mapName) : mapInfoFile(_mapInfoFile)
 {
 	map.name = mapName;
 
-	parser = new MapParser(mapName);
+	parser = new MapParser(mapInfoFile);
 	if (!parser->IsValid()) {
 		throw content_error("MapInfo: " + parser->GetErrorLog());
 	}
-}
 
-void CMapInfo::Load()
-{
-	LuaParser resParser("gamedata/resources.lua",
-	                    SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
+	LuaParser resParser("gamedata/resources.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
 	if (!resParser.Execute()) {
 		logOutput.Print(resParser.GetErrorLog());
 	}
@@ -49,6 +43,8 @@ void CMapInfo::Load()
 	ReadGlobal();
 	ReadAtmosphere();
 	ReadGui();
+	ReadSplats();
+	ReadGrass();
 	ReadLight();
 	ReadWater();
 	ReadSmf();
@@ -71,7 +67,7 @@ void CMapInfo::ReadGlobal()
 {
 	const LuaTable topTable = parser->GetRoot();
 
-	map.humanName    = topTable.GetString("description", map.name);
+	map.description  = topTable.GetString("description", map.name);
 	map.author       = topTable.GetString("author", "");
 
 	map.hardness      = topTable.GetFloat("maphardness", 100.0f);
@@ -88,10 +84,10 @@ void CMapInfo::ReadGlobal()
 	map.voidWater = topTable.GetBool("voidWater", false);
 
 	// clamps
-	map.hardness        = max(0.0f, map.hardness);
-	map.tidalStrength   = max(0.0f, map.tidalStrength);
-	map.maxMetal        = max(0.0f, map.maxMetal);
-	map.extractorRadius = max(0.0f, map.extractorRadius);
+	map.hardness        = max(0.001f, map.hardness);
+	map.tidalStrength   = max(0.000f, map.tidalStrength);
+	map.maxMetal        = max(0.000f, map.maxMetal);
+	map.extractorRadius = max(0.000f, map.extractorRadius);
 }
 
 
@@ -124,6 +120,24 @@ void CMapInfo::ReadAtmosphere()
 	atmo.minWind      = min(atmo.maxWind, atmo.minWind);
 }
 
+
+void CMapInfo::ReadSplats()
+{
+	const LuaTable splatsTable = parser->GetRoot().SubTable("splats");
+
+	splats.texScales = splatsTable.GetFloat4("texScales", float4(0.02f, 0.02f, 0.02f, 0.02f));
+	splats.texMults = splatsTable.GetFloat4("texMults", float4(1.0f, 1.0f, 1.0f, 1.0f));
+}
+
+void CMapInfo::ReadGrass()
+{
+	const LuaTable grassTable = parser->GetRoot().SubTable("grass");
+
+	grass.bladeWaveScale = grassTable.GetFloat("bladeWaveScale", 1.0f);
+	grass.bladeWidth     = grassTable.GetFloat("bladeWidth", 0.32f);
+	grass.bladeHeight    = grassTable.GetFloat("bladeHeight", 4.0f);
+	grass.bladeAngle     = grassTable.GetFloat("bladeAngle", 1.57f);
+}
 
 void CMapInfo::ReadLight()
 {
@@ -256,8 +270,16 @@ void CMapInfo::ReadSmf()
 {
 	// SMF specific settings
 	const LuaTable mapResTable = parser->GetRoot().SubTable("resources");
-	smf.detailTexName = mapResTable.GetString("detailTex", "");
-	smf.specularTexName = mapResTable.GetString("specularTex", "");
+
+	smf.detailTexName      = mapResTable.GetString("detailTex", "");
+	smf.specularTexName    = mapResTable.GetString("specularTex", "");
+	smf.splatDetailTexName = mapResTable.GetString("splatDetailTex", "");
+	smf.splatDistrTexName  = mapResTable.GetString("splatDistrTex", "");
+
+	smf.grassBladeTexName = mapResTable.GetString("grassBladeTex", "");
+	smf.grassShadingTexName = mapResTable.GetString("grassShadingTex", "");
+
+	smf.skyReflectModTexName = mapResTable.GetString("skyReflectModTex", "");
 
 	if (!smf.detailTexName.empty()) {
 		smf.detailTexName = "maps/" + smf.detailTexName;
@@ -267,9 +289,12 @@ void CMapInfo::ReadSmf()
 		smf.detailTexName = "bitmaps/" + smf.detailTexName;
 	}
 
-	if (!smf.specularTexName.empty()) {
-		smf.specularTexName = "maps/" + smf.specularTexName;
-	}
+	if (!smf.specularTexName.empty()) { smf.specularTexName = "maps/" + smf.specularTexName; }
+	if (!smf.splatDetailTexName.empty()) { smf.splatDetailTexName = "maps/" + smf.splatDetailTexName; }
+	if (!smf.splatDistrTexName.empty()) { smf.splatDistrTexName = "maps/" + smf.splatDistrTexName; }
+	if (!smf.grassBladeTexName.empty()) { smf.grassBladeTexName = "maps/" + smf.grassBladeTexName; }
+	if (!smf.grassShadingTexName.empty()) { smf.grassShadingTexName = "maps/" + smf.grassShadingTexName; }
+	if (!smf.skyReflectModTexName.empty()) { smf.skyReflectModTexName = "maps/" + smf.skyReflectModTexName; }
 
 	// height overrides
 	const LuaTable smfTable = parser->GetRoot().SubTable("smf");
@@ -304,8 +329,7 @@ void CMapInfo::ReadSm3()
 
 void CMapInfo::ReadTerrainTypes()
 {
-	const LuaTable terrTypeTable =
-		parser->GetRoot().SubTable("terrainTypes");
+	const LuaTable terrTypeTable = parser->GetRoot().SubTable("terrainTypes");
 
 	for (int tt = 0; tt < NUM_TERRAIN_TYPES; tt++) {
 		TerrainType& terrType = terrainTypes[tt];
@@ -320,10 +344,10 @@ void CMapInfo::ReadTerrainTypes()
 		terrType.shipSpeed  = moveTable.GetFloat("ship",  1.0f);
 
 		// clamps
-		terrType.hardness   = max(0.0f, terrType.hardness);
-		terrType.tankSpeed  = max(0.0f, terrType.tankSpeed);
-		terrType.kbotSpeed  = max(0.0f, terrType.kbotSpeed);
-		terrType.hoverSpeed = max(0.0f, terrType.hoverSpeed);
-		terrType.shipSpeed  = max(0.0f, terrType.shipSpeed);
+		terrType.hardness   = max(0.001f, terrType.hardness);
+		terrType.tankSpeed  = max(0.000f, terrType.tankSpeed);
+		terrType.kbotSpeed  = max(0.000f, terrType.kbotSpeed);
+		terrType.hoverSpeed = max(0.000f, terrType.hoverSpeed);
+		terrType.shipSpeed  = max(0.000f, terrType.shipSpeed);
 	}
 }

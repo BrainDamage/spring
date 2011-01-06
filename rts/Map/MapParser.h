@@ -1,18 +1,21 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef MAP_PARSER_H
 #define MAP_PARSER_H
 
 #include <string>
-#include "float3.h"
+
 #include "Lua/LuaParser.h"
+#include "System/float3.h"
 
 
 class MapParser
 {
 	public:
-		static std::string GetMapConfigName(const std::string& mapName);
+		static std::string GetMapConfigName(const std::string& mapFileName);
 
 	public:
-		MapParser(const std::string& mapName);
+		MapParser(const std::string& mapFileName);
 		~MapParser();
 
 		LuaParser* GetParser() { return parser; }
@@ -25,7 +28,7 @@ class MapParser
 
 	private:
 		LuaParser* parser;
+		mutable std::string errorLog;
 };
-
 
 #endif // MAP_PARSER_H

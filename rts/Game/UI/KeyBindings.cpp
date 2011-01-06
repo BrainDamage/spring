@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// CKeyBindings.cpp: implementation of the CKeyBindings class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <cstdio>
 #include <cctype>
@@ -17,7 +16,6 @@
 #include "KeyAutoBinder.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitDefHandler.h"
-#include "Platform/errorhandler.h"
 #include "FileSystem/FileHandler.h"
 #include "FileSystem/SimpleParser.h"
 #include "LogOutput.h"
@@ -33,7 +31,8 @@ static const struct DefaultBinding {
 }
 defaultBindings[] = {
 
-	{        "esc", "quitmenu"    },
+	{        "esc", "quitmessage"    },
+	{        "Shift+esc", "quitmenu"    },
 	{ "Ctrl+Shift+esc", "quitforce"    },
 	{  "Any+pause", "pause"       },
 
@@ -187,15 +186,17 @@ defaultBindings[] = {
 	{ "Ctrl+f4", "viewrot"  },
 	{ "Ctrl+f5", "viewfree" },
 
-	{ "Any+f1",  "showElevation"  },
-	{ "Any+f2",  "ShowPathMap"    },
-	{ "Any+f3",  "LastMsgPos"     },
-	{ "Any+f4",  "ShowMetalMap"   },
-	{ "Any+f5",  "hideinterface"  },
-	{ "Any+f6",  "NoSound"        },
-	{ "Any+f7",  "dynamicSky"     },
+	{ "Any+f1",  "ShowElevation"         },
+	{ "Any+f2",  "ShowPathTraversability"},
+	{ "Any+f3",  "LastMsgPos"            },
+	{ "Any+f4",  "ShowMetalMap"          },
+	{ "Any+f5",  "HideInterface"         },
+	{ "Any+f6",  "NoSound"               },
+	{ "Any+f7",  "DynamicSky"            },
 	{ "Ctrl+Shift+f8", "savegame" },
+#ifdef USE_GML
 	{ "Any+f9",  "showhealthbars" },
+#endif
 	{ "Ctrl+Shift+f10", "createvideo" },
 	{ "Any+f11", "screenshot"     },
 	{ "Any+f12", "screenshot"     },
@@ -322,13 +323,14 @@ const CKeyBindings::ActionList&
 		SNPRINTF(buf, sizeof(buf), "GetAction: %s (0x%03X)",
 		         ks.GetString(false).c_str(), ks.Key());
 		if (alPtr == &empty) {
-			strncat(buf, "  EMPTY", sizeof(buf));
+			// Note: strncat: 3rd param: maximum number of characters to append
+			STRNCAT(buf, "  EMPTY", sizeof(buf) - strlen(buf) - 1);
 			logOutput.Print("%s", buf);
 		}
 		else {
 			logOutput.Print("%s", buf);
 			const ActionList& al = *alPtr;
-			for (int i = 0; i < (int)al.size(); ++i) {
+			for (size_t i = 0; i < al.size(); ++i) {
 				SNPRINTF(buf, sizeof(buf), "  %s  \"%s\"",
 				         al[i].command.c_str(), al[i].rawline.c_str());
 				logOutput.Print("%s", buf);
@@ -748,7 +750,7 @@ void CKeyBindings::BuildHotkeyMap()
 		const string keystr = ks.GetString(true);
 		const ActionList& al = kit->second;
 		for (int i = 0; i < (int)al.size(); ++i) {
-			HotkeyList& hl = hotkeys[al[i].command];
+			HotkeyList& hl = hotkeys[al[i].command + ((al[i].extra == "") ? "" : " " + al[i].extra)];
 			int j;
 			for (j = 0; j < (int)hl.size(); ++j) {
 				if (hl[j] == keystr) {

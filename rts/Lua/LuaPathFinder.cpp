@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaPathFinder.cpp: implementation of the LuaPathFinder class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <stdlib.h>
 #include <algorithm>
@@ -11,13 +10,11 @@
 using namespace std;
 
 #include "LuaPathFinder.h"
-
 #include "LuaInclude.h"
-
 #include "LuaHandle.h"
 #include "LuaUtils.h"
+#include "Sim/Path/IPathManager.h"
 #include "Sim/MoveTypes/MoveInfo.h"
-#include "Sim/Path/PathManager.h"
 
 
 static void CreatePathMetatable(lua_State* L);
@@ -36,6 +33,8 @@ bool LuaPathFinder::PushEntries(lua_State* L)
 	lua_rawset(L, -3)
                         
 	REGISTER_LUA_CFUNC(RequestPath);
+	REGISTER_LUA_CFUNC(SetPathNodeCost);
+	REGISTER_LUA_CFUNC(GetPathNodeCost);
 
 	return true;	
 }
@@ -62,7 +61,8 @@ static int path_next(lua_State* L)
 
 	const float minDist = luaL_optfloat(L, 5, 0.0f);
 
-	const float3 point = pathManager->NextWaypoint(pathID, callerPos, minDist);
+	const bool synced = CLuaHandle::GetActiveHandle()->GetSynced();
+	const float3 point = pathManager->NextWaypoint(pathID, callerPos, minDist, 0, 0, synced);
 
 	if ((point.x == -1.0f) &&
 	    (point.y == -1.0f) &&
@@ -70,9 +70,9 @@ static int path_next(lua_State* L)
 		return 0;
 	}
 
-	lua_pushnumber(L, point.x);		
-	lua_pushnumber(L, point.y);		
-	lua_pushnumber(L, point.z);		
+	lua_pushnumber(L, point.x);
+	lua_pushnumber(L, point.y);
+	lua_pushnumber(L, point.z);
 
 	return 3;
 }
@@ -199,8 +199,8 @@ int LuaPathFinder::RequestPath(lua_State* L)
 
 	const float radius = luaL_optfloat(L, 8, 8.0f);
 
-	const int pathID =
-		pathManager->RequestPath(moveData, start, end, radius, NULL);
+	const bool synced = CLuaHandle::GetActiveHandle()->GetSynced();
+	const int pathID = pathManager->RequestPath(moveData, start, end, radius, NULL, synced);
 
 	if (pathID == 0) {
 		return 0;
@@ -215,6 +215,29 @@ int LuaPathFinder::RequestPath(lua_State* L)
 	return 1;
 }
 
+
+
+int LuaPathFinder::SetPathNodeCost(lua_State* L)
+{
+	const unsigned int x = luaL_checkint(L, 1);
+	const unsigned int z = luaL_checkint(L, 2);
+	const float cost = luaL_checkint(L, 3);
+
+	const bool r = pathManager->SetNodeExtraCost(x, z, cost, CLuaHandle::GetActiveHandle()->GetSynced());
+
+	lua_pushboolean(L, r);
+	return 1;
+}
+
+int LuaPathFinder::GetPathNodeCost(lua_State* L)
+{
+	const unsigned int x = luaL_checkint(L, 1);
+	const unsigned int z = luaL_checkint(L, 2);
+	const float cost = pathManager->GetNodeExtraCost(x, z, CLuaHandle::GetActiveHandle()->GetSynced());
+
+	lua_pushnumber(L, cost);
+	return 1;
+}
 
 /******************************************************************************/
 /******************************************************************************/

@@ -1,6 +1,4 @@
-// Team.cpp: implementation of the CTeam class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "mmgr.h"
@@ -8,11 +6,11 @@
 #include "Team.h"
 #include "TeamHandler.h"
 
-#include "Messages.h"
 #include "GlobalSynced.h"
 #include "LogOutput.h"
 #include "Game/PlayerHandler.h"
 #include "Game/GameSetup.h"
+#include "Game/Messages.h"
 #include "GlobalUnsynced.h"
 #include "Game/UI/LuaUI.h"
 #include "Lua/LuaRules.h"
@@ -28,12 +26,11 @@
 #include "NetProtocol.h"
 
 CR_BIND(CTeam,);
-
 CR_REG_METADATA(CTeam, (
 // from CTeamBase
 				CR_MEMBER(leader),
 				CR_MEMBER(color),
-				CR_MEMBER(handicap),
+				CR_MEMBER(incomeMultiplier),
 				CR_MEMBER(side),
 				CR_MEMBER(startPos),
 				CR_MEMBER(teamStartNum),
@@ -43,7 +40,6 @@ CR_REG_METADATA(CTeam, (
 				CR_MEMBER(teamNum),
 				CR_MEMBER(isDead),
 				CR_MEMBER(gaia),
-				CR_MEMBER(lineageRoot),
 				CR_MEMBER(origColor),
 				CR_MEMBER(units),
 				CR_MEMBER(metal),
@@ -75,8 +71,7 @@ CR_REG_METADATA(CTeam, (
 				CR_MEMBER(energySent),
 				CR_MEMBER(energyReceived),
 				//CR_MEMBER(currentStats),
-				CR_MEMBER(lastStatSave),
-				CR_MEMBER(numCommanders),
+				CR_MEMBER(nextHistoryEntry),
 				//CR_MEMBER(statHistory),
 				CR_MEMBER(modParams),
 				CR_MEMBER(modParamsMap),
@@ -88,35 +83,40 @@ CR_REG_METADATA(CTeam, (
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-CTeam::CTeam()
-: isDead(false),
-  gaia(false),
-  lineageRoot(-1),
-  metal(0),
-  energy(0),
-  metalPull(0),     prevMetalPull(0),
-  metalIncome(0),   prevMetalIncome(0),
-  metalExpense(0),  prevMetalExpense(0),
-  metalUpkeep(0),   prevMetalUpkeep(0),
-  energyPull(0),    prevEnergyPull(0),
-  energyIncome(0),  prevEnergyIncome(0),
-  energyExpense(0), prevEnergyExpense(0),
-  energyUpkeep(0),  prevEnergyUpkeep(0),
-  metalStorage(1000000),
-  energyStorage(1000000),
-  metalShare(0.99f),
-  energyShare(0.95f),
-  delayedMetalShare(0),
-  delayedEnergyShare(0),
-  metalSent(0),
-  metalReceived(0),
-  energySent(0),
-  energyReceived(0),
-  lastStatSave(0),
-  numCommanders(0)
+CTeam::CTeam() :
+	teamNum(-1),
+	isDead(false),
+	gaia(false),
+	metal(0.0f),
+	energy(0.0f),
+	metalPull(0.0f),     prevMetalPull(0.0f),
+	metalIncome(0.0f),   prevMetalIncome(0.0f),
+	metalExpense(0.0f),  prevMetalExpense(0.0f),
+	metalUpkeep(0.0f),   prevMetalUpkeep(0.0f),
+	energyPull(0.0f),    prevEnergyPull(0.0f),
+	energyIncome(0.0f),  prevEnergyIncome(0.0f),
+	energyExpense(0.0f), prevEnergyExpense(0.0f),
+	energyUpkeep(0.0f),  prevEnergyUpkeep(0.0f),
+	metalStorage(1000000),
+	energyStorage(1000000),
+	metalShare(0.99f),
+	energyShare(0.95f),
+	delayedMetalShare(0.0f),
+	delayedEnergyShare(0.0f),
+	metalSent(0.0f),
+	metalReceived(0.0f),
+	energySent(0.0f),
+	energyReceived(0.0f),
+	nextHistoryEntry(0),
+	highlight(0.0f)
 {
-	memset(&currentStats,0,sizeof(currentStats));
-	statHistory.push_back(currentStats);
+	origColor[0] = 0;
+	origColor[1] = 0;
+	origColor[2] = 0;
+	origColor[3] = 0;
+	
+	statHistory.push_back(TeamStatistics());
+	currentStats = &statHistory.back();
 }
 
 
@@ -171,9 +171,9 @@ bool CTeam::UseEnergyUpkeep(float amount)
 }
 
 
-void CTeam::AddMetal(float amount, bool hc)
+void CTeam::AddMetal(float amount, bool useIncomeMultiplier)
 {
-	if (hc) { amount *= handicap; }
+	if (useIncomeMultiplier) { amount *= GetIncomeMultiplier(); }
 	metal += amount;
 	metalIncome += amount;
 	if (metal > metalStorage) {
@@ -183,9 +183,9 @@ void CTeam::AddMetal(float amount, bool hc)
 }
 
 
-void CTeam::AddEnergy(float amount, bool hc)
+void CTeam::AddEnergy(float amount, bool useIncomeMultiplier)
 {
-	if (hc) { amount *= handicap; }
+	if (useIncomeMultiplier) { amount *= GetIncomeMultiplier(); }
 	energy += amount;
 	energyIncome += amount;
 	if (energy > energyStorage) {
@@ -218,8 +218,6 @@ void CTeam::GiveEverythingTo(const unsigned toTeam)
 		(*ui)->ChangeTeam(toTeam, CUnit::ChangeGiven);
 		ui = next;
 	}
-
-	Died();
 }
 
 
@@ -245,7 +243,7 @@ void CTeam::Died()
 	net->Send(CBaseNetProtocol::Get().SendTeamDied(gu->myPlayerNum, teamNum));
 
 	for (int a = 0; a < playerHandler->ActivePlayers(); ++a) {
-		if (playerHandler->Player(a)->active && (playerHandler->Player(a)->team == teamNum)) {
+		if (playerHandler->Player(a)->team == teamNum) {
 			playerHandler->Player(a)->StartSpectating();
 		}
 	}
@@ -260,9 +258,10 @@ void CTeam::StartposMessage(const float3& pos)
 	startPos = pos;
 }
 
-void CTeam::operator=(const TeamBase& base)
+CTeam& CTeam::operator=(const TeamBase& base)
 {
 	TeamBase::operator=(base);
+	return *this;
 }
 
 void CTeam::ResetFrameVariables()
@@ -293,15 +292,18 @@ void CTeam::ResetFrameVariables()
 
 void CTeam::SlowUpdate()
 {
-	currentStats.metalProduced  += prevMetalIncome;
-	currentStats.energyProduced += prevEnergyIncome;
-	currentStats.metalUsed  += prevMetalUpkeep + prevMetalExpense;
-	currentStats.energyUsed += prevEnergyUpkeep + prevEnergyExpense;
+	currentStats->metalProduced  += prevMetalIncome;
+	currentStats->energyProduced += prevEnergyIncome;
+	currentStats->metalUsed  += prevMetalUpkeep + prevMetalExpense;
+	currentStats->energyUsed += prevEnergyUpkeep + prevEnergyExpense;
 
 	float eShare = 0.0f, mShare = 0.0f;
 	for (int a = 0; a < teamHandler->ActiveTeams(); ++a) {
 		if ((a != teamNum) && (teamHandler->AllyTeam(teamNum) == teamHandler->AllyTeam(a))) {
 			CTeam* team = teamHandler->Team(a);
+			if (team->isDead)
+				continue;
+
 			eShare += std::max(0.0f, (team->energyStorage * 0.99f) - team->energy);
 			mShare += std::max(0.0f, (team->metalStorage  * 0.99f) - team->metal);
 		}
@@ -325,54 +327,49 @@ void CTeam::SlowUpdate()
 	for (int a = 0; a < teamHandler->ActiveTeams(); ++a) {
 		if ((a != teamNum) && (teamHandler->AllyTeam(teamNum) == teamHandler->AllyTeam(a))) {
 			CTeam* team = teamHandler->Team(a);
+			if (team->isDead)
+				continue;
 
 			const float edif = std::max(0.0f, (team->energyStorage * 0.99f) - team->energy) * de;
 			energy -= edif;
 			energySent += edif;
-			currentStats.energySent += edif;
+			currentStats->energySent += edif;
 			team->energy += edif;
 			team->energyReceived += edif;
-			team->currentStats.energyReceived += edif;
+			team->currentStats->energyReceived += edif;
 
 			const float mdif = std::max(0.0f, (team->metalStorage * 0.99f) - team->metal) * dm;
 			metal -= mdif;
 			metalSent += mdif;
-			currentStats.metalSent += mdif;
+			currentStats->metalSent += mdif;
 			team->metal += mdif;
 			team->metalReceived += mdif;
-			team->currentStats.metalReceived += mdif;
+			team->currentStats->metalReceived += mdif;
 		}
 	}
 
 	if (metal > metalStorage) {
-		currentStats.metalExcess += (metal - metalStorage);
+		currentStats->metalExcess += (metal - metalStorage);
 		metal = metalStorage;
 	}
 	if (energy > energyStorage) {
-		currentStats.energyExcess += (energy - energyStorage);
+		currentStats->energyExcess += (energy - energyStorage);
 		energy = energyStorage;
 	}
 
-	const int statsFrames = (statsPeriod * GAME_SPEED);
-	if ((lastStatSave + statsFrames) < gs->frameNum) {
-		lastStatSave += statsFrames;
-		statHistory.push_back(currentStats);
+	//! make sure the stats update is always in a SlowUpdate
+	assert(((TeamStatistics::statsPeriod * GAME_SPEED) % TEAM_SLOWUPDATE_RATE) == 0);
+
+	const int statsFrames = TeamStatistics::statsPeriod * GAME_SPEED;
+	if (nextHistoryEntry <= gs->frameNum) {
+		currentStats->frame = gs->frameNum;
+		statHistory.push_back(*currentStats);
+		currentStats = &statHistory.back();
+
+		nextHistoryEntry = gs->frameNum + statsFrames;
+		currentStats->frame = nextHistoryEntry;
 	}
 
-	/* Kill the player on 'com dies = game ends' games.  This can't be done in
-	CTeam::CommanderDied anymore, because that function is called in
-	CUnit::ChangeTeam(), hence it'd cause a random amount of the shared units
-	to be killed if the commander is among them. Also, ".take" would kill all
-	units once it transfered the commander. */
-	if (gameSetup->gameMode == GameMode::ComEnd && numCommanders<=0 && !gaia){
-		for(std::list<CUnit*>::iterator ui=uh->activeUnits.begin();ui!=uh->activeUnits.end();++ui){
-			if ((*ui)->team==teamNum && !(*ui)->unitDef->isCommander) {
-				(*ui)->KillUnit(true, false, NULL);
-			}
-		}
-		// Set to 1 to prevent above loop from being done every update.
-		numCommanders = 1;
-	}
 }
 
 
@@ -381,20 +378,17 @@ void CTeam::AddUnit(CUnit* unit,AddType type)
 	units.insert(unit);
 	switch (type) {
 		case AddBuilt: {
-			currentStats.unitsProduced++;
+			currentStats->unitsProduced++;
 			break;
 		}
 		case AddGiven: {
-			currentStats.unitsReceived++;
+			currentStats->unitsReceived++;
 			break;
 		}
 		case AddCaptured: {
-			currentStats.unitsCaptured++;
+			currentStats->unitsCaptured++;
 			break;
 		}
-	}
-	if (unit->unitDef->isCommander) {
-		numCommanders++;
 	}
 }
 
@@ -404,44 +398,19 @@ void CTeam::RemoveUnit(CUnit* unit,RemoveType type)
 	units.erase(unit);
 	switch (type) {
 		case RemoveDied: {
-			currentStats.unitsDied++;
+			currentStats->unitsDied++;
 			break;
 		}
 		case RemoveGiven: {
-			currentStats.unitsSent++;
+			currentStats->unitsSent++;
 			break;
 		}
 		case RemoveCaptured: {
-			currentStats.unitsOutCaptured++;
+			currentStats->unitsOutCaptured++;
 			break;
 		}
 	}
-
-	if (units.empty() && !gaia) {
-		Died();
-	}
 }
-
-
-void CTeam::CommanderDied(CUnit* commander)
-{
-	assert(commander->unitDef->isCommander);
-	--numCommanders;
-}
-
-
-void CTeam::LeftLineage(CUnit* unit)
-{
-	if (gameSetup->gameMode == GameMode::Lineage && unit->id == this->lineageRoot) {
-		for (std::list<CUnit*>::iterator ui = uh->activeUnits.begin(); ui != uh->activeUnits.end(); ++ui) {
-			if ((*ui)->lineage == this->teamNum) {
-				(*ui)->KillUnit(true, false, NULL);
-			}
-		}
-	}
-}
-
-
 
 std::string CTeam::GetControllerName() const {
 	std::string s;

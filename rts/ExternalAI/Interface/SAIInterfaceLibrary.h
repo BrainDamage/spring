@@ -1,19 +1,4 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
-
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef _SAIINTERFACELIBRARY_H
 #define _SAIINTERFACELIBRARY_H
@@ -36,6 +21,7 @@ extern "C" {
  * example: "/home/john/spring/AI/Interfaces/C/0.1"
  */
 #define AI_INTERFACE_PROPERTY_DATA_DIR               "dataDir"
+
 /**
  * [string]
  * Absolute, version independent data dir.
@@ -43,36 +29,43 @@ extern "C" {
  * example: "/home/john/spring/AI/Interfaces/C/common"
  */
 #define AI_INTERFACE_PROPERTY_DATA_DIR_COMMON        "dataDirCommon"
+
 /**
  * [string: [a-zA-Z0-9_.]*]
  * example: "C"
  */
 #define AI_INTERFACE_PROPERTY_SHORT_NAME             "shortName"
+
 /**
  * [string: [a-zA-Z0-9_.]*]
  * example: "0.1"
  */
 #define AI_INTERFACE_PROPERTY_VERSION                "version"
+
 /**
  * [string]
  * example: "C/C++"
  */
 #define AI_INTERFACE_PROPERTY_NAME                   "name"
+
 /**
  * [string]
  * example: "supports loading native AIs written in C and/or C++"
  */
 #define AI_INTERFACE_PROPERTY_DESCRIPTION            "description"
+
 /**
  * [string]
- * example: "http://spring.clan-sy.com/wiki/AIInterface:C"
+ * example: "http://springrts.com/wiki/AIInterface:C"
  */
 #define AI_INTERFACE_PROPERTY_URL                    "url"
+
 /**
  * [string]
  * example: "C, C++"
  */
 #define AI_INTERFACE_PROPERTY_SUPPORTED_LANGUAGES    "supportedLanguages"
+
 /**
  * [int]
  * The engine version number the AI Interface was compiled for,
@@ -133,6 +126,7 @@ struct SAIInterfaceLibrary {
 	 */
 	int (CALLING_CONV *initStatic)(int interfaceId,
 			const struct SAIInterfaceCallback* const);
+
 //			unsigned int infoSize,
 //			const char** infoKeys, const char** infoValues,
 //			const struct SStaticGlobalData* staticGlobalData);
@@ -191,6 +185,7 @@ struct SAIInterfaceLibrary {
 	 *          != 0: error
 	 */
 	int (CALLING_CONV *unloadAllSkirmishAILibraries)();
+
 };
 
 #endif // !defined BUILDING_AI

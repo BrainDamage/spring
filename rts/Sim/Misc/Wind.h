@@ -1,9 +1,14 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef WIND_H
 #define WIND_H
 
+#include <map>
 #include <boost/noncopyable.hpp>
 
-#include "float3.h"
+#include "System/float3.h"
+
+class CUnit;
 
 class CWind : public boost::noncopyable
 {
@@ -15,6 +20,9 @@ public:
 
 	void LoadWind(float min, float max);
 	void Update();
+
+	bool AddUnit(CUnit* u);
+	bool DelUnit(CUnit* u);
 
 	float GetMaxWind() const { return maxWind; }
 	float GetMinWind() const { return minWind; }
@@ -34,6 +42,8 @@ private:
 	float3 newWind;
 	float3 oldWind;
 	int status;
+
+	std::map<int, CUnit*> windGens;
 };
 
 extern CWind wind;

@@ -1,26 +1,7 @@
-/*
-	Copyright (c) 2005 Krogoth
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-	This program is free software {} you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation {} either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY {} without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-	@author Krogoth
-	@author Kloot
-	@author Robin Vobruba <hoijui.quaero@gmail.com>
-*/
-
-#ifndef _RESOURCEMAPANALYZER_H
-#define _RESOURCEMAPANALYZER_H
+#ifndef _RESOURCE_MAP_ANALYZER_H
+#define _RESOURCE_MAP_ANALYZER_H
 
 #include "float3.h"
 #include <vector>
@@ -30,7 +11,7 @@ struct UnitDef;
 
 class CResourceMapAnalyzer {
 	public:
-		CResourceMapAnalyzer(int ResourceId);
+		CResourceMapAnalyzer(int resourceId);
 		~CResourceMapAnalyzer();
 
 		float3 GetNearestSpot(float3 fromPos, int team, const UnitDef* extractor = NULL) const;
@@ -53,32 +34,31 @@ class CResourceMapAnalyzer {
 
 		std::string GetCacheFileName() const;
 
-		int ResourceId;
-		float ExtractorRadius;
-		int NumSpotsFound;
-		std::vector<float3> VectoredSpots;
-		float AverageIncome;
-		float3 BufferSpot;
-		bool StopMe;
-		int MaxSpots;
-		int MapHeight;
-		int MapWidth;
-		int TotalCells;
-		int SquareRadius;
-		int DoubleSquareRadius;
-		int TotalResources;
-		int MaxResource;
-		int TempResources;
+		int resourceId;
+		float extractorRadius;
+		int numSpotsFound;
+		std::vector<float3> vectoredSpots;
+		float averageIncome;
+		float3 bufferSpot;
+		bool stopMe;
+		int maxSpots;
+		int mapHeight;
+		int mapWidth;
+		int totalCells;
+		int squareRadius;
+		int doubleSquareRadius;
+		int totalResources;
+		int maxResource;
+		int tempResources;
 		int coordX;
 		int coordZ;
-		int MinRadius;
-		int MinIncomeForSpot;
-		int XtractorRadius;
-		int DoubleRadius;
-		unsigned char* RexArrayA;
-		unsigned char* RexArrayB;
-		unsigned char* RexArrayC;
-		int* TempAverage;
+		int minIncomeForSpot;
+		int xtractorRadius;
+		int doubleRadius;
+		unsigned char* rexArrayA;
+		unsigned char* rexArrayB;
+		unsigned char* rexArrayC;
+		int* tempAverage;
 };
 
-#endif // _RESOURCEMAPANALYZER_H
+#endif // _RESOURCE_MAP_ANALYZER_H

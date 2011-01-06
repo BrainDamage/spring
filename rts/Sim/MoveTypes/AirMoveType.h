@@ -1,5 +1,7 @@
-#ifndef __AIR_MOVE_TYPE_H__
-#define __AIR_MOVE_TYPE_H__
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef _AIR_MOVE_TYPE_H_
+#define _AIR_MOVE_TYPE_H_
 
 #include "AAirMoveType.h"
 #include <vector>
@@ -16,23 +18,23 @@ class CAirMoveType : public AAirMoveType
 public:
 
 	CAirMoveType(CUnit* owner);
-	~CAirMoveType(void);
-	virtual void Update();
-	virtual void SlowUpdate();
+	~CAirMoveType();
+	void Update();
+	void SlowUpdate();
 
 	void UpdateManeuver();
 	void UpdateFighterAttack();
 	void UpdateAttack();
-	void UpdateFlying(float wantedHeight,float engine);
+	void UpdateFlying(float wantedHeight, float engine);
 	void UpdateLanded();
 	void UpdateLanding();
 	void UpdateAirPhysics(float rudder, float aileron, float elevator,
-			float engine,const float3& engineVector);
+			float engine, const float3& engineVector);
 	void SetState(AircraftState state);
 	void UpdateTakeOff(float wantedHeight);
-	void ImpulseAdded(void);
-	float3 FindLandingPos(void);
-	void CheckForCollision(void);
+	void ImpulseAdded();
+	float3 FindLandingPos() const;
+	void CheckForCollision();
 	void DependentDied(CObject* o);
 	void SetMaxSpeed(float speed);
 
@@ -42,7 +44,7 @@ public:
 	void StopMoving();
 
 	void Takeoff();
-	bool IsFighter();
+	bool IsFighter() const;
 
 	int subState;
 
@@ -71,7 +73,6 @@ public:
 	float maxElevator;
 	float maxRudder;
 
-
 	float inSupply;
 
 	/// used while landing
@@ -79,8 +80,6 @@ public:
 	float crashAileron;
 	float crashElevator;
 	float crashRudder;
-
-	float3 oldSlowUpdatePos;
 
 	struct DrawLine {
 		CR_DECLARE_STRUCT(DrawLine);
@@ -108,6 +107,10 @@ public:
 	float inefficientAttackTime;
 	/// used by fighters to turn away when closing in on ground targets
 	float3 exitVector;
+
+private:
+
+	void HandleCollisions();
 };
 
-#endif // __AIR_MOVE_TYPE_H__
+#endif // _AIR_MOVE_TYPE_H_

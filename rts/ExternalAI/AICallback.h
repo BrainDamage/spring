@@ -1,32 +1,60 @@
-#ifndef AICALLBACK_H
-#define AICALLBACK_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "IAICallback.h"
+#ifndef AI_CALLBACK_H
+#define AI_CALLBACK_H
 
+#include "ExternalAI/AILegacySupport.h"
+#include "float3.h"
+
+#include <string>
+#include <vector>
+#include <map>
+
+struct Command;
+struct UnitDef;
+struct FeatureDef;
+struct WeaponDef;
+struct CommandDescription;
+class CCommandQueue;
 class CGroupHandler;
 class CGroup;
+class CUnit;
 
-class CAICallback: public IAICallback
+/** Generalized legacy callback interface backend */
+class CAICallback
 {
 	int team;
+public:
 	bool noMessages;
+private:
 	CGroupHandler* gh;
 
+	// utility methods
 	void verify();
 
+	/// Returns the unit if the ID is valid
+	CUnit* GetUnit(int unitId) const;
+	/// Returns the unit if the ID is valid, and the unit is in this AIs team
+	CUnit* GetMyTeamUnit(int unitId) const;
+	CUnit* GetInSensorRangeUnit(int unitId, unsigned short losFlags) const;
+	/// Returns the unit if the ID is valid, and the unit is in LOS
+	CUnit* GetInLosUnit(int unitId) const;
+	/// Returns the unit if the ID is valid, and the unit is in LOS or Radar
+	CUnit* GetInLosAndRadarUnit(int unitId) const;
+
 public:
-	CAICallback(int team, CGroupHandler* gh);
+	CAICallback(int teamId);
 	~CAICallback();
 
 	void SendStartPos(bool ready, float3 pos);
 	void SendTextMsg(const char* text, int zone);
-	void SetLastMsgPos(float3 pos);
-	void AddNotification(float3 pos, float3 color, float alpha);
+	void SetLastMsgPos(const float3& pos);
+	void AddNotification(const float3& pos, const float3& color, float alpha);
 
 	bool SendResources(float mAmount, float eAmount, int receivingTeamId);
 	int SendUnits(const std::vector<int>& unitIds, int receivingTeamId);
 
-	bool PosInCamera(float3 pos, float radius);
+	bool PosInCamera(const float3& pos, float radius);
 
 	int GetCurrentFrame();
 	int GetMyTeam();
@@ -72,6 +100,7 @@ public:
 	bool UnitBeingBuilt(int unitId);
 	const UnitDef* GetUnitDef(int unitId);
 	float3 GetUnitPos(int unitId);
+	float3 GetUnitVelocity(int unitId);
 	int GetBuildingFacing(int unitId);
 	bool IsUnitCloaked(int unitId);
 	bool IsUnitParalyzed(int unitId);
@@ -83,19 +112,21 @@ private:
 	const UnitDef* GetUnitDefById(int unitDefId);
 public:
 
-	int InitPath(float3 start, float3 end, int pathType);
+	int InitPath(const float3& start, const float3& end, int pathType, float goalRadius);
 	float3 GetNextWaypoint(int pathId);
 	void FreePath(int pathId);
 
-	float GetPathLength(float3 start, float3 end, int pathType);
+	float GetPathLength(float3 start, float3 end, int pathType, float goalRadius);
+	bool SetPathNodeCost(unsigned int, unsigned int, float);
+	float GetPathNodeCost(unsigned int, unsigned int);
 
-	int GetEnemyUnits(int* unitIds, int unitIds_max);
-	int GetEnemyUnitsInRadarAndLos(int* unitIds, int unitIds_max);
-	int GetEnemyUnits(int* unitIds, const float3& pos, float radius, int unitIds_max);
-	int GetFriendlyUnits(int* unitIds, int unitIds_max);
-	int GetFriendlyUnits(int* unitIds, const float3& pos, float radius, int unitIds_max);
-	int GetNeutralUnits(int* unitIds, int unitIds_max);
-	int GetNeutralUnits(int* unitIds, const float3& pos, float radius, int unitIds_max);
+	int GetEnemyUnits(int* unitIds, int unitIds_max = -1);
+	int GetEnemyUnitsInRadarAndLos(int* unitIds, int unitIds_max = -1);
+	int GetEnemyUnits(int* unitIds, const float3& pos, float radius, int unitIds_max = -1);
+	int GetFriendlyUnits(int* unitIds, int unitIds_max = -1);
+	int GetFriendlyUnits(int* unitIds, const float3& pos, float radius, int unitIds_max = -1);
+	int GetNeutralUnits(int* unitIds, int unitIds_max = -1);
+	int GetNeutralUnits(int* unitIds, const float3& pos, float radius, int unitIds_max = -1);
 
 
 	int GetMapWidth();
@@ -106,12 +137,16 @@ public:
 	float GetMaxHeight();
 	const float* GetSlopeMap();
 	const unsigned short* GetLosMap();
-	int GetLosMapResolution();
+	int GetLosMapResolution() { return -1; }          // never called, implemented in CAIAICallback
 	const unsigned short* GetRadarMap();
 	const unsigned short* GetJammerMap();
 	const unsigned char* GetMetalMap();
-	const char* GetMapName ();
-	const char* GetModName();
+	int GetMapHash() { return 0; }                    // never called, implemented in SSkirmishAICallbackImpl
+	const char* GetMapName() { return NULL; }         // never called, implemented in SSkirmishAICallbackImpl
+	const char* GetMapHumanName() { return NULL; }    // never called, implemented in SSkirmishAICallbackImpl
+	int GetModHash() { return 0; }                    // never called, implemented in SSkirmishAICallbackImpl
+	const char* GetModName() { return NULL; }         // never called, implemented in SSkirmishAICallbackImpl
+	const char* GetModHumanName() { return NULL; }    // never called, implemented in SSkirmishAICallbackImpl
 
 	float GetMaxMetal() const;
 	float GetExtractorRadius() const;
@@ -132,15 +167,34 @@ public:
 	void LineDrawerRestart();
 	void LineDrawerRestartSameColor();
 
-	int CreateSplineFigure(float3 pos1, float3 pos2, float3 pos3, float3 pos4, float width, int arrow, int lifetime, int figureGroupId);
-	int CreateLineFigure(float3 pos1, float3 pos2, float width, int arrow, int lifetime, int figureGroupId);
+	int CreateSplineFigure(const float3& pos1, const float3& pos2, const float3& pos3, const float3& pos4, float width, int arrow, int lifetime, int figureGroupId);
+	int CreateLineFigure(const float3& pos1, const float3& pos2, float width, int arrow, int lifetime, int figureGroupId);
 	void SetFigureColor(int figureGroupId,float red, float green, float blue, float alpha);
 	void DeleteFigureGroup(int figureGroupId);
 
-	void DrawUnit(const char* unitName, float3 pos, float rotation, int lifetime, int teamId, bool transparent, bool drawBorder, int facing);
+	void DrawUnit(const char* unitName, const float3& pos, float rotation, int lifetime, int teamId, bool transparent, bool drawBorder, int facing);
 
-	bool CanBuildAt(const UnitDef* unitDef, float3 pos, int facing);
-	float3 ClosestBuildSite(const UnitDef* unitdef, float3 pos, float searchRadius, int minDist, int facing);
+
+	bool IsDebugDrawerEnabled() const;
+	// not implemented as members, but as commands via HandleCommand
+	void DebugDrawerAddGraphPoint(int, float, float) {}
+	void DebugDrawerDelGraphPoints(int, int) {}
+	void DebugDrawerSetGraphPos(float, float) {}
+	void DebugDrawerSetGraphSize(float, float) {}
+	void DebugDrawerSetGraphLineColor(int, const float3&) {}
+	void DebugDrawerSetGraphLineLabel(int, const char*) {}
+
+	// these are also not implemented as members
+	int DebugDrawerAddOverlayTexture(const float*, int, int) { return 0; }
+	void DebugDrawerUpdateOverlayTexture(int, const float*, int, int, int, int) {}
+	void DebugDrawerDelOverlayTexture(int) {}
+	void DebugDrawerSetOverlayTexturePos(int, float, float) {}
+	void DebugDrawerSetOverlayTextureSize(int, float, float) {}
+	void DebugDrawerSetOverlayTextureLabel(int, const char*) {}
+
+
+	bool CanBuildAt(const UnitDef* unitDef, const float3& pos, int facing);
+	float3 ClosestBuildSite(const UnitDef* unitdef, const float3& pos, float searchRadius, int minDist, int facing);
 
 	float GetMetal();
 	float GetMetalIncome();
@@ -174,7 +228,7 @@ public:
 	int GetNumUnitDefs();
 	void GetUnitDefList (const UnitDef** list);
 
-	int GetSelectedUnits(int* unitIds, int unitIds_max);
+	int GetSelectedUnits(int* unitIds, int unitIds_max = -1);
 	float3 GetMousePos();
 	int GetMapPoints(PointMarker* pm, int pm_sizeMax, bool includeAllies);
 	int GetMapLines(LineMarker* lm, int lm_sizeMax, bool includeAllies);
@@ -197,10 +251,11 @@ public:
 	// 2. if inSize is less than 0, the data size is calculated using strlen()
 	// 3. the return data is subject to lua garbage collection,
 	//    copy it if you wish to continue using it
-	const char* CallLuaRules(const char* data, int inSize = -1, int* outSize = NULL);
+	const char* CallLuaRules(const char* data, int inSize = -1);
 
-	std::map<std::string, std::string> GetMyInfo();
-	std::map<std::string, std::string> GetMyOptionValues();
+	// never called, implemented in SSkirmishAICallbackImpl
+	std::map<std::string, std::string> GetMyInfo() { return std::map<std::string, std::string>(); }
+	std::map<std::string, std::string> GetMyOptionValues() { return std::map<std::string, std::string>(); }
 };
 
-#endif /* AICALLBACK_H */
+#endif // AI_CALLBACK_H

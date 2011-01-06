@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifdef _MSC_VER
 #include "StdAfx.h"
 #endif
@@ -22,16 +24,18 @@
 #include "SelectionWidget.h"
 #include "Game/PreGame.h"
 #include "Rendering/glFont.h"
-#include "LogOutput.h"
-#include "Exceptions.h"
-#include "TdfParser.h"
-#include "Util.h"
-#include "FileSystem/ArchiveScanner.h"
-#include "FileSystem/FileHandler.h"
-#include "FileSystem/VFSHandler.h"
-#include "FileSystem/FileSystem.h"
-#include "ConfigHandler.h"
-#include "InputHandler.h"
+#include "Rendering/GL/myGL.h"
+#include "System/ConfigHandler.h"
+#include "System/GlobalUnsynced.h"
+#include "System/Exceptions.h"
+#include "System/LogOutput.h"
+#include "System/TdfParser.h"
+#include "System/Util.h"
+#include "System/Input/InputHandler.h"
+#include "System/FileSystem/ArchiveScanner.h"
+#include "System/FileSystem/FileHandler.h"
+#include "System/FileSystem/VFSHandler.h"
+#include "System/FileSystem/FileSystem.h"
 #include "ScriptHandler.h"
 #include "aGui/Gui.h"
 #include "aGui/VerticalLayout.h"
@@ -47,9 +51,6 @@ using std::string;
 using agui::Button;
 using agui::HorizontalLayout;
 
-extern boost::uint8_t* keys;
-extern bool globalQuit;
-
 class ConnectWindow : public agui::Window
 {
 public:
@@ -58,7 +59,7 @@ public:
 		agui::gui->AddElement(this);
 		SetPos(0.5, 0.5);
 		SetSize(0.4, 0.2);
-		
+
 		agui::VerticalLayout* wndLayout = new agui::VerticalLayout(this);
 		HorizontalLayout* input = new HorizontalLayout(wndLayout);
 		/*agui::TextElement* label = */new agui::TextElement("Address:", input); // will be deleted in input
@@ -76,7 +77,7 @@ public:
 
 	boost::signal<void (std::string)> Connect;
 	agui::LineEdit* address;
-	
+
 private:
 	void Finish(bool connect)
 	{
@@ -113,7 +114,7 @@ public:
 
 	boost::signal<void (std::string)> OK;
 	agui::LineEdit* value;
-	
+
 private:
 	void Finish(bool set)
 	{
@@ -133,10 +134,10 @@ std::string CreateDefaultSetup(const std::string& map, const std::string& mod, c
 	game->add_name_value("Gametype", mod);
 
 	TdfParser::TdfSection* modopts = game->construct_subsection("MODOPTIONS");
-	modopts->AddPair("GameMode", 3);
 	modopts->AddPair("MaxSpeed", 20);
 
 	game->AddPair("IsHost", 1);
+	game->AddPair("OnlyLocal", 1);
 	game->add_name_value("MyPlayerName", playername);
 
 	game->AddPair("NoHelperAIs", configHandler->Get("NoHelperAIs", 0));
@@ -246,6 +247,7 @@ SelectMenu::~SelectMenu()
 	ShowConnectWindow(false);
 	CleanWindow();
 	delete updWindow;
+	delete mySettings;
 }
 
 bool SelectMenu::Draw()
@@ -268,7 +270,7 @@ bool SelectMenu::Update()
 			updWindow = NULL;
 		}
 	}
-	
+
 	return true;
 }
 
@@ -319,7 +321,7 @@ void SelectMenu::Multi()
 
 void SelectMenu::Quit()
 {
-	globalQuit = true;
+	gu->globalQuit = true;
 }
 
 void SelectMenu::ShowConnectWindow(bool show)
@@ -384,7 +386,7 @@ void SelectMenu::ShowSettingsList()
 		curSelect = new ListSelectWnd("Select setting");
 		curSelect->Selected.connect(boost::bind(&SelectMenu::SelectSetting, this, _1));
 		curSelect->WantClose.connect(boost::bind(&SelectMenu::CleanWindow, this));
-	}	
+	}
 	curSelect->list->RemoveAllItems();
 	const std::map<std::string, std::string> &data = configHandler->GetData();
 	for(std::map<std::string,std::string>::const_iterator iter = data.begin(); iter != data.end(); ++iter)
@@ -414,7 +416,7 @@ void SelectMenu::CleanWindow() {
 void SelectMenu::DirectConnect(const std::string& addr)
 {
 	configHandler->SetString("address", addr);
-	mySettings->hostip = addr;
+	mySettings->hostIP = addr;
 	mySettings->isHost = false;
 	pregame = new CPreGame(mySettings);
 	agui::gui->RmElement(this);
@@ -424,13 +426,10 @@ bool SelectMenu::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
 		case SDL_KEYDOWN: {
-			if (ev.key.keysym.sym == SDLK_ESCAPE)
-			{
+			if (ev.key.keysym.sym == SDLK_ESCAPE) {
 				logOutput.Print("User exited");
-				globalQuit=true;
-			}
-			else if (ev.key.keysym.sym == SDLK_RETURN)
-			{
+				Quit();
+			} else if (ev.key.keysym.sym == SDLK_RETURN) {
 				Single();
 				return true;
 			}

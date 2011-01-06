@@ -1,19 +1,4 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
-
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include <cstdio>
 
@@ -31,7 +16,6 @@ using std::sprintf;
 #include "ExternalAI/AIInterfaceLibraryInfo.h"
 #include "ExternalAI/SkirmishAIHandler.h"
 #include "ExternalAI/Interface/ELevelOfSupport.h"     // for ABI version
-#include "ExternalAI/Interface/SAIFloat3.h"           // for ABI version
 #include "ExternalAI/Interface/AISEvents.h"           // for ABI version
 #include "ExternalAI/Interface/AISCommands.h"         // for ABI version
 #include "ExternalAI/Interface/SSkirmishAILibrary.h"  // for ABI version
@@ -171,7 +155,7 @@ EXPORT(void) aiInterfaceCallback_Log_exception(int interfaceId, const char* cons
 			(die ? "AI Interface shutting down" : "AI Interface still running"), msg);
 	if (die) {
 		// TODO: FIXME: unload all skirmish AIs of this interface plus the interface itsself
-// 		std::vector<int> teamIds = IAILibraryManager::GetInstance()->GetAllTeamIdsAccociatedWithInterface(info->GetKey());
+// 		const std::vector<int> &teamIds = IAILibraryManager::GetInstance()->GetAllTeamIdsAccociatedWithInterface(info->GetKey());
 // 		std::vector<int>::const_iterator teamId;
 // 		for (teamId = teamIds.begin(); teamId != teamIds.end(); ++teamId) {
 // 			eoh->DestroySkirmishAI(*teamId);
@@ -187,13 +171,13 @@ EXPORT(char) aiInterfaceCallback_DataDirs_getPathSeparator(int UNUSED_interfaceI
 }
 EXPORT(int) aiInterfaceCallback_DataDirs_Roots_getSize(int UNUSED_interfaceId) {
 
-	const std::vector<std::string> dds =
+	const std::vector<std::string> &dds =
 			FileSystemHandler::GetInstance().GetDataDirectories();
 	return dds.size();
 }
 EXPORT(bool) aiInterfaceCallback_DataDirs_Roots_getDir(int UNUSED_interfaceId, char* path, int path_sizeMax, int dirIndex) {
 
-	const std::vector<std::string> dds =
+	const std::vector<std::string> &dds =
 			FileSystemHandler::GetInstance().GetDataDirectories();
 	size_t numDataDirs = dds.size();
 	if (dirIndex >= 0 && (size_t)dirIndex < numDataDirs) {
@@ -297,7 +281,7 @@ EXPORT(const char*) aiInterfaceCallback_DataDirs_getWriteableDir(int interfaceId
 		static const unsigned int sizeMax = 1024;
 		char tmpRes[sizeMax];
 		static const char* const rootPath = "";
-		bool exists = aiInterfaceCallback_DataDirs_locatePath(interfaceId,
+		const bool exists = aiInterfaceCallback_DataDirs_locatePath(interfaceId,
 				tmpRes, sizeMax, rootPath, true, true, true, false);
 		writeableDataDirs[interfaceId] = tmpRes;
 		if (!exists) {

@@ -1,12 +1,13 @@
 #!/bin/sh
-# Author: Tobi Vollebregt
 
 # Quit on error.
 set -e
 
+ORIG_DIR=$(pwd)
+
 # Sanity check.
 if [ ! -x /usr/bin/git ]; then
-	echo "Error: Couldn't find /usr/bin/git"
+	echo "Error: Couldn't find /usr/bin/git" >&2
 	exit 1
 fi
 
@@ -14,12 +15,12 @@ fi
 # (Compatible with SConstruct, which is in trunk root)
 
 while [ ! -d installer ]; do
-        if [ "$PWD" = "/" ]; then
-                echo "Error: Could not find installer directory."
-                echo "Make sure to run this script from a directory below your checkout directory."
-                exit 1
-        fi
-        cd ..
+	if [ "$PWD" = "/" ]; then
+		echo "Error: Could not find installer directory." >&2
+		echo "Make sure to run this script from a directory below your checkout directory." >&2
+		exit 1
+	fi
+	cd ..
 done
 
 set +e # turn of quit on error
@@ -40,14 +41,13 @@ else
 	version_string=`git describe --tags | sed s/\-[^\-]*$//`
 	branch="master"
 fi
-echo "Using $branch as source"
+echo "Using ${branch} as source"
 
 dir="spring_${version_string}"
 
 # Each one of these that is set, is built when running this script.
 # Linux archives
 # * linux (LF) line endings
-# * removed files needed for windows installer generation only
 # * GPL compatible
 lzma="spring_${version_string}_src.tar.lzma"
 #tbz="spring_${version_string}_src.tar.bz2"
@@ -63,36 +63,30 @@ tgz="spring_${branch}_src.tar.gz"
 # (directories are included recursively)
 include=" \
  $dir/AI/ \
- $dir/Documentation/ \
- $dir/Doxyfile \
- $dir/game/ \
+ $dir/doc/ \
+ $dir/cont/ \
+ $dir/include/ \
  $dir/installer/ \
- $dir/LICENSE.html \
- $dir/README.* \
  $dir/rts/ \
  $dir/SConstruct \
- $dir/tools/SelectionEditor/ \
- $dir/CMakeLists.txt \
  $dir/tools/unitsync/ \
+ $dir/tools/ArchiveMover/ \
  $dir/tools/DemoTool/ \
- $dir/tools/DedicatedServer/"
+ $dir/tools/CMakeLists.txt \
+ $dir/CMakeLists.txt \
+ $dir/Doxyfile \
+ $dir/directories.txt \
+ $dir/README.markdown \
+ $dir/LICENSE \
+ $dir/LICENSE.html \
+ $dir/THANKS \
+ $dir/AUTHORS \
+ $dir/FAQ \
+ $dir/COPYING"
 
 # On linux, win32 executables are useless.
-# TASClient is windows only.
 exclude_from_all=""
-linux_exclude="${exclude_from_all}
-	${dir}/installer/include/
-	${dir}/installer/sections/
-	${dir}/installer/graphics/
-	${dir}/installer/nsis_plugins/
-	${dir}/installer/*.exe
-	${dir}/installer/*.bat
-	${dir}/installer/*.nsi
-	${dir}/installer/*.nsh
-	${dir}/installer/make_installer.pl
-	${dir}/installer/make_luaui_nsh.py
-	${dir}/installer/tasclient_download.sh
-	${dir}/installer/springlobby_download.sh"
+linux_exclude="${exclude_from_all}"
 linux_include=""
 windows_exclude="${exclude_from_all}"
 windows_include=""
@@ -136,4 +130,4 @@ if [ -n "$zip" ] || [ -n "$seven_zip" ]; then
 	rm -rf crlf
 fi
 
-cd ..
+cd ${ORIG_DIR}

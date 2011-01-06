@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef OBJECT_H
 #define OBJECT_H
-// Object.h: interface for the CObject class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <list>
 #include "creg/creg_cond.h"
@@ -26,11 +25,14 @@ public:
 
 	CObject();
 	virtual ~CObject();
-	void Serialize(creg::ISerializer *s);
+	void Serialize(creg::ISerializer* s);
 	void PostLoad();
-	
+
+	/// Request to not inform this when o dies
 	void DeleteDeathDependence(CObject* o);
+	/// Request to inform this when o dies
 	void AddDeathDependence(CObject* o);
+	/// Called when an object died, that this is interested in
 	virtual void DependentDied(CObject* o);
 /*
 	// Possible future replacement for dynamic_cast (10x faster)

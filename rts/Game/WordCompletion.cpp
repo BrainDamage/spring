@@ -1,11 +1,7 @@
-// WordCompletion.cpp: implementation of the CWordCompletion class.
-//
-//////////////////////////////////////////////////////////////////////
-//
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 //  TODO: replace 'WordProperties' with regex/glob expressions
 //        ex: '.give [0-9]* armcom'
-//
-
 
 #include "StdAfx.h"
 #include "mmgr.h"
@@ -42,6 +38,7 @@ void CWordCompletion::Reset()
 	words["/ctrlpanel "] = sl;
 	words["/distdraw "] = sl;
 	words["/disticon "] = sl;
+	words["/debugdrawai"] = sl;
 	words["/debuginfo sound"] = sl;
 	words["/debuginfo profiling"] = sl;
 	words["/incguiopacity "] = sl;
@@ -111,10 +108,14 @@ void CWordCompletion::Reset()
 	words["/nopause "] = sl;
 	words["/nospectatorchat "] = sl;
 	words["/reloadcob "] = sl;
+	words["/reloadcegs "] = sl;
 	words["/save "] = sl;
 	words["/setmaxspeed "] = sl;
 	words["/setminspeed "] = sl;
+	words["/skip "] = sl;
 	words["/skip +"] = sl;
+	words["/skip f"] = sl;
+	words["/skip f+"] = sl;
 	words["/spectator"] = sl;
 	words["/take"] = sl;
 	words["/team "] = sl;
@@ -171,7 +172,7 @@ std::vector<std::string> CWordCompletion::Complete(std::string& msg) const
 
 	// make a list of valid possible matches
 	std::map<std::string, WordProperties>::const_iterator it;
-	for (it = start; it != words.end(); it++) {
+	for (it = start; it != words.end(); ++it) {
 		const int cmp = it->first.compare(0, fragLen, fragment);
 		if (cmp < 0) continue;
 		if (cmp > 0) break;

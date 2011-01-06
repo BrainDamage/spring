@@ -1,38 +1,54 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LOSHANDLER_H
 #define LOSHANDLER_H
-// LosHandler.h: interface for the CLosHandler class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <vector>
 #include <list>
 #include <deque>
 #include <boost/noncopyable.hpp>
-#include "MemPool.h"
 #include "Map/Ground.h"
 #include "Sim/Objects/WorldObject.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Misc/RadarHandler.h"
+#include "System/MemPool.h"
+#include "System/Vec2.h"
 #include <assert.h>
 
 
 struct LosInstance : public boost::noncopyable
 {
+private:
 	CR_DECLARE_STRUCT(LosInstance);
- 	std::vector<int> losSquares;
-	LosInstance() {} // default constructor for creg
+
+	/// default constructor for creg
+	LosInstance()
+		: losSize(0)
+		, airLosSize(0)
+		, refCount(0)
+		, allyteam(-1)
+		, baseSquare(0)
+		, hashNum(-1)
+		, baseHeight(0.0f)
+		, toBeDeleted(false)
+	{}
+
+public:
 	LosInstance(int lossize, int airLosSize, int allyteam, int2 basePos,
-	            int baseSquare, int2 baseAirPos, int hashNum, float baseHeight)
-		: losSize(lossize),
-			airLosSize(airLosSize),
-			refCount(1),
-			allyteam(allyteam),
-			basePos(basePos),
-			baseSquare(baseSquare),
-			baseAirPos(baseAirPos),
-			hashNum(hashNum),
-			baseHeight(baseHeight),
-			toBeDeleted(false) {}
+			int baseSquare, int2 baseAirPos, int hashNum, float baseHeight)
+		: losSize(lossize)
+		, airLosSize(airLosSize)
+		, refCount(1)
+		, allyteam(allyteam)
+		, basePos(basePos)
+		, baseSquare(baseSquare)
+		, baseAirPos(baseAirPos)
+		, hashNum(hashNum)
+		, baseHeight(baseHeight)
+		, toBeDeleted(false)
+	{}
+
+ 	std::vector<int> losSquares;
 	int losSize;
 	int airLosSize;
 	int refCount;
@@ -56,64 +72,47 @@ public:
 	void MoveUnit(CUnit* unit, bool redoCurrent);
 	void FreeInstance(LosInstance* instance);
 
-	bool InLos(const CWorldObject* object, int allyTeam) {
+	inline bool InLos(const CWorldObject* object, int allyTeam) {
 		if (object->alwaysVisible || gs->globalLOS) {
 			return true;
-		}
-		else if (object->useAirLos) {
-			const int gx = (int)(object->pos.x * invAirDiv);
-			const int gz = (int)(object->pos.z * invAirDiv);
-			return !!airLosMap[allyTeam].At(gx, gz);
-		}
-		else {
-			const int gx = (int)(object->pos.x * invLosDiv);
-			const int gz = (int)(object->pos.z * invLosDiv);
-			return !!losMap[allyTeam].At(gx, gz);
+		} else if (object->useAirLos) {
+			return (InAirLos(object->pos, allyTeam));
+		} else {
+			return (InLos(object->pos, allyTeam));
 		}
 	}
 
-	bool InLos(const CUnit* unit, int allyTeam) {
+	inline bool InLos(const CUnit* unit, int allyTeam) {
 		// NOTE: units are treated differently than world objects in 2 ways:
 		//       1. they can be cloaked
 		//       2. when underwater, they only get LOS if they also have sonar
 		//          (when the requireSonarUnderWater variable is enabled)
 		if (unit->alwaysVisible || gs->globalLOS) {
 			return true;
-		}
-		else if (unit->isCloaked) {
+		} else if (unit->isCloaked) {
 			return false;
-		}
-		else if (unit->useAirLos) {
-			const int gx = (int)(unit->pos.x * invAirDiv);
-			const int gz = (int)(unit->pos.z * invAirDiv);
-			return !!airLosMap[allyTeam].At(gx, gz);
-		}
-		else {
+		} else if (unit->useAirLos) {
+			return (InAirLos(unit->pos, allyTeam));
+		} else {
 			if (unit->isUnderWater && requireSonarUnderWater &&
 			    !radarhandler->InRadar(unit, allyTeam)) {
 				return false;
 			}
-			const int gx = (int)(unit->pos.x * invLosDiv);
-			const int gz = (int)(unit->pos.z * invLosDiv);
-			return !!losMap[allyTeam].At(gx, gz);
+			return (InLos(unit->pos, allyTeam));
 		}
 	}
 
-	bool InLos(float3 pos, int allyTeam) {
-		if (gs->globalLOS) {
-			return true;
-		}
-		const int gx = (int)(pos.x * invLosDiv);
-		const int gz = (int)(pos.z * invLosDiv);
+	inline bool InLos(const float3& pos, int allyTeam) {
+		if (gs->globalLOS) { return true; }
+		const int gx = int(pos.x * invLosDiv);
+		const int gz = int(pos.z * invLosDiv);
 		return !!losMap[allyTeam].At(gx, gz);
 	}
 
-	bool InAirLos(float3 pos, int allyTeam) {
-		if (gs->globalLOS) {
-			return true;
-		}
-		const int gx = (int)(pos.x * invAirDiv);
-		const int gz = (int)(pos.z * invAirDiv);
+	inline bool InAirLos(const float3& pos, int allyTeam) {
+		if (gs->globalLOS) { return true; }
+		const int gx = int(pos.x * invAirDiv);
+		const int gz = int(pos.z * invAirDiv);
 		return !!airLosMap[allyTeam].At(gx, gz);
 	}
 
@@ -137,6 +136,8 @@ public:
 	const bool requireSonarUnderWater;
 
 private:
+	static const unsigned int LOSHANDLER_MAGIC_PRIME = 2309;
+
 	void PostLoad();
 	void LosAdd(LosInstance* instance);
 	int GetHashNum(CUnit* unit);
@@ -145,7 +146,7 @@ private:
 
 	CLosAlgorithm losAlgo;
 
-	std::list<LosInstance*> instanceHash[2309+1];
+	std::list<LosInstance*> instanceHash[LOSHANDLER_MAGIC_PRIME];
 
 	std::deque<LosInstance*> toBeDeleted;
 
@@ -158,7 +159,7 @@ private:
 	std::deque<DelayedInstance> delayQue;
 
 public:
-	void Update(void);
+	void Update();
 	void DelayedFreeInstance(LosInstance* instance);
 };
 

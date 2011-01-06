@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef MOVEMATH_H
 #define MOVEMATH_H
 
@@ -14,33 +16,31 @@ public:
 	const static int BLOCK_MOBILE = 2;
 	const static int BLOCK_MOBILE_BUSY = 4;
 	const static int BLOCK_STRUCTURE = 8;
-	const static int BLOCK_TERRAIN = 16;
 
 	// returns a speed-multiplier for given position or data
-	float SpeedMod(const MoveData& moveData, float3 pos);
-	float SpeedMod(const MoveData& moveData, int xSquare, int zSquare);
-	virtual float SpeedMod(const MoveData& moveData, float height, float slope) = 0;
-	float SpeedMod(const MoveData& moveData, float3 pos,const float3& moveDir);
-	float SpeedMod(const MoveData& moveData, int xSquare, int zSquare,const float3& moveDir);
-	virtual float SpeedMod(const MoveData& moveData, float height, float slope,float moveSlope) = 0;
+	float SpeedMod(const MoveData& moveData, const float3& pos) const;
+	float SpeedMod(const MoveData& moveData, int xSquare, int zSquare) const;
+	virtual float SpeedMod(const MoveData& moveData, float height, float slope) const = 0;
+	float SpeedMod(const MoveData& moveData, const float3& pos, const float3& moveDir) const;
+	float SpeedMod(const MoveData& moveData, int xSquare, int zSquare,const float3& moveDir) const;
+	virtual float SpeedMod(const MoveData& moveData, float height, float slope, float moveSlope) const = 0;
 
 	// tells whether a position is blocked (inaccessable for a given object's movedata)
-	int IsBlocked(const MoveData& moveData, float3 pos, bool fromEst = false);
-	int IsBlocked(const MoveData& moveData, int xSquare, int zSquare, bool fromEst = false);
-	int IsBlocked2(const MoveData& moveData, int xSquare, int zSquare, bool fromEst = false);
-
+	int IsBlocked(const MoveData& moveData, const float3& pos) const;
+	int IsBlocked(const MoveData& moveData, int xSquare, int zSquare) const;
+	
 	// tells whether a given object is blocking the given movedata
-	bool CrushResistant(const MoveData& moveData, const CSolidObject* object);
-	bool IsNonBlocking(const MoveData& moveData, const CSolidObject* object);
+	bool CrushResistant(const MoveData& moveData, const CSolidObject* object) const;
+	bool IsNonBlocking(const MoveData& moveData, const CSolidObject* object) const;
 
 	// gives the y-coordinate the unit will "stand on"
-	virtual float yLevel(const float3& pos);
-	virtual float yLevel(int xSquare, int Square) = 0;
+	virtual float yLevel(const float3& pos) const;
+	virtual float yLevel(int xSquare, int Square) const = 0;
 
 	// returns the block-status of a single quare
-	int SquareIsBlocked(const MoveData& moveData, int xSquare, int zSquare, bool fromEst = false);
+	int SquareIsBlocked(const MoveData& moveData, int xSquare, int zSquare) const;
 
-	virtual ~CMoveMath();
+	virtual ~CMoveMath() {}
 };
 
 #endif

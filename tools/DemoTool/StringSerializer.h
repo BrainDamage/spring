@@ -1,12 +1,14 @@
-#ifndef STRINGSERIALIZER_H
-#define STRINGSERIALIZER_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef STRING_SERIALIZER_H
+#define STRING_SERIALIZER_H
 
 #include <sstream>
 #include <cstdio>
 
-#include "PlayerStatistics.h"
-#include "TeamStatistics.h"
-#include "demofile.h"
+#include "Game/PlayerStatistics.h"
+#include "Sim/Misc/TeamStatistics.h"
+#include "System/LoadSave/demofile.h"
 
 using std::wstringstream;
 using std::endl;
@@ -38,7 +40,6 @@ wstringstream& operator<<(wstringstream& str, const DemoFileHeader& header)
 	str<<L"TeamStatSize: " <<header.teamStatSize<<endl;
 	str<<L"TeamStatElemSize: " <<header.teamStatElemSize<<endl;
 	str<<L"TeamStatPeriod: " <<header.teamStatPeriod<<endl;
-	str<<L"WinningAllyTeam: " <<header.winningAllyTeam<<endl;
 	return str;
 }
 
@@ -78,4 +79,4 @@ wstringstream& operator<<(wstringstream& str, const TeamStatistics& header)
 	return str;
 }
 
-#endif
+#endif /* STRING_SERIALIZER_H */

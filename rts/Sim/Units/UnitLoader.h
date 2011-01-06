@@ -1,34 +1,36 @@
-#ifndef UNITLOADER_H
-#define UNITLOADER_H
-// UnitLoader.h: interface for the CUnitLoader class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef UNIT_LOADER_H
+#define UNIT_LOADER_H
+
+#include "System/float3.h"
+
+#include <string>
 
 class CUnit;
 class CWeapon;
-#include <string>
-
-#include "UnitDef.h"
-
 struct GuiSoundSet;
+struct UnitDef;
+struct UnitDefWeapon;
+struct WeaponDef;
 
 class CUnitLoader
 {
 public:
-	CUnitLoader();
-	virtual ~CUnitLoader();
+	/// @param builder may be NULL
+	CUnit* LoadUnit(const std::string& name, const float3& pos, int team, bool build, int facing, const CUnit* builder);
+	/// @param builder may be NULL
+	CUnit* LoadUnit(const UnitDef* ud, const float3& pos, int team, bool build, int facing, const CUnit* builder);
 
-	CUnit* LoadUnit(const std::string& name, float3 pos, int team,
-		bool build, int facing, const CUnit* builder /* can be NULL */);
-	CUnit* LoadUnit(const UnitDef* ud, float3 pos, int team,
-		bool build, int facing, const CUnit* builder /* can be NULL */);
+	CWeapon* LoadWeapon(CUnit* owner, const UnitDefWeapon* udw);
+
 	void FlattenGround(const CUnit* unit);
+	void RestoreGround(const CUnit* unit);
 
-	CWeapon* LoadWeapon(const WeaponDef* weapondef, CUnit* owner, const UnitDef::UnitDefWeapon* udw);
 protected:
-	void LoadSound(GuiSoundSet &sound);
+	void LoadSound(GuiSoundSet& sound);
 };
 
-extern CUnitLoader unitLoader;
+extern CUnitLoader* unitLoader;
 
-#endif /* UNITLOADER_H */
+#endif /* UNIT_LOADER_H */

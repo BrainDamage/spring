@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef MOD_INFO_H
 #define MOD_INFO_H
 
@@ -6,16 +8,63 @@
 class CModInfo
 {
 public:
-	CModInfo() {};
-	~CModInfo() {};
+	CModInfo()
+		: allowTeamColors(true)
+		, allowAirPlanesToLeaveMap(true)
+		, constructionDecay(true)
+		, constructionDecayTime(1000)
+		, constructionDecaySpeed(1.0f)
+		, multiReclaim(1)
+		, reclaimMethod(1)
+		, reclaimUnitMethod(1)
+		, reclaimUnitEnergyCostFactor(0.0f)
+		, reclaimUnitEfficiency(1.0f)
+		, reclaimFeatureEnergyCostFactor(0.0f)
+		, reclaimAllowEnemies(true)
+		, reclaimAllowAllies(true)
+		, repairEnergyCostFactor(0.0f)
+		, resurrectEnergyCostFactor(0.5f)
+		, captureEnergyCostFactor(0.0f)
+		, paralyzeOnMaxHealth(true)
+		, transportGround(1)
+		, transportHover(0)
+		, transportShip(0)
+		, transportAir(0)
+		, fireAtKilled(1)
+		, fireAtCrashing(1)
+		, flankingBonusModeDefault(0)
+		, losMipLevel(0)
+		, airMipLevel(0)
+		, losMul(1.0f)
+		, airLosMul(1.0f)
+		, requireSonarUnderWater(true)
+		, featureVisibility(FEATURELOS_NONE)
+	{}
+	~CModInfo() {}
 
-	void Init(const char* modname);
+	void Init(const char* modArchive);
 
-	/// archive filename
+	/**
+	 * The archive file name.
+	 * examples: "Supreme Annihilation U32 V1.0.sdz", "BA704.sd7", "133855d253e657e9406122f346cfe8f1.sdp"
+	 */
 	std::string filename;
 
+	/**
+	 * The human readable name (including version).
+	 * The lower-case version of this is used for dependency checking.
+	 * examples: "Supreme Annihilation U32 V1.0", "Balanced Annihilation V7.04", "Balanced Annihilation V7.11"
+	 */
 	std::string humanName;
+	/**
+	 * The short name (not including version).
+	 * examples: "SA", "BA", "BA"
+	 */
 	std::string shortName;
+	/**
+	 * The version
+	 * examples: "U32 V1.0", "7.04", "7.11"
+	 */
 	std::string version;
 	std::string mutator;
 	std::string description;
@@ -108,5 +157,4 @@ public:
 
 extern CModInfo modInfo;
 
-
-#endif
+#endif // MOD_INFO_H

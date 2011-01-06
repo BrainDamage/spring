@@ -1,21 +1,24 @@
-#ifndef MUZZLEFLAME_H
-#define MUZZLEFLAME_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef MUZZLE_FLAME_H
+#define MUZZLE_FLAME_H
 
 #include "Sim/Projectiles/Projectile.h"
 
-class CMuzzleFlame :
-	public CProjectile
+class CMuzzleFlame : public CProjectile
 {
 	CR_DECLARE(CMuzzleFlame);
 
 	void creg_Serialize(creg::ISerializer& s);
 public:
-	CMuzzleFlame(const float3& pos,const float3& speed,const float3& dir,float size GML_PARG_H);
-	~CMuzzleFlame(void);
+	CMuzzleFlame(const float3& pos, const float3& speed, const float3& dir,
+			float size);
+	~CMuzzleFlame();
 
-	void Draw(void);
-	void Update(void);
+	void Draw();
+	void Update();
 
+private:
 	float3 dir;
 	float size;
 	int age;
@@ -27,4 +30,4 @@ public:
 };
 
 
-#endif /* MUZZLEFLAME_H */
+#endif /* MUZZLE_FLAME_H */

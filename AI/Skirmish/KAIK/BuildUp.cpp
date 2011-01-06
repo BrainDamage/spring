@@ -104,15 +104,17 @@ void CBuildUp::GetEconState(EconState* es) const {
 	es->mOverflow = (es->mStorage / (es->mIncome + 0.01)) < (STORAGETIME * 2);
 
 	es->eLevelMed = (es->eLevel50 && es->makersOn);
-	es->mLevelLow =
-		es->mLevel50 ||
-		(es->mStall && es->eLevel80) ||
-		(!es->factFeasM && factoryTimer <= 0);
 
 	es->factFeasM =
 		(es->factoryDef != NULL)?
 		ai->math->MFeasibleConstruction(es->builderDef, es->factoryDef):
 		true;
+
+	es->mLevelLow =
+		es->mLevel50 ||
+		(es->mStall && es->eLevel80) ||
+		(!es->factFeasM && factoryTimer <= 0);
+
 	es->factFeasE =
 		(es->factoryDef != NULL)?
 		ai->math->EFeasibleConstruction(es->builderDef, es->factoryDef):
@@ -235,7 +237,7 @@ void CBuildUp::Buildup(int frame) {
 					// FIXME: not happening often enough during res. stalls
 					//
 					const bool reclaimFeature =
-						((frame & 1) && ai->MyUnits[econState.builderID]->ReclaimBestFeature(true, 4096));
+						((frame & 1) && ai->GetUnit(econState.builderID)->ReclaimBestFeature(true, 4096));
 
 					if (!reclaimFeature) {
 						const bool haveNewMex = BuildUpgradeExtractor(econState.builderID);
@@ -289,8 +291,8 @@ void CBuildUp::Buildup(int frame) {
 								bool r = false;
 
 								if (building) {
-									float3 buildPos = ai->dm->GetDefensePos(building, ai->MyUnits[econState.builderID]->pos());
-									r = ai->MyUnits[econState.builderID]->Build_ClosestSite(building, buildPos, 2);
+									float3 buildPos = ai->dm->GetDefensePos(building, ai->GetUnit(econState.builderID)->pos());
+									r = ai->GetUnit(econState.builderID)->Build_ClosestSite(building, buildPos, 2);
 								} else {
 									FallbackBuild(econState.builderID, CAT_DEFENCE);
 								}
@@ -313,10 +315,10 @@ void CBuildUp::Buildup(int frame) {
 								BuildNow(econState.builderID, CAT_FACTORY, econState.factoryDef);
 							} else {
 								std::stringstream msg;
-									msg << "[CBuildUp::BuildUp()] frame " << frame << "\n";
+									msg << "[CBuildUp::BuildUp()][frame=" << frame << "]\n";
 									msg << "\tbuilder " << econState.builderID << " is currently in limbo";
 									msg << " (total number of idle builders: " << econState.nIdleBuilders << ")\n";
-								L(ai, msg.str());
+								ai->GetLogger()->Log(msg.str());
 							}
 						}
 					}
@@ -344,7 +346,7 @@ void CBuildUp::FactoryCycle(int frame) {
 		// pick the i-th idle factory we have
 		UnitCategory producedCat = CAT_LAST;
 		const int factoryUnitID  = ai->uh->GetIU(CAT_FACTORY);
-		const CUNIT* u           = ai->MyUnits[factoryUnitID];
+		const CUNIT* u           = ai->GetUnit(factoryUnitID);
 		const bool isHub         = u->isHub();
 		const UnitDef* factDef   = u->def();
 
@@ -434,7 +436,7 @@ void CBuildUp::NukeSiloCycle(void) {
 
 		// always keep at least 5 nukes in queue for a rainy day
 		if (silo->numNukesQueued < 5)
-			ai->MyUnits[silo->id]->NukeSiloBuild();
+			ai->GetUnit(silo->id)->NukeSiloBuild();
 	}
 }
 
@@ -466,22 +468,22 @@ void CBuildUp::FallbackBuild(int builderID, int failedCat) {
 		const UnitDef* udef4 = ai->ut->GetUnitByScore(builderID, CAT_FACTORY);
 
 		if (udef2 && failedCat != CAT_ENERGY) {
-			ai->MyUnits[builderID]->Build_ClosestSite(udef2, builderPos);
+			ai->GetUnit(builderID)->Build_ClosestSite(udef2, builderPos);
 			return;
 		}
 		if (udef3 && failedCat != CAT_DEFENCE) {
 			float3 pos = ai->dm->GetDefensePos(udef3, builderPos);
-			ai->MyUnits[builderID]->Build_ClosestSite(udef3, pos);
+			ai->GetUnit(builderID)->Build_ClosestSite(udef3, pos);
 			return;
 		}
 		if (udef4 && failedCat != CAT_FACTORY) {
-			ai->MyUnits[builderID]->Build_ClosestSite(udef4, builderPos);
+			ai->GetUnit(builderID)->Build_ClosestSite(udef4, builderPos);
 			return;
 		}
 		if (udef1 && failedCat != CAT_MEX) {
 			float3 pos = ai->mm->GetNearestMetalSpot(builderID, udef1);
 			if (pos != ERRORVECTOR)
-				ai->MyUnits[builderID]->Build(pos, udef1, -1);
+				ai->GetUnit(builderID)->Build(pos, udef1, -1);
 			return;
 		}
 	}
@@ -489,7 +491,7 @@ void CBuildUp::FallbackBuild(int builderID, int failedCat) {
 
 	// unable to assist and unable to build, just patrol
 	if (!b1 && !b2 && !b3 && !b4) {
-		ai->MyUnits[builderID]->Patrol(builderPos);
+		ai->GetUnit(builderID)->Patrol(builderPos);
 	}
 }
 
@@ -539,7 +541,7 @@ bool CBuildUp::BuildNow(int builderID, UnitCategory cat, const UnitDef* udef) {
 		const bool b1 = ((ai->uh->AllUnitsByType[udef->id]).size() < 1);
 
 		if (!b0 || b1) {
-			r = ai->MyUnits[builderID]->Build_ClosestSite(udef, ai->cb->GetUnitPos(builderID));
+			r = ai->GetUnit(builderID)->Build_ClosestSite(udef, ai->cb->GetUnitPos(builderID));
 		}
 	} else {
 		FallbackBuild(builderID, cat);
@@ -554,14 +556,15 @@ bool CBuildUp::BuildUpgradeExtractor(int builderID) {
 	const UnitDef* newMexDef = ai->ut->GetUnitByScore(builderID, CAT_MEX);
 
 	if (newMexDef != NULL) {
-		const float3 builderPos = ai->MyUnits[builderID]->pos();
-		const float3 newMexPos  = ai->mm->GetNearestMetalSpot(builderID, newMexDef);
+		const CUNIT*  builder    = ai->GetUnit(builderID);
+		const float3& builderPos = builder->pos();
+		const float3  newMexPos  = ai->mm->GetNearestMetalSpot(builderID, newMexDef);
 		// const float  oldMexDist = newMexPos.distance2D(builderPos);
 
 		if (newMexPos != ERRORVECTOR) {
 			if (!ai->uh->BuildTaskAddBuilder(builderID, CAT_MEX)) {
 				// build a new metal extractor
-				return (ai->MyUnits[builderID]->Build(newMexPos, newMexDef, -1));
+				return (builder->Build(newMexPos, newMexDef, -1));
 			}
 		} else {
 			// upgrade an existing extractor (NOTE: GetNearestMetalSpot()
@@ -606,7 +609,7 @@ bool CBuildUp::BuildUpgradeReactor(int builderID) {
 			float        closestDstSq = MY_FLT_MAX;
 
 			int             oldReactorID  = -1;
-			float3          oldReactorPos = ZEROVECTOR;
+			float3          oldReactorPos = ZeroVector;
 			const  UnitDef* oldReactorDef = NULL;
 
 			std::list<int> lst = ai->uh->AllUnitsByCat[CAT_ENERGY];

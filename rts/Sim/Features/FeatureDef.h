@@ -1,10 +1,12 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef FEATURE_DEF_H
 #define FEATURE_DEF_H
 
 #include <string>
 #include <map>
 
-#include "float3.h"
+#include "System/float3.h"
 
 #define DRAWTYPE_MODEL 0
 #define DRAWTYPE_TREE 1 // >= different types of trees
@@ -18,14 +20,10 @@ struct FeatureDef
 {
 	CR_DECLARE_STRUCT(FeatureDef);
 
-	FeatureDef():
-		metal(0), energy(0), maxHealth(0), reclaimTime(0), mass(0),
-		upright(false), drawType(0), model(NULL),
-		resurrectable(false), smokeTime(0), destructable(false), reclaimable(true), autoreclaim(true), blocking(false),
-		burnable(false), floating(false), noSelect(false), geoThermal(false),
-		xsize(0), zsize(0) {}
+	FeatureDef();
+	~FeatureDef();
 
-	S3DModel* LoadModel();
+	S3DModel* LoadModel() const;
 	CollisionVolume* collisionVolume;
 
 	std::string myName;
@@ -41,11 +39,6 @@ struct FeatureDef
 
 	/// used to see if the object can be overrun
 	float mass;
-
-	std::string collisionVolumeTypeStr;  // can be "Ell", "CylT" (where T is one of "XYZ"), or "Box"
-	float3 collisionVolumeScales;        // the collision volume's full axis lengths
-	float3 collisionVolumeOffsets;       // relative to the feature's center position
-	int collisionVolumeTest;             // 0: discrete, 1: continuous
 
 	bool upright;
 	int drawType;
@@ -77,11 +70,5 @@ struct FeatureDef
 
 	std::map<std::string, std::string> customParams;
 };
-
-//not very sweet, but still better than replacing "const FeatureDef" _everywhere_
-inline S3DModel* LoadModel(const FeatureDef* fdef)
-{
-	return const_cast<FeatureDef*>(fdef)->LoadModel();
-}
 
 #endif

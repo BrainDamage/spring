@@ -1,20 +1,10 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaUnsyncedCtrl.cpp: implementation of the LuaUnsyncedCtrl class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <list>
 #include <cctype>
-#ifndef _WIN32
-	#include <unistd.h>
-	#define EXECLP execlp
-#else
-	#include <process.h>
-	#define EXECLP _execlp
-#endif
-
-#include <errno.h>
 
 #include <fstream>
 
@@ -52,9 +42,10 @@
 #include "Map/ReadMap.h"
 #include "Map/BaseGroundDrawer.h"
 #include "Rendering/GL/myGL.h"
-#include "Rendering/FontTexture.h"
 #include "Rendering/IconHandler.h"
 #include "Rendering/InMapDraw.h"
+#include "Rendering/WindowManagerHelper.h"
+#include "Rendering/Textures/Bitmap.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDefHandler.h"
@@ -66,9 +57,9 @@
 #include "LogOutput.h"
 #include "Util.h"
 #include "NetProtocol.h"
-#include "Sound/Sound.h"
-#include "Sound/AudioChannel.h"
-#include "Sound/Music.h"
+#include "Sound/ISound.h"
+#include "Sound/IEffectChannel.h"
+#include "Sound/IMusicChannel.h"
 
 #include "FileSystem/FileHandler.h"
 #include "FileSystem/FileSystemHandler.h"
@@ -82,7 +73,6 @@ using namespace std;
 
 // MinGW defines this for a WINAPI function
 #undef SendMessage
-extern boost::uint8_t *keys;
 
 const int CMD_INDEX_OFFSET = 1; // starting index for command descriptions
 
@@ -165,7 +155,6 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetConfigString);
 
 	REGISTER_LUA_CFUNC(CreateDir);
-	REGISTER_LUA_CFUNC(MakeFont);
 
 	REGISTER_LUA_CFUNC(SendCommands);
 	REGISTER_LUA_CFUNC(GiveOrder);
@@ -191,6 +180,8 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetLosViewColors);
 
 	REGISTER_LUA_CFUNC(Restart);
+	REGISTER_LUA_CFUNC(SetWMIcon);
+	REGISTER_LUA_CFUNC(SetWMCaption);
 
 	REGISTER_LUA_CFUNC(SetUnitDefIcon);
 	REGISTER_LUA_CFUNC(SetUnitDefImage);
@@ -392,6 +383,7 @@ void LuaUnsyncedCtrl::DrawUnitCommandQueues()
 
 	glLineWidth(cmdColors.QueuedLineWidth());
 
+	GML_RECMUTEX_LOCK(unit); // DrawUnitCommandQueues
 	GML_STDMUTEX_LOCK(cai); // DrawUnitCommandQueues
 	GML_STDMUTEX_LOCK(dque); // DrawUnitCommandQueues
 
@@ -445,7 +437,7 @@ static string ParseMessage(lua_State* L, const string& msg)
 		luaL_error(L, "Bad message format: %s", msg.c_str());
 	}
 
-	if ((playerID < 0) || (playerID >= playerHandler->ActivePlayers())) {
+	if (!playerHandler->IsValidPlayer(playerID)) {
 		luaL_error(L, "Invalid message playerID: %i", playerID);
 	}
 	const CPlayer* player = playerHandler->Player(playerID);
@@ -562,10 +554,7 @@ int LuaUnsyncedCtrl::PlaySoundFile(lua_State* L)
 	const string soundFile = lua_tostring(L, 1);
 	const unsigned int soundID = sound->GetSoundId(soundFile, false);
 	if (soundID > 0) {
-		float volume = 1.0f;
-		if (args >= 2) {
-			volume = lua_tofloat(L, 2);
-		}
+		float volume = luaL_optfloat(L, 2, 1.0f);
 
 		if (args < 5) {
 			Channels::General.PlaySample(soundID, volume);
@@ -685,18 +674,18 @@ int LuaUnsyncedCtrl::AddWorldUnit(lua_State* L)
 			"Incorrect arguments to AddWorldUnit(unitDefID, x, y, z, team, facing)");
 	}
 	const int unitDefID = lua_toint(L, 1);
-	if ((unitDefID < 0) || (unitDefID > unitDefHandler->numUnitDefs)) {
+	if (!unitDefHandler->IsValidUnitDefID(unitDefID)) {
 		return 0;
 	}
 	const float3 pos(lua_tofloat(L, 2),
 	                 lua_tofloat(L, 3),
 	                 lua_tofloat(L, 4));
-	const int team = lua_toint(L, 5);
-	if ((team < 0) || (team >= teamHandler->ActiveTeams())) {
+	const int teamId = lua_toint(L, 5);
+	if (!teamHandler->IsValidTeam(teamId)) {
 		return 0;
 	}
 	const int facing = lua_toint(L, 6);
-	cursorIcons.AddBuildIcon(-unitDefID, pos, team, facing);
+	cursorIcons.AddBuildIcon(-unitDefID, pos, teamId, facing);
 	return 0;
 }
 
@@ -856,7 +845,7 @@ int LuaUnsyncedCtrl::SelectUnitMap(lua_State* L)
 int LuaUnsyncedCtrl::SetTeamColor(lua_State* L)
 {
 	const int teamID = luaL_checkint(L, 1);
-	if ((teamID < 0) || (teamID >= teamHandler->ActiveTeams())) {
+	if (!teamHandler->IsValidTeam(teamID)) {
 		return 0;
 	}
 	CTeam* team = teamHandler->Team(teamID);
@@ -877,10 +866,6 @@ int LuaUnsyncedCtrl::SetTeamColor(lua_State* L)
 
 int LuaUnsyncedCtrl::AssignMouseCursor(lua_State* L)
 {
-	if (!CLuaHandle::GetActiveHandle()->GetUserMode()) {
-		return 0;
-	}
-
 	const int args = lua_gettop(L); // number of arguments
 	if ((args < 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
 		luaL_error(L, "Incorrect arguments to AssignMouseCursor()");
@@ -901,22 +886,19 @@ int LuaUnsyncedCtrl::AssignMouseCursor(lua_State* L)
 		}
 	}
 
-	if (mouse->AssignMouseCursor(cmdName, fileName, hotSpot, overwrite)) {
-		lua_pushboolean(L, true);
-	} else {
-		lua_pushboolean(L, false);
+	const bool worked = mouse->AssignMouseCursor(cmdName, fileName, hotSpot, overwrite);
+
+	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+		lua_pushboolean(L, worked);
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 
 int LuaUnsyncedCtrl::ReplaceMouseCursor(lua_State* L)
 {
-	if (!CLuaHandle::GetActiveHandle()->GetUserMode()) {
-		return 0;
-	}
-
 	const int args = lua_gettop(L); // number of arguments
 	if ((args < 1) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
 		luaL_error(L, "Incorrect arguments to ReplaceMouseCursor()");
@@ -932,9 +914,14 @@ int LuaUnsyncedCtrl::ReplaceMouseCursor(lua_State* L)
 		}
 	}
 
-	lua_pushboolean(L, mouse->ReplaceMouseCursor(oldName, newName, hotSpot));
+	const bool worked = mouse->ReplaceMouseCursor(oldName, newName, hotSpot);
 
-	return 1;
+	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+		lua_pushboolean(L, worked);
+		return 1;
+	}
+
+	return 0;
 }
 
 /******************************************************************************/
@@ -996,7 +983,7 @@ int LuaUnsyncedCtrl::SetDrawSky(lua_State* L)
 	if (!lua_isboolean(L, 1)) {
 		luaL_error(L, "Incorrect arguments to SetDrawSky()");
 	}
-	game->drawSky = !!lua_toboolean(L, 1);
+	globalRendering->drawSky = !!lua_toboolean(L, 1);
 	return 0;
 }
 
@@ -1009,7 +996,7 @@ int LuaUnsyncedCtrl::SetDrawWater(lua_State* L)
 	if (!lua_isboolean(L, 1)) {
 		luaL_error(L, "Incorrect arguments to SetDrawWater()");
 	}
-	game->drawWater = !!lua_toboolean(L, 1);
+	globalRendering->drawWater = !!lua_toboolean(L, 1);
 	return 0;
 }
 
@@ -1022,7 +1009,7 @@ int LuaUnsyncedCtrl::SetDrawGround(lua_State* L)
 	if (!lua_isboolean(L, 1)) {
 		luaL_error(L, "Incorrect arguments to SetDrawGround()");
 	}
-	game->drawGround = !!lua_toboolean(L, 1);
+	globalRendering->drawGround = !!lua_toboolean(L, 1);
 	return 0;
 }
 
@@ -1049,7 +1036,7 @@ int LuaUnsyncedCtrl::SetWaterParams(lua_State* L)
 			if (lua_istable(L, -1)) {
 				float color[3];
 				const int size = ParseFloatArray(L, -1, color, 3);
-				if (size>=3) {
+				if (size >= 3) {
 					if (key == "absorb") {
 						w.absorb = color;
 					} else if (key == "baseColor") {
@@ -1063,7 +1050,9 @@ int LuaUnsyncedCtrl::SetWaterParams(lua_State* L)
 					} else if (key == "specularColor") {
 						w.specularColor = color;
  					} else if (key == "planeColor") {
-						w.planeColor = color;
+						w.planeColor.x = color[0];
+						w.planeColor.y = color[1];
+						w.planeColor.z = color[2];
 					}
 				}
 			}
@@ -1462,7 +1451,7 @@ int LuaUnsyncedCtrl::WarpMouse(lua_State* L)
 		luaL_error(L, "Incorrect arguments to WarpMouse()");
 	}
 	const int x = lua_toint(L, 1);
-	const int y = gu->viewSizeY - lua_toint(L, 2) - 1;
+	const int y = globalRendering->viewSizeY - lua_toint(L, 2) - 1;
 	mouse->WarpMouse(x, y);
 	return 0;
 }
@@ -1543,7 +1532,8 @@ int LuaUnsyncedCtrl::GetConfigInt(lua_State* L)
 	}
 	const string name = luaL_checkstring(L, 1);
 	const int def     = luaL_optint(L, 2, 0);
-	const int value = configHandler->Get(name, def);
+	const bool setInOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	const int value = configHandler->Get(name, def, setInOverlay);
 	lua_pushnumber(L, value);
 	return 1;
 }
@@ -1556,7 +1546,8 @@ int LuaUnsyncedCtrl::SetConfigInt(lua_State* L)
 	}
 	const string name = luaL_checkstring(L, 1);
 	const int value   = luaL_checkint(L, 2);
-	configHandler->Set(name, value);
+	const bool useOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	configHandler->Set(name, value, useOverlay);
 	return 0;
 }
 
@@ -1568,7 +1559,8 @@ int LuaUnsyncedCtrl::GetConfigString(lua_State* L)
 	}
 	const string name = luaL_checkstring(L, 1);
 	const string def  = luaL_optstring(L, 2, "");
-	const string value = configHandler->GetString(name, def);
+	const bool setInOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	const string value = configHandler->GetString(name, def, setInOverlay);
 	lua_pushstring(L, value.c_str());
 	return 1;
 }
@@ -1581,7 +1573,8 @@ int LuaUnsyncedCtrl::SetConfigString(lua_State* L)
 	}
 	const string name  = luaL_checkstring(L, 1);
 	const string value = luaL_checkstring(L, 2);
-	configHandler->SetString(name, value);
+	const bool useOverlay = (bool) luaL_optnumber(L, 3, 0); // default: false
+	configHandler->SetString(name, value, useOverlay);
 	return 0;
 }
 
@@ -1609,109 +1602,87 @@ int LuaUnsyncedCtrl::CreateDir(lua_State* L)
 
 /******************************************************************************/
 
-int LuaUnsyncedCtrl::MakeFont(lua_State* L)
-{
-	if (!CheckModUICtrl()) {
-		return 0;
-	}
-
-	int tableIndex = 1;
-	string inputFile;
-	string inputData;
-	if (lua_israwstring(L, 1)) {
-		inputFile = lua_tostring(L, 1);
-		tableIndex++;
-	}
-
-	FontTexture::Reset();
-	if (lua_istable(L, tableIndex)) {
-		for (lua_pushnil(L); lua_next(L, tableIndex) != 0; lua_pop(L, 1)) {
-			if (lua_israwstring(L, -2)) {
-				const string key = lua_tostring(L, -2);
-				if (lua_israwstring(L, -1)) {
-					if (key == "outName") {
-						FontTexture::SetOutBaseName(lua_tostring(L, -1));
-					}
-					else if (key == "inData") {
-						size_t len = 0;
-						const char* ptr = lua_tolstring(L, -1, &len);
-						inputData.assign(ptr, len);
-						FontTexture::SetInData(inputData);
-					}
-				}
-				else if (lua_isnumber(L, -1)) {
-					const unsigned int value = (unsigned int)lua_tonumber(L, -1);
-					if (key == "height") {
-						FontTexture::SetFontHeight(value);
-					} else if (key == "texWidth") {
-						FontTexture::SetTextureWidth(value);
-					} else if (key == "minChar") {
-						FontTexture::SetMinChar(value);
-					} else if (key == "maxChar") {
-						FontTexture::SetMaxChar(value);
-					} else if (key == "outlineMode") {
-						FontTexture::SetOutlineMode(value);
-					} else if (key == "outlineRadius") {
-						FontTexture::SetOutlineRadius(value);
-					} else if (key == "outlineWeight") {
-						FontTexture::SetOutlineWeight(value);
-					} else if (key == "padding") {
-						FontTexture::SetPadding(value);
-					} else if (key == "stuffing") {
-						FontTexture::SetStuffing(value);
-					} else if (key == "debug") {
-						FontTexture::SetDebugLevel(value);
-					}
-				}
-			}
-		}
-	}
-
-	if (!inputFile.empty()) {
-		// inputData has the override
-		FontTexture::SetInFileName(inputFile);
-	}
-
-	lua_pushboolean(L, FontTexture::Execute());
-	return 1;
-}
-
 int LuaUnsyncedCtrl::Restart(lua_State* L)
 {
 	const int args = lua_gettop(L); // number of arguments
 	if ((args != 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
-		luaL_error(L,
-			"Incorrect arguments to Restart(arguments, script)");
+		luaL_error(L, "Incorrect arguments to Restart(arguments, script)");
 	}
 
-	const string arguments = luaL_checkstring(L, 1);
-	const string script = luaL_checkstring(L, 2);
+	const std::string arguments = luaL_checkstring(L, 1);
+	// LogObject() << "Args: " << arguments;
+	const std::string script = luaL_checkstring(L, 2);
 
 	const std::string springFullName = (Platform::GetProcessExecutableFile());
-	// LogObject() << "Args: " << arguments;
-	if (!script.empty())
-	{
-		const std::string scriptFullName = FileSystemHandler::GetInstance().GetWriteDir()+"script.txt";
+
+	std::vector<std::string> processArgs;
+
+	// Arguments given by Lua code, if any
+	if (!arguments.empty()) {
+		processArgs.push_back(arguments);
+	}
+
+	// script.txt, if content for it is given by Lua code
+	const std::string scriptFullName = FileSystemHandler::GetInstance().GetWriteDir() + "script.txt";
+	if (!script.empty()) {
 		// LogObject() << "Writing script to: " << scriptFullName;
 		std::ofstream scriptfile(scriptFullName.c_str());
 		scriptfile << script;
 		scriptfile.close();
-		//FIXME: ugly
-		if (arguments.empty())
-			EXECLP(springFullName.c_str(), Quote(springFullName).c_str(), Quote(scriptFullName).c_str(), NULL);
-		else
-			EXECLP(springFullName.c_str(), Quote(springFullName).c_str(), arguments.c_str(), Quote(scriptFullName).c_str(), NULL);
+
+		processArgs.push_back(Quote(scriptFullName));
 	}
-	else
-	{
-		if (arguments.empty())
-			EXECLP(springFullName.c_str(), Quote(springFullName).c_str(), NULL);
-		else
-			EXECLP(springFullName.c_str(), Quote(springFullName).c_str(), arguments.c_str(), NULL);
+
+#ifdef _WIN32
+		//! else OpenAL soft crashes when using execvp
+		ISound::Shutdown();
+#endif
+
+	const std::string execError = Platform::ExecuteProcess(springFullName, processArgs);
+	const bool execOk = execError.empty();
+
+	if (execOk) {
+		LogObject() << "The game should restart";
+	} else {
+		LogObject() << "Error in Restart: " << execError;
 	}
-	LogObject() << "Error in Restart: " << strerror(errno);
-	lua_pushboolean(L, false);
+
+	lua_pushboolean(L, execOk);
 	return 1;
+}
+
+int LuaUnsyncedCtrl::SetWMIcon(lua_State* L)
+{
+	const int args = lua_gettop(L); // number of arguments
+	if ((args != 1) || !lua_isstring(L, 1)) {
+		luaL_error(L, "Incorrect arguments to SetWMIcon(iconFileName)");
+	}
+
+	const std::string iconFileName = luaL_checkstring(L, 1);
+
+	CBitmap iconTexture;
+	const bool loaded = iconTexture.Load(iconFileName);
+	if (loaded) {
+		WindowManagerHelper::SetIcon(&iconTexture);
+	} else {
+		luaL_error(L, "Failed to load image from file \"%s\"", iconFileName.c_str());
+	}
+
+	return 0;
+}
+
+int LuaUnsyncedCtrl::SetWMCaption(lua_State* L)
+{
+	const int args = lua_gettop(L); // number of arguments
+	if ((args != 1) || !lua_isstring(L, 1)) {
+		luaL_error(L, "Incorrect arguments to SetWMCaption(caption)");
+	}
+
+	const std::string caption = luaL_checkstring(L, 1);
+
+	WindowManagerHelper::SetCaption(caption);
+
+	return 0;
 }
 
 /******************************************************************************/
@@ -1936,7 +1907,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnit(lua_State* L)
 	Command cmd;
 	LuaUtils::ParseCommand(L, __FUNCTION__, 2, cmd);
 
-	net->Send(CBaseNetProtocol::Get().SendAICommand(gu->myPlayerNum, unit->id, cmd.id, cmd.options, cmd.params));
+	net->Send(CBaseNetProtocol::Get().SendAICommand(gu->myPlayerNum, unit->id, cmd.id, cmd.aiCommandId, cmd.options, cmd.params));
 
 	lua_pushboolean(L, true);
 	return 1;
@@ -2178,7 +2149,7 @@ int LuaUnsyncedCtrl::ShareResources(lua_State* L)
 		luaL_error(L, "Incorrect arguments to ShareResources()");
 	}
 	const int teamID = lua_toint(L, 1);
-	if ((teamID < 0) || (teamID >= teamHandler->ActiveTeams())) {
+	if (!teamHandler->IsValidTeam(teamID)) {
 		return 0;
 	}
 	const CTeam* team = teamHandler->Team(teamID);
@@ -2248,7 +2219,7 @@ int LuaUnsyncedCtrl::MarkerAddPoint(lua_State* L)
 	                 lua_tofloat(L, 2),
 	                 lua_tofloat(L, 3));
 	const string text = luaL_optstring(L, 4, "");
-	const bool onlyLocal = bool(luaL_optnumber(L, 5, 0));
+	const bool onlyLocal = bool(luaL_optnumber(L, 5, 1));
 
 	if (onlyLocal) {
 		inMapDrawer->LocalPoint(pos, text, gu->myPlayerNum);

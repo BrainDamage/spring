@@ -1,13 +1,10 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_DEFS_H
 #define LUA_DEFS_H
-// LuaDefs.h: helper routines for creating definition tables
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <map>
 #include <string>
-using std::map;
-using std::string;
 
 
 enum DataType {
@@ -40,7 +37,7 @@ struct DataElement {
 };
 
 
-typedef map<string, DataElement> ParamMap;
+typedef std::map<std::string, DataElement> ParamMap;
 
 
 /* This is unused and does not compile on GCC 4.3 -- tvo 9/9/2007
@@ -75,6 +72,19 @@ template<> static DataType GetDataType(string) { return STRING_TYPE; }
 
 #define ADD_FUNCTION(lua, cpp, func) \
 	paramMap[lua] = DataElement(FUNCTION_TYPE, ADDRESS(cpp) - start, func)
+
+
+
+
+#if (LUA_VERSION_NUM < 500)
+#  define LUA_OPEN_LIB(L, lib) lib(L)
+#else
+#  define LUA_OPEN_LIB(L, lib) \
+     lua_pushcfunction((L), lib); \
+     lua_pcall((L), 0, 0, 0);
+#endif
+
+
 
 
 #endif // LUA_DEFS_H

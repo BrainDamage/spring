@@ -1,8 +1,8 @@
 #include "GResourceMap.h"
 #include "RAI.h"
 #include <set>
-#include "Sim/Features/FeatureDef.h"
-//#include <time.h>
+#include "LegacyCpp/FeatureDef.h"
+#include "System/Util.h"
 #include <stdio.h>
 
 // a metal map block is 0-255 * cb->GetMaxMetal(), extractors are normally built on several
@@ -83,7 +83,7 @@ GlobalResourceMap::GlobalResourceMap(IAICallback* _cb, cLogFile* l, GlobalTerrai
 		return;
 	}
 
-	int *fList;
+	int *fList = NULL;
 	int fSize = 0;
 	if( UDGeoResource )
 	{
@@ -100,11 +100,11 @@ GlobalResourceMap::GlobalResourceMap(IAICallback* _cb, cLogFile* l, GlobalTerrai
 				fList[i] = fList[--fSize];
 	}
 
-	relResourceFileName = "cache/" + string(cb->GetModName());
-	relResourceFileName.resize(relResourceFileName.size()-4);
-	relResourceFileName += "-" + string(cb->GetMapName());
-	relResourceFileName.resize(relResourceFileName.size()-3);
-	relResourceFileName += "res";
+	relResourceFileName = "cache/" + cRAI::MakeFileSystemCompatible(cb->GetModHumanName());
+	relResourceFileName += "-" + IntToString(cb->GetModHash(), "%x");
+	relResourceFileName += "-" + cRAI::MakeFileSystemCompatible(cb->GetMapName());
+	relResourceFileName += "-" + IntToString(cb->GetMapHash(), "%x");
+	relResourceFileName += ".res";
 
 	string resourceFileName_r;
 	FILE* resourceFile_r = NULL;
@@ -341,13 +341,13 @@ GlobalResourceMap::GlobalResourceMap(IAICallback* _cb, cLogFile* l, GlobalTerrai
 				for(int x=0; x < TM->sectorXSize; x++)
 				{
 //if( x == 0 ) *l<<"\n ";
-					float sectorMetal = 0.0;
 					int i=(z*TM->sectorXSize)+x;
 					sector[i].S = &TM->sector[i];
 					if( sector[i].S->maxElevation < 0 && TM->waterIsHarmful )
 						uselessSectors++;
 					else
 					{
+						float sectorMetal = 0.0;
 						int iMap = ((z*convertStoMM)*metalMapXSize)+x*convertStoMM;
 //*l<<"\t"<<standardMetalMap[iMap];
 						for(int zM=0; zM<convertStoMM; zM++)
@@ -443,7 +443,7 @@ GlobalResourceMap::GlobalResourceMap(IAICallback* _cb, cLogFile* l, GlobalTerrai
 						break;
 					}
 
-			// Initailizing MMS(.metal .assessing .x .z)
+			// Initializing MMS(.metal .assessing .x .z)
 			int SMindex;	// temp variable
 			float percentMetal = 0.0;
 			const unsigned char *StandardMetalMap = cb->GetMetalMap();
@@ -722,10 +722,10 @@ GlobalResourceMap::~GlobalResourceMap()
 
 		int size;
 		fwrite(&(size=saveUD.size()), sizeof(int), 1, resourceFile_w);
-		for(vector<int>::iterator i=saveUD.begin(); i!=saveUD.end(); i++)
+		for(vector<int>::iterator i=saveUD.begin(); i!=saveUD.end(); ++i)
 			fwrite(&*i, sizeof(int), 1, resourceFile_w);
 		fwrite(&(size=saveF.size()), sizeof(int), 1, resourceFile_w);
-		for(vector<int>::iterator i=saveF.begin(); i!=saveF.end(); i++)
+		for(vector<int>::iterator i=saveF.begin(); i!=saveF.end(); ++i)
 			fwrite(&*i, sizeof(int), 1, resourceFile_w);
 		for( int iT=0; iT<2; iT++ )
 		{
@@ -736,7 +736,7 @@ GlobalResourceMap::~GlobalResourceMap()
 				fwrite(&R[iT][iR]->position, sizeof(float3), 1, resourceFile_w);
 				fwrite(&R[iT][iR]->amount, sizeof(float), 1, resourceFile_w);
 				fwrite(&(size=R[iT][iR]->options.size()), sizeof(int), 1, resourceFile_w);
-				for( set<int>::iterator i=R[iT][iR]->options.begin(); i!=R[iT][iR]->options.end(); i++ )
+				for( set<int>::iterator i=R[iT][iR]->options.begin(); i!=R[iT][iR]->options.end(); ++i )
 					fwrite(&*i, sizeof(int), 1, resourceFile_w);
 			}
 		}
@@ -744,7 +744,7 @@ GlobalResourceMap::~GlobalResourceMap()
 			for( int iR=0; iR<RSize[iT]; iR++ )
 			{
 				fwrite(&(size=R[iT][iR]->siteDistance.size()), sizeof(int), 1, resourceFile_w);
-				for( map<ResourceSite*,ResourceSiteDistance>::iterator iRS=R[iT][iR]->siteDistance.begin(); iRS!=R[iT][iR]->siteDistance.end(); iRS++ )
+				for( map<ResourceSite*,ResourceSiteDistance>::iterator iRS=R[iT][iR]->siteDistance.begin(); iRS!=R[iT][iR]->siteDistance.end(); ++iRS )
 				{
 					fwrite(&iRS->first->type, sizeof(int), 1, resourceFile_w);
 					ResourceSiteDistance* RSD = &iRS->second;
@@ -759,13 +759,13 @@ GlobalResourceMap::~GlobalResourceMap()
 						RSD->bestPathType = -2;
 					fwrite(&RSD->bestPathType, sizeof(int), 1, resourceFile_w);
 					fwrite(&(size=RSD->distance.size()), sizeof(int), 1, resourceFile_w);
-					for( map<int,float>::iterator i=RSD->distance.begin(); i!=RSD->distance.end(); i++ )
+					for( map<int,float>::iterator i=RSD->distance.begin(); i!=RSD->distance.end(); ++i )
 					{
 						fwrite(&i->first, sizeof(int), 1, resourceFile_w);
 						fwrite(&i->second, sizeof(float), 1, resourceFile_w);
 					}
 					fwrite(&(size=RSD->pathDebug.size()), sizeof(int), 1, resourceFile_w);
-					for( vector<float3>::iterator i=RSD->pathDebug.begin(); i!=RSD->pathDebug.end(); i++ )
+					for( vector<float3>::iterator i=RSD->pathDebug.begin(); i!=RSD->pathDebug.end(); ++i )
 						fwrite(&*i, sizeof(float3), 1, resourceFile_w);
 				}
 			}
@@ -777,8 +777,7 @@ GlobalResourceMap::~GlobalResourceMap()
 		fclose(resourceFile_w);
 	}
 
-	if( sector != 0 )
-		delete [] sector;
+	delete [] sector;
 	for( int iT=0; iT<2; iT++ )
 	{
 		for(int iR=0; iR<RSize[iT]; iR++)
@@ -787,7 +786,7 @@ GlobalResourceMap::~GlobalResourceMap()
 	}
 }
 
-float3 GlobalResourceMap::GetMetalMapPosition(const float3& position)
+float3 GlobalResourceMap::GetMetalMapPosition(const float3& position) const
 {	// UNFINISHED
 	return position;
 }

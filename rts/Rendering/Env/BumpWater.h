@@ -1,6 +1,4 @@
-// BumpWater.h: interface for the CBumpWater class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef __BUMP_WATER_H__
 #define __BUMP_WATER_H__
@@ -11,26 +9,30 @@
 
 #include <bitset>
 
+namespace Shader {
+	struct IProgramObject;
+}
 
 class CBumpWater : public CBaseWater
 {
 public:
+	CBumpWater();
+	~CBumpWater();
+
 	void Update();
-	void DoUpdate();
 	void UpdateWater(CGame* game);
 	void OcclusionQuery();
 	void HeightmapChanged(const int x1, const int y1, const int x2, const int y2);
 	void DrawReflection(CGame* game);
 	void DrawRefraction(CGame* game);
 	void Draw();
-	CBumpWater();
-	~CBumpWater();
-	int GetID() const { return 4; }
+	int GetID() const { return WATER_RENDERER_BUMPMAPPED; }
+	const char* GetName() const { return "bumpmapped"; }
 
 private:
 	void SetUniforms(); //! see useUniforms
 	void SetupUniforms( std::string& definitions );
-	void GetUniformLocations( GLuint& program );
+	void GetUniformLocations();
 
 	//! user options
 	char  reflection;   //! 0:=off, 1:=don't render the terrain, 2:=render everything+terrain
@@ -101,16 +103,8 @@ private:
 	GLuint coastUpdateTexture;
 	std::vector<GLuint> caustTextures;
 
-	GLuint waterFP;
-	GLuint waterVP;
-	GLuint waterShader;
-
-	GLuint blurFP;
-	GLuint blurShader;
-
-	GLuint frameLoc;
-	GLuint midPosLoc;
-	GLuint eyePosLoc;
+	Shader::IProgramObject* waterShader;
+	Shader::IProgramObject* blurShader;
 
 	GLuint uniforms[20]; //! see useUniforms
 
@@ -121,8 +115,6 @@ private:
 	float3 windVec;
 	float3 windndir;
 	float  windStrength;
-
-	unsigned int lastFrame;
 };
 
 #endif // __BUMP_WATER_H__

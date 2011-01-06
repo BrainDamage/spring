@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 #include "FeatureHandler.h"
@@ -6,7 +8,6 @@
 #include "Lua/LuaParser.h"
 #include "Lua/LuaRules.h"
 #include "Map/ReadMap.h"
-#include "Rendering/UnitModels/FeatureDrawer.h" // FIXME -- sim shouldn't depend on rendering
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Units/CommandAI/BuilderCAI.h"
@@ -51,8 +52,6 @@ CR_REG_METADATA(CFeatureHandler, (
 
 CFeatureHandler::CFeatureHandler()
 {
-	PrintLoadMsg("Loading feature definitions");
-
 	const LuaTable rootTable = game->defsParser->GetRoot().SubTable("FeatureDefs");
 	if (!rootTable.IsValid()) {
 		throw content_error("Error loading FeatureDefs");
@@ -71,37 +70,21 @@ CFeatureHandler::CFeatureHandler()
 	}
 }
 
-
 CFeatureHandler::~CFeatureHandler()
 {
 	for (CFeatureSet::iterator fi = activeFeatures.begin(); fi != activeFeatures.end(); ++fi) {
-		// unsavory, but better than a memleak
-		FeatureDef* fd = (FeatureDef*) (*fi)->def;
-
-		if (fd->collisionVolume) {
-			delete fd->collisionVolume;
-			fd->collisionVolume = 0;
-		}
 		delete *fi;
+	}
+
+	for (std::map<std::string, const FeatureDef*>::iterator it = featureDefs.begin(); it != featureDefs.end(); ++it) {
+		delete it->second;
 	}
 
 	activeFeatures.clear();
 	features.clear();
-
-	while (!featureDefs.empty()) {
-		map<string, const FeatureDef*>::iterator fi = featureDefs.begin();
-
-		FeatureDef* fd = (FeatureDef*) fi->second;
-
-		if (fd->collisionVolume) {
-			delete fd->collisionVolume;
-			fd->collisionVolume = 0;
-		}
-
-		delete fi->second;
-		featureDefs.erase(fi);
-	}
+	featureDefs.clear();
 }
+
 
 
 void CFeatureHandler::AddFeatureDef(const string& name, FeatureDef* fd)
@@ -167,20 +150,17 @@ void CFeatureHandler::CreateFeatureDef(const LuaTable& fdTable, const string& mi
 	}
 
 
-	// these take precedence over the old sphere tags as well as
-	// feature->radius (for feature <--> projectile interactions)
-	fd->collisionVolumeTypeStr = fdTable.GetString("collisionVolumeType", "");
-	fd->collisionVolumeScales  = fdTable.GetFloat3("collisionVolumeScales", ZeroVector);
-	fd->collisionVolumeOffsets = fdTable.GetFloat3("collisionVolumeOffsets", ZeroVector);
-	fd->collisionVolumeTest    = fdTable.GetInt("collisionVolumeTest", COLVOL_TEST_CONT);
-
 	// initialize the (per-featuredef) collision-volume,
 	// all CFeature instances hold a copy of this object
+	//
+	// takes precedence over the old sphere tags as well
+	// as feature->radius (for feature <---> projectile
+	// interactions)
 	fd->collisionVolume = new CollisionVolume(
-		fd->collisionVolumeTypeStr,
-		fd->collisionVolumeScales,
-		fd->collisionVolumeOffsets,
-		fd->collisionVolumeTest
+		fdTable.GetString("collisionVolumeType", ""),
+		fdTable.GetFloat3("collisionVolumeScales", ZeroVector),
+		fdTable.GetFloat3("collisionVolumeOffsets", ZeroVector),
+		fdTable.GetInt("collisionVolumeTest", CollisionVolume::COLVOL_HITTEST_CONT)
 	);
 
 
@@ -201,12 +181,12 @@ void CFeatureHandler::CreateFeatureDef(const LuaTable& fdTable, const string& mi
 }
 
 
-const FeatureDef* CFeatureHandler::GetFeatureDef(const string mixedCase, const bool showError)
+const FeatureDef* CFeatureHandler::GetFeatureDef(string name, const bool showError)
 {
-	if (mixedCase.empty())
+	if (name.empty())
 		return NULL;
 
-	const string name = StringToLower(mixedCase);
+	StringToLowerInPlace(name);
 	map<string, const FeatureDef*>::iterator fi = featureDefs.find(name);
 
 	if (fi != featureDefs.end()) {
@@ -231,8 +211,6 @@ const FeatureDef* CFeatureHandler::GetFeatureDefByID(int id)
 
 void CFeatureHandler::LoadFeaturesFromMap(bool onlyCreateDefs)
 {
-	PrintLoadMsg("Initializing map features");
-
 	//! add map's featureDefs
 	int numType = readmap->GetNumFeatureTypes ();
 	for (int a = 0; a < numType; ++a) {
@@ -255,7 +233,7 @@ void CFeatureHandler::LoadFeaturesFromMap(bool onlyCreateDefs)
 				fd->myName = name;
 				fd->description = "Tree";
 				fd->mass = 20;
-				fd->collisionVolume = new CollisionVolume("", ZeroVector, ZeroVector, COLVOL_TEST_DISC);
+				fd->collisionVolume = new CollisionVolume("", ZeroVector, ZeroVector, CollisionVolume::COLVOL_HITTEST_DISC);
 				AddFeatureDef(name, fd);
 			}
 			else if (name.find("geovent") != string::npos) {
@@ -274,9 +252,9 @@ void CFeatureHandler::LoadFeaturesFromMap(bool onlyCreateDefs)
 				fd->xsize = 0;
 				fd->zsize = 0;
 				fd->myName = name;
-				fd->mass = 100000;
+				fd->mass = CSolidObject::DEFAULT_MASS;
 				// geothermals have no collision volume at all
-				fd->collisionVolume = 0;
+				fd->collisionVolume = NULL;
 				AddFeatureDef(name, fd);
 			}
 			else {
@@ -300,7 +278,7 @@ void CFeatureHandler::LoadFeaturesFromMap(bool onlyCreateDefs)
 				continue;
 			}
 
-			const float ypos = ground->GetHeight2(mfi[a].pos.x, mfi[a].pos.z);
+			const float ypos = ground->GetHeightReal(mfi[a].pos.x, mfi[a].pos.z);
 			(new CFeature)->Initialize(
 				float3(mfi[a].pos.x, ypos, mfi[a].pos.z),
 				def->second, (short int) mfi[a].rotation,
@@ -315,8 +293,8 @@ void CFeatureHandler::LoadFeaturesFromMap(bool onlyCreateDefs)
 
 int CFeatureHandler::AddFeature(CFeature* feature)
 {
-	if (freeIDs.empty())
-	{ // alloc n new ids and randomly insert to freeIDs
+	if (freeIDs.empty()) {
+		// alloc n new ids and randomly insert to freeIDs
 		const unsigned n = 100;
 		std::vector<int> newIds(n);
 		for (unsigned i = 0; i < n; ++i)
@@ -333,20 +311,16 @@ int CFeatureHandler::AddFeature(CFeature* feature)
 	features[feature->id] = feature;
 	SetFeatureUpdateable(feature);
 
-	// FIXME -- sim shouldn't depend on rendering
-	featureDrawer->FeatureCreated(feature);
-
 	eventHandler.FeatureCreated(feature);
-
-	return feature->id ;
+	return feature->id;
 }
 
 
 void CFeatureHandler::DeleteFeature(CFeature* feature)
 {
-	toBeRemoved.push_back(feature->id);
-
 	eventHandler.FeatureDestroyed(feature);
+
+	toBeRemoved.push_back(feature->id);
 }
 
 CFeature* CFeatureHandler::GetFeature(int id)
@@ -407,29 +381,34 @@ void CFeatureHandler::Update()
 			freeIDs.splice(freeIDs.end(), toBeFreedIDs, toBeFreedIDs.begin(), toBeFreedIDs.end());
 	}
 
-	if(!toBeRemoved.empty()) {
+	{
+		GML_STDMUTEX_LOCK(rfeat); // Update
 
-		GML_RECMUTEX_LOCK(feat); // Update
-		GML_RECMUTEX_LOCK(quad); // Update
+		if(!toBeRemoved.empty()) {
 
-		while (!toBeRemoved.empty()) {
-			CFeature* feature = GetFeature(toBeRemoved.back());
-			toBeRemoved.pop_back();
-			if (feature) {
-				toBeFreedIDs.push_back(feature->id);
-				activeFeatures.erase(feature);
-				features[feature->id] = 0;
+			GML_RECMUTEX_LOCK(feat); // Update
+			GML_RECMUTEX_LOCK(quad); // Update
 
-				// FIXME -- sim shouldn't depend on rendering
-				featureDrawer->FeatureDestroyed(feature);
+			eventHandler.DeleteSyncedFeatures();
 
-				if (feature->inUpdateQue) {
-					updateFeatures.erase(feature);
+			while (!toBeRemoved.empty()) {
+				CFeature* feature = GetFeature(toBeRemoved.back());
+				toBeRemoved.pop_back();
+				if (feature) {
+					toBeFreedIDs.push_back(feature->id);
+					activeFeatures.erase(feature);
+					features[feature->id] = 0;
+
+					if (feature->inUpdateQue) {
+						updateFeatures.erase(feature);
+					}
+
+					delete feature;
 				}
-
-				delete feature;
 			}
 		}
+
+		eventHandler.UpdateFeatures();
 	}
 
 	CFeatureSet::iterator fi = updateFeatures.begin();
@@ -458,20 +437,20 @@ void CFeatureHandler::SetFeatureUpdateable(CFeature* feature)
 
 void CFeatureHandler::TerrainChanged(int x1, int y1, int x2, int y2)
 {
-	vector<int> quads = qf->GetQuadsRectangle(float3(x1 * SQUARE_SIZE, 0, y1 * SQUARE_SIZE),
+	const vector<int> &quads = qf->GetQuadsRectangle(float3(x1 * SQUARE_SIZE, 0, y1 * SQUARE_SIZE),
 		float3(x2 * SQUARE_SIZE, 0, y2 * SQUARE_SIZE));
 
-	for (vector<int>::iterator qi = quads.begin(); qi != quads.end(); ++qi) {
+	for (vector<int>::const_iterator qi = quads.begin(); qi != quads.end(); ++qi) {
 		list<CFeature*>::const_iterator fi;
 		const list<CFeature*>& features = qf->GetQuad(*qi).features;
 
 		for (fi = features.begin(); fi != features.end(); ++fi) {
 			CFeature* feature = *fi;
 			float3& fpos = feature->pos;
-			float gh = ground->GetHeight2(fpos.x, fpos.z);
+			float gh = ground->GetHeightReal(fpos.x, fpos.z);
 			float wh = gh;
 			if(feature->def->floating)
-				wh = ground->GetHeight(fpos.x, fpos.z);
+				wh = ground->GetHeightAboveWater(fpos.x, fpos.z);
 			if (fpos.y > wh || fpos.y < gh) {
 				feature->finalHeight = wh;
 				feature->reachedFinalPos = false;

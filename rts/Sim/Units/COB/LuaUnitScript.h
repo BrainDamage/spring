@@ -1,14 +1,14 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef LUAUNITSCRIPT_H
 #define LUAUNITSCRIPT_H
 
+#include <map>
 #include "UnitScript.h"
 
-
+class CUnit;
 class CLuaHandle;
 struct lua_State;
-
 
 class CLuaUnitScript : public CUnitScript, CUnitScript::IAnimListener
 {

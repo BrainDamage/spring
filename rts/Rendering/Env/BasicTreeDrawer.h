@@ -1,6 +1,4 @@
-// TreeDrawer.h: interface for the CTreeDrawer class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef __BASIC_TREE_DRAWER_H__
 #define __BASIC_TREE_DRAWER_H__
@@ -19,12 +17,9 @@ public:
 
 	void Draw(float treeDistance,bool drawReflection);
 	void Update();
-	void CreateTreeTex(GLuint& texnum,unsigned char* data,int xsize,int ysize);
+	void ResetPos(const float3& pos);
 	void AddTree(int type, float3 pos, float size);
 	void DeleteTree(float3 pos);
-
-	GLuint treetex;
-	int lastListClean;
 
 	struct TreeStruct{
 		float3 pos;
@@ -46,7 +41,9 @@ public:
 	int treesY;
 	int nTrees;
 
-	void ResetPos(const float3& pos);
+private:
+	GLuint treetex;
+	int lastListClean;
 };
 
 #endif // __BASIC_TREE_DRAWER_H__

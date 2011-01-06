@@ -15,10 +15,10 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _AIGLOBALAICALLBACK_H
-#define _AIGLOBALAICALLBACK_H
+#ifndef _AI_GLOBAL_AI_CALLBACK_H
+#define _AI_GLOBAL_AI_CALLBACK_H
 
-#include "ExternalAI/IGlobalAICallback.h"
+#include "IGlobalAICallback.h"
 
 struct SSkirmishAICallback;
 class CAIAICallback;
@@ -30,17 +30,19 @@ class CAIAICheats;
 class CAIGlobalAICallback : public IGlobalAICallback {
 public:
 	CAIGlobalAICallback();
-	CAIGlobalAICallback(const SSkirmishAICallback* sAICallback, int teamId);
+	CAIGlobalAICallback(const SSkirmishAICallback* sAICallback, int skirmishAIId);
 	~CAIGlobalAICallback();
 
 	virtual IAICheats* GetCheatInterface();
 	virtual IAICallback* GetAICallback();
 
+	const SSkirmishAICallback* GetInnerCallback() const;
+
 private:
 	const SSkirmishAICallback* sAICallback;
-	int teamId;
+	int skirmishAIId;
 	CAIAICallback* wrappedAICallback;
 	CAIAICheats* wrappedAICheats;
 };
 
-#endif // _AIGLOBALAICALLBACK_H
+#endif // _AI_GLOBAL_AI_CALLBACK_H

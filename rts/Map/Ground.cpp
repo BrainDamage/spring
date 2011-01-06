@@ -1,6 +1,4 @@
-// Ground.cpp: implementation of the CGround class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "mmgr.h"
@@ -8,23 +6,126 @@
 #include "Ground.h"
 #include "ReadMap.h"
 #include "Game/Camera.h"
+#include "Sim/Misc/GeometricObjects.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "LogOutput.h"
-#include "Sim/Misc/GeometricObjects.h"
+#include "myMath.h"
 #include <assert.h>
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
-CGround* ground;
 
-CGround::CGround()
+static inline float Interpolate(float x, float y, const float* heightmap)
 {
+	//! NOTE:
+	//! This isn't a bilinear interpolation. Instead it interpolates
+	//! on the 2 triangles that form the ground quad:
+	//! __________
+	//! |        /|
+	//! | dx+dy / |
+	//! |  <1  /  |
+	//! |     /   |
+	//! |    /    |
+	//! |   /     |
+	//! |  / dx+dy|
+	//! | /   >=1 |
+	//! |/        |
+	//! ----------
+
+	x = Clamp(x, 0.f, float3::maxxpos) / SQUARE_SIZE;
+	y = Clamp(y, 0.f, float3::maxzpos) / SQUARE_SIZE;
+
+	const int isx = int(x);
+	const int isy = int(y);
+	const float dx = x - isx;
+	const float dy = y - isy;
+	const int hs = isx + isy * (gs->mapx + 1);
+
+	if (dx + dy < 1) {
+		//! top left triangle
+		const float h00 = heightmap[hs                     ];
+		const float h10 = heightmap[hs + 1                 ];
+		const float h01 = heightmap[hs     + (gs->mapx + 1)];
+		const float xdif = (dx) * (h10 - h00);
+		const float ydif = (dy) * (h01 - h00);
+
+		return h00 + xdif + ydif;
+	}
+	else {
+		//! bottom right triangle
+		const float h10 = heightmap[hs + 1                 ];
+		const float h11 = heightmap[hs + 1 + (gs->mapx + 1)];
+		const float h01 = heightmap[hs     + (gs->mapx + 1)];
+		const float xdif = (1.0f - dx) * (h01 - h11);
+		const float ydif = (1.0f - dy) * (h10 - h11);
+
+		return h11 + xdif + ydif;
+	}
+	return 0; // can not be reached
 }
+
+
+static inline float LineGroundSquareCol(const float3& from, const float3& to, int xs, int ys)
+{
+	if ((xs < 0) || (ys < 0) || (xs >= gs->mapx - 1) || (ys >= gs->mapy - 1))
+		return -1;
+
+	float3 tri;
+	const float* heightmap = readmap->GetHeightmap();
+
+	//! Info:
+	//! The terrain grid is constructed by a triangle strip
+	//! so we have to check 2 triangles for each quad
+
+	//! triangle topright
+	tri.x = xs * SQUARE_SIZE;
+	tri.z = ys * SQUARE_SIZE;
+	tri.y = heightmap[ys * (gs->mapx + 1) + xs];
+
+	const float3& norm = readmap->facenormals[(ys * gs->mapx + xs) * 2];
+	float side1 = (to - tri).dot(norm);
+
+	if (side1 <= 0.0f) {
+		float side2 = (from - tri).dot(norm);
+
+		if (side2 != side1) {
+			float frontpart = side2 / (side2 - side1);
+			const float3 col = from * (1 - frontpart) + to * frontpart;
+
+			if ((col.x >= tri.x) && (col.z >= tri.z) && (col.x + col.z <= tri.x + tri.z + SQUARE_SIZE)) {
+				return col.distance(from);
+			}
+		}
+	}
+
+	//! triangle bottomleft
+	tri.x += SQUARE_SIZE;
+	tri.z += SQUARE_SIZE;
+	tri.y = heightmap[(ys + 1) * (gs->mapx + 1) + xs + 1];
+
+	const float3& norm2 = readmap->facenormals[(ys * gs->mapx + xs) * 2 + 1];
+	side1 = (to - tri).dot(norm2);
+
+	if (side1 <= 0.0f) {
+		float side2 = (from - tri).dot(norm2);
+
+		if (side2 != side1) {
+			float frontpart = side2 / (side2 - side1);
+			const float3 col = from * (1 - frontpart) + to * frontpart;
+
+			if ((col.x <= tri.x) && (col.z <= tri.z) && (col.x + col.z >= tri.x + tri.z - SQUARE_SIZE)) {
+				return col.distance(from);
+			}
+		}
+	}
+	return -2;
+}
+
+
+
+CGround* ground = NULL;
 
 CGround::~CGround()
 {
-	delete readmap;
+	delete readmap; readmap = NULL;
 }
 
 void CGround::CheckColSquare(CProjectile* p, int x, int y)
@@ -67,65 +168,6 @@ void CGround::CheckColSquare(CProjectile* p, int x, int y)
 	return;
 }
 
-inline float LineGroundSquareCol(const float3& from, const float3& to, int xs, int ys)
-{
-	if ((xs < 0) || (ys < 0) || (xs >= gs->mapx - 1) || (ys >= gs->mapy - 1))
-		return -1;
-
-	float3 tri;
-	const float* heightmap = readmap->GetHeightmap();
-
-	//! Info:
-	//! The terrain grid is constructed by a triangle strip
-	//! so we have to check 2 triangles foreach quad
-
-	//! triangle 1
-	tri.x = xs * SQUARE_SIZE;
-	tri.z = ys * SQUARE_SIZE;
-	tri.y = heightmap[ys * (gs->mapx + 1) + xs];
-
-	const float3& norm = readmap->facenormals[(ys * gs->mapx + xs) * 2];
-	float side1 = (to - tri).dot(norm);
-
-	if (side1 <= 0) {
-		// linjen passerar triangelns plan?
-		float side2 = (from - tri).dot(norm);
-		float dif = side2 - side1;
-		if (dif != 0) {
-			float frontpart = side2 / dif;
-			float3 col = from + ((to - from) * frontpart);
-
-			if ((col.x >= tri.x) && (col.z >= tri.z) && (col.x + col.z <= tri.x + tri.z + SQUARE_SIZE)) {
-				// kollision inuti triangeln (utnyttja trianglarnas "2d aktighet")
-				return col.distance(from);
-			}
-		}
-	}
-
-	//! triangle 2
-	tri.x += SQUARE_SIZE;
-	tri.z += SQUARE_SIZE;
-	tri.y = heightmap[(ys + 1) * (gs->mapx + 1) + xs + 1];
-
-	const float3& norm2 = readmap->facenormals[(ys * gs->mapx + xs) * 2 + 1];
-	side1 = (to - tri).dot(norm2);
-
-	if (side1 <= 0) {
-		// linjen passerar triangelns plan?
-		float side2 = (from - tri).dot(norm2);
-		float dif = side2 - side1;
-		if (dif != 0) {
-			float frontpart = side2 / dif;
-			float3 col = from + ((to - from) * frontpart);
-
-			if ((col.x <= tri.x) && (col.z <= tri.z) && (col.x + col.z >= tri.x + tri.z - SQUARE_SIZE)) {
-				// kollision inuti triangeln (utntri.ytja trianglarnas "2d aktighet")
-				return col.distance(from);
-			}
-		}
-	}
-	return -2;
-}
 
 float CGround::LineGroundCol(float3 from, float3 to) const
 {
@@ -257,66 +299,21 @@ float CGround::GetApproximateHeight(float x, float y) const
 {
 	int xsquare = int(x) / SQUARE_SIZE;
 	int ysquare = int(y) / SQUARE_SIZE;
-
-	if (xsquare < 0)
-		xsquare = 0;
-	else if (xsquare > gs->mapx - 1)
-		xsquare = gs->mapx - 1;
-	if (ysquare < 0)
-		ysquare = 0;
-	else if (ysquare > gs->mapy - 1)
-		ysquare = gs->mapy - 1;
+	xsquare = Clamp(xsquare, 0, gs->mapx - 1);
+	ysquare = Clamp(ysquare, 0, gs->mapy - 1);
 
 	return readmap->centerheightmap[xsquare + ysquare * gs->mapx];
 }
 
-//rename to GetHeightAboveWater?
-float CGround::GetHeight(float x, float y) const
+float CGround::GetHeightAboveWater(float x, float y) const
 {
-	float r = GetHeight2(x, y);
-	return (r < 0.0f? 0.0f: r);
+	return std::max(0.0f, GetHeightReal(x, y));
 }
 
-
-static inline float Interpolate(float x, float y, const float* heightmap)
-{
-	if (x < 1)
-		x = 1;
-	else if (x > float3::maxxpos)
-		x = float3::maxxpos;
-
-	if (y < 1)
-		y = 1;
-	else if (y > float3::maxzpos)
-		y = float3::maxzpos;
-
-	const int sx = (int) (x / SQUARE_SIZE);
-	const int sy = (int) (y / SQUARE_SIZE);
-	const float dx = (x - sx * SQUARE_SIZE) * (1.0f / SQUARE_SIZE);
-	const float dy = (y - sy * SQUARE_SIZE) * (1.0f / SQUARE_SIZE);
-	const int hs = sx + sy * (gs->mapx + 1);
-
-	if (dx + dy < 1) {
-		const float xdif = (dx) * (heightmap[hs +            1] - heightmap[hs]);
-		const float ydif = (dy) * (heightmap[hs + gs->mapx + 1] - heightmap[hs]);
-
-		return heightmap[hs] + xdif + ydif;
-	}
-	else {
-		const float xdif = (1.0f - dx) * (heightmap[hs + gs->mapx + 1] - heightmap[hs + 1 + 1 + gs->mapx]);
-		const float ydif = (1.0f - dy) * (heightmap[hs            + 1] - heightmap[hs + 1 + 1 + gs->mapx]);
-
-		return heightmap[hs + 1 + 1 + gs->mapx] + xdif + ydif;
-	}
-	return 0; // can not be reached
-}
-
-
-float CGround::GetHeight2(float x, float y) const
+float CGround::GetHeightReal(float x, float y) const
 {
 	return Interpolate(x, y, readmap->GetHeightmap());
 }
-
 
 float CGround::GetOrigHeight(float x, float y) const
 {
@@ -326,34 +323,24 @@ float CGround::GetOrigHeight(float x, float y) const
 
 float3& CGround::GetNormal(float x, float y) const
 {
-	if (x < 1.0f)
-		x = 1.0f;
-	else if (x > float3::maxxpos)
-		x = float3::maxxpos;
+	int xsquare = int(x) / SQUARE_SIZE;
+	int ysquare = int(y) / SQUARE_SIZE;
+	xsquare = Clamp(xsquare, 0, gs->mapx - 1);
+	ysquare = Clamp(ysquare, 0, gs->mapy - 1);
 
-	if (y < 1.0f)
-		y = 1.0f;
-	else if (y > float3::maxzpos)
-		y = float3::maxzpos;
-
-	return readmap->centernormals[int(x) / SQUARE_SIZE + int(y) / SQUARE_SIZE * gs->mapx];
+	return readmap->centernormals[xsquare + ysquare * gs->mapx];
 }
 
 
 float CGround::GetSlope(float x, float y) const
 {
-	if (x < 1.0f)
-		x = 1.0f;
-	else if (x > float3::maxxpos)
-		x = float3::maxxpos;
-
-	if (y < 1.0f)
-		y = 1.0f;
-	else if (y > float3::maxzpos)
-		y = float3::maxzpos;
+	int xhsquare = int(x) / (2 * SQUARE_SIZE);
+	int yhsquare = int(y) / (2 * SQUARE_SIZE);
+	xhsquare = Clamp(xhsquare, 0, gs->hmapx - 1);
+	yhsquare = Clamp(yhsquare, 0, gs->hmapy - 1);
 
 	//return (1.0f - readmap->centernormals[int(x) / SQUARE_SIZE + int(y) / SQUARE_SIZE * gs->mapx].y);
-	return readmap->slopemap[(int(x) / SQUARE_SIZE) / 2 + (int(y) / SQUARE_SIZE) / 2 * gs->hmapx];
+	return readmap->slopemap[xhsquare + yhsquare * gs->hmapx];
 }
 
 
@@ -371,8 +358,8 @@ float3 CGround::GetSmoothNormal(float x, float y) const
 	if (sx >= gs->mapx - 1)
 		sx = gs->mapx - 2;
 
-	float dx = (x - sx * SQUARE_SIZE) / SQUARE_SIZE;
-	float dy = (y - sy * SQUARE_SIZE) / SQUARE_SIZE;
+	float dx = (x / SQUARE_SIZE) - sx;
+	float dy = (y / SQUARE_SIZE) - sy;
 
 	int sy2;
 	float fy;
@@ -411,13 +398,21 @@ float3 CGround::GetSmoothNormal(float x, float y) const
 	return norm1;
 }
 
-float CGround::TrajectoryGroundCol(float3 from, float3 flatdir, float length, float linear, float quadratic) const
+float CGround::TrajectoryGroundCol(float3 from, const float3& flatdir, float length, float linear, float quadratic) const
 {
-	from.CheckInBounds();
-
 	float3 dir(flatdir.x, linear, flatdir.z);
 
-	for (float l = 0.0f; l < length; l += 8.0f) {
+	//! limit the checking to the `in map part` of the line
+	std::pair<float,float> near_far = GetMapBoundaryIntersectionPoints(from, dir*length);
+
+	//! outside of map
+	if (near_far.second < 0.f)
+		return -1;
+
+	const float near = length * std::max(0.f, near_far.first);
+	const float far  = length * std::min(1.f, near_far.second);
+
+	for (float l = near; l < far; l += SQUARE_SIZE) {
 		float3 pos(from + dir*l);
 		pos.y += quadratic * l * l;
 
@@ -425,5 +420,5 @@ float CGround::TrajectoryGroundCol(float3 from, float3 flatdir, float length, fl
 			return l;
 		}
 	}
-	return -1;
+	return -1.f;
 }

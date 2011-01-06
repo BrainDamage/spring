@@ -1,27 +1,23 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
 #include "CameraController.h"
+#include "System/ConfigHandler.h"
 
-#include "ConfigHandler.h"
-
-
-CCameraController::CCameraController() : pos(2000, 70, 1800)
+CCameraController::CCameraController()
 {
 	// switchVal:
 	// * 1.0 = 0 degree  = overview
 	// * 0.0 = 90 degree = first person
 	switchVal = configHandler->Get("UseDistToGroundForIcons", 0.95f);
-	mouseScale = configHandler->Get("FPSMouseScale", 0.01f);
 	scrollSpeed = 1;
 	fov = 45.0f;
+	pixelSize = 1.0f;
 	enabled = true;
 }
 
-
-CCameraController::~CCameraController(void)
-{
-}
 
 
 bool CCameraController::SetStateBool(const StateMap& sm,

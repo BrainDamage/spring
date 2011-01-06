@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_HANDLE_H
 #define LUA_HANDLE_H
-// LuaHandle.h: interface for the CLuaHandle class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <string>
 #include <vector>
@@ -94,12 +93,17 @@ class CLuaHandle : public CEventClient
 
 		void Shutdown();
 
+		void Load(CArchiveBase* archive);
+
 		void GamePreload();
 		void GameStart();
-		void GameOver();
+		void GameOver(const std::vector<unsigned char>& winningAllyTeams);
+		void GamePaused(int playerID, bool paused);
+		void GameFrame(int frameNum);
 		void TeamDied(int teamID);
 		void TeamChanged(int teamID);
 		void PlayerChanged(int playerID);
+		void PlayerAdded(int playerID);
 		void PlayerRemoved(int playerID, int reason);
 
 		void UnitCreated(const CUnit* unit, const CUnit* builder);
@@ -135,6 +139,8 @@ class CLuaHandle : public CEventClient
 		void UnitCloaked(const CUnit* unit);
 		void UnitDecloaked(const CUnit* unit);
 
+		void UnitUnitCollision(const CUnit* collider, const CUnit* collidee);
+		void UnitFeatureCollision(const CUnit* collider, const CFeature* collidee);
 		void UnitMoveFailed(const CUnit* unit);
 
 		void FeatureCreated(const CFeature* feature);
@@ -150,6 +156,8 @@ class CLuaHandle : public CEventClient
 
 		// LuaHandleSynced wraps this to set allowChanges
 		virtual bool RecvLuaMsg(const string& msg, int playerID);
+
+		void Save(zipFile archive);
 
 		void Update();
 
@@ -344,6 +352,20 @@ inline void CLuaHandle::SetActiveHandle(CLuaHandle* lh)
 		activeFullRead     = lh->fullRead;
 		activeReadAllyTeam = lh->readAllyTeam;
 	}
+}
+
+inline bool CLuaHandle::RunCallIn(const LuaHashString& hs, int inArgs, int outArgs)
+{
+	return RunCallInTraceback(hs, inArgs, outArgs, 0);
+}
+
+
+inline bool CLuaHandle::RunCallInUnsynced(const LuaHashString& hs, int inArgs, int outArgs)
+{
+	synced = false;
+	const bool retval = RunCallIn(hs, inArgs, outArgs);
+	synced = !userMode;
+	return retval;
 }
 
 

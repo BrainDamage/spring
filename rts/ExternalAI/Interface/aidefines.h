@@ -1,27 +1,12 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
-
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 /*
  * This file has to be C99 compatible, as it is not only used by the engine,
  * but also by AIs.
  */
 
-#ifndef _AIDEFINES_H
-#define _AIDEFINES_H
+#ifndef _AI_DEFINES_H
+#define _AI_DEFINES_H
 
 #include "System/maindefines.h"
 #include "System/exportdefines.h"
@@ -35,9 +20,8 @@
 // Therefore, this number will stay the same, if you only change parameters
 // of function pointers, which is why it is only partly representing
 // the real ABI.
-// Files that have ot be included when using this define:
+// Files that have to be included when using this define:
 // * ExternalAI/Interface/ELevelOfSupport.h
-// * ExternalAI/Interface/SAIFloat3.h
 // * ExternalAI/Interface/SSkirmishAILibrary.h
 // * ExternalAI/Interface/SSkirmishAICallback.h
 // * ExternalAI/Interface/SAIInterfaceLibrary.h
@@ -46,20 +30,27 @@
 // * ExternalAI/Interface/AISCommands.h
 /**
  * Returns the Application Binary Interface version, fail part.
- * If the engine and the AI INterface differ in this,
+ * If the engine and the AI Interface differ in this,
  * the AI Interface will not be used.
- * Changes here usually indicate that struct memebers were
+ * Changes here usually indicate that struct members were
  * added or removed.
  */
 #define AIINTERFACE_ABI_VERSION_FAIL ( \
 	  sizeof(enum LevelOfSupport) \
-	+ sizeof(struct SAIFloat3) \
 	+ sizeof(struct SSkirmishAILibrary) \
 	+ sizeof(struct SSkirmishAICallback) \
 	+ sizeof(struct SAIInterfaceLibrary) \
 	+ sizeof(struct SAIInterfaceCallback) \
 	+ AIINTERFACE_EVENTS_ABI_VERSION \
 	+ AIINTERFACE_COMMANDS_ABI_VERSION \
+	+ __archBits__   * 10000 \
+	+ sizeof(int)    * 1001 \
+	+ sizeof(char)   * 1002 \
+	+ sizeof(void*)  * 1003 \
+	+ sizeof(size_t) * 1005 \
+	+ sizeof(float)  * 1007 \
+	+ sizeof(short)  * 1011 \
+	+ sizeof(bool)   * 1013 \
 	)
 /**
  * Returns the Application Binary Interface version, warning part.
@@ -67,31 +58,25 @@
  * if they differ only in the warning part of the ABI version.
  * Changes here could indicate that function arguments got changed,
  * which could cause a crash, but it could be unimportant changes
- * like added comments or code reformatting aswell.
+ * like added comments or code reformatting as well.
  */
 #define AIINTERFACE_ABI_VERSION_WARNING ( \
-	  sizeof(int) \
-	+ sizeof(char) \
-	+ sizeof(void*) \
-	+ sizeof(size_t) \
-	+ sizeof(float) \
-	+ sizeof(short) \
-	+ sizeof(bool) \
+	  0 \
 	)
 
 /**
- * @brief max skirmish AIs
+ * @brief max Skirmish AIs
  *
  * Defines the maximum number of skirmish AIs.
  * As there can not be more then spring allows teams, this is the upper limit.
- * (currently (July 2008) 16 real teams)
+ * (currently (February 2010) 255 real teams)
  */
 //const unsigned int MAX_SKIRMISH_AIS = MAX_TEAMS - 1;
-#define MAX_SKIRMISH_AIS 16
+#define MAX_SKIRMISH_AIS 255
 
 //const char* const AI_INTERFACES_DATA_DIR = "AI/Interfaces";
 #define AI_INTERFACES_DATA_DIR "AI/Interfaces"
 
 #define SKIRMISH_AI_DATA_DIR "AI/Skirmish"
 
-#endif // _AIDEFINES_H
+#endif // _AI_DEFINES_H

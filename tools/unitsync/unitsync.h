@@ -14,6 +14,7 @@
 /**
  * @brief 2d vector storing a map defined starting position
  * @sa MapInfo
+ * @deprecated
  */
 struct StartPos
 {
@@ -25,6 +26,7 @@ struct StartPos
 /**
  * @brief Metadata of a map
  * @sa GetMapInfo GetMapInfoEx
+ * @deprecated
  */
 struct MapInfo
 {
@@ -59,6 +61,6 @@ enum BitmapType {
 /** @} */
 
 
-const char *GetStr(std::string str);
+const char* GetStr(std::string str);
 
 #endif // UNITSYNC_H

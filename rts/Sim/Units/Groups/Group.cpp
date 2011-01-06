@@ -1,6 +1,4 @@
-// Group.cpp: implementation of the CGroup class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "Group.h"
@@ -52,10 +50,9 @@ void CGroup::PostLoad()
 {
 	CUnitSet unitBackup = units;
 
-	for(CUnitSet::iterator ui=unitBackup.begin();ui!=unitBackup.end();++ui)
-	{
+	for(CUnitSet::iterator ui = unitBackup.begin(); ui != unitBackup.end(); ++ui) {
 		units.erase(*ui);
-		(*ui)->group=0;
+		(*ui)->group = NULL;
 	}
 }
 
@@ -106,7 +103,7 @@ const vector<CommandDescription>& CGroup::GetPossibleCommands()
 	return myCommands;
 }
 
-int CGroup::GetDefaultCmd(const CUnit *unit, const CFeature* feature)
+int CGroup::GetDefaultCmd(const CUnit *unit, const CFeature* feature) const
 {
 	return CMD_STOP;
 }
@@ -126,7 +123,7 @@ void CGroup::ClearUnits(void)
 	GML_RECMUTEX_LOCK(group); // ClearUnits
 
 	eventHandler.GroupChanged(id);
-	while(!units.empty()){
+	while (!units.empty()) {
 		(*units.begin())->SetGroup(0);
 	}
 }

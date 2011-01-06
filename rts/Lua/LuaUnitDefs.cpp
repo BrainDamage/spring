@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaUnitDefs.cpp: implementation of the LuaUnitDefs class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <string>
@@ -26,7 +25,7 @@
 #include "Map/MapDamage.h"
 #include "Map/MapInfo.h"
 #include "Rendering/IconHandler.h"
-#include "Rendering/UnitModels/IModelParser.h"
+#include "Rendering/Models/IModelParser.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/CategoryHandler.h"
@@ -93,7 +92,7 @@ bool LuaUnitDefs::PushEntries(lua_State* L)
 
 	const map<string, int>& udMap = unitDefHandler->unitDefIDsByName;
 	map<string, int>::const_iterator udIt;
-	for (udIt = udMap.begin(); udIt != udMap.end(); udIt++) {
+	for (udIt = udMap.begin(); udIt != udMap.end(); ++udIt) {
 	  const UnitDef* ud = unitDefHandler->GetUnitDefByID(udIt->second);
 		if (ud == NULL) {
 	  	continue;
@@ -264,8 +263,9 @@ static int UnitDefNewIndex(lua_State* L)
 
 static int UnitDefMetatable(lua_State* L)
 {
-	const void* userData = lua_touserdata(L, lua_upvalueindex(1));
-	//const UnitDef* ud = (const UnitDef*)userData;
+	lua_touserdata(L, lua_upvalueindex(1));
+	// const void* userData = lua_touserdata(L, lua_upvalueindex(1));
+	// const UnitDef* ud = (const UnitDef*)userData;
 	return 0;
 }
 
@@ -377,7 +377,7 @@ static inline int BuildCategorySet(lua_State* L, const vector<string>& cats)
 static int CategorySetFromBits(lua_State* L, const void* data)
 {
 	const int bits = *((const int*)data);
-	const vector<string> cats =
+	const vector<string> &cats =
 		CCategoryHandler::Instance()->GetCategoryNames(bits);
 	return BuildCategorySet(L, cats);
 }
@@ -387,22 +387,22 @@ static int CategorySetFromString(lua_State* L, const void* data)
 {
 	const string& str = *((const string*)data);
 	const string lower = StringToLower(str);
-	const vector<string> cats = CSimpleParser::Tokenize(lower, 0);
+	const vector<string> &cats = CSimpleParser::Tokenize(lower, 0);
 	return BuildCategorySet(L, cats);
 }
 
 
 static int WeaponsTable(lua_State* L, const void* data)
 {
-	const vector<UnitDef::UnitDefWeapon>& weapons =
-		*((const vector<UnitDef::UnitDefWeapon>*)data);
+	const vector<UnitDefWeapon>& weapons =
+		*((const vector<UnitDefWeapon>*)data);
 
 	const int weaponCount = (int)weapons.size();
 
 	lua_newtable(L);
 
 	for (int i = 0; i < weaponCount; i++) {
-		const UnitDef::UnitDefWeapon& udw = weapons[i];
+		const UnitDefWeapon& udw = weapons[i];
 		const WeaponDef* weapon = udw.def;
 		lua_pushnumber(L, i + 1);
 		lua_newtable(L); {
@@ -475,20 +475,21 @@ static int SoundsTable(lua_State* L, const void* data) {
 
 static int ModelDefTable(lua_State* L, const void* data) {
 	const UnitModelDef& md = *((const UnitModelDef*) data);
-	const char* type;
-	if (StringToLower(md.modelpath).find(".s3o") != string::npos) {
-		type = "s3o";
-	} else {
-		type = "3do";
-	}
+	const char* type = "???";
+
+	     if (StringToLower(md.modelName).find(".3do") != string::npos) { type = "3do"; }
+	else if (StringToLower(md.modelName).find(".s3o") != string::npos) { type = "s3o"; }
+	else if (StringToLower(md.modelName).find(".obj") != string::npos) { type = "obj"; }
+
 	lua_newtable(L);
 	HSTR_PUSH_STRING(L, "type", type);
-	HSTR_PUSH_STRING(L, "path", md.modelpath);
-	HSTR_PUSH_STRING(L, "name", md.modelname);
+	HSTR_PUSH_STRING(L, "path", md.modelPath);
+	HSTR_PUSH_STRING(L, "name", md.modelName);
 	HSTR_PUSH(L, "textures");
+
 	lua_newtable(L);
 	map<string, string>::const_iterator it;
-	for (it = md.textures.begin(); it != md.textures.end(); ++it) {
+	for (it = md.modelTextures.begin(); it != md.modelTextures.end(); ++it) {
 		LuaPushNamedString(L, it->first, it->second);
 	}
 	lua_rawset(L, -3);
@@ -525,7 +526,8 @@ static int MoveDataTable(lua_State* L, const void* data)
 		default: { HSTR_PUSH_STRING(L, "family", "error"); break; }
 	}
 
-	HSTR_PUSH_NUMBER(L, "size",          md->size);
+	HSTR_PUSH_NUMBER(L, "xsize",         md->xsize);
+	HSTR_PUSH_NUMBER(L, "zsize",         md->zsize);
 	HSTR_PUSH_NUMBER(L, "depth",         md->depth);
 	HSTR_PUSH_NUMBER(L, "maxSlope",      md->maxSlope);
 	HSTR_PUSH_NUMBER(L, "slopeMod",      md->slopeMod);
@@ -556,28 +558,27 @@ static int TotalEnergyOut(lua_State* L, const void* data)
 }
 
 
-#define TYPE_STRING_FUNC(name)                          \
-	static int Is ## name(lua_State* L, const void* data) \
-	{                                                     \
-		const string& type = *((const string*)data);        \
-		lua_pushboolean(L, type == #name);                  \
-		return 1;                                           \
+
+#define TYPE_BOOL_FUNC(FuncName)                        \
+	static int FuncName(lua_State* L, const void* data) \
+	{                                                   \
+		const UnitDef* ud = (const UnitDef*) data;      \
+		lua_pushboolean(L, ud->FuncName());             \
+		return 1;                                       \
 	}
 
-TYPE_STRING_FUNC(Bomber);
-TYPE_STRING_FUNC(Builder);
-TYPE_STRING_FUNC(Building);
-TYPE_STRING_FUNC(Factory);
-TYPE_STRING_FUNC(Fighter);
-TYPE_STRING_FUNC(Transport);
-TYPE_STRING_FUNC(GroundUnit);
-TYPE_STRING_FUNC(MetalExtractor);
+TYPE_BOOL_FUNC(IsImmobileUnit);
+TYPE_BOOL_FUNC(IsFactoryUnit);
+TYPE_BOOL_FUNC(IsFighterUnit);
+TYPE_BOOL_FUNC(IsBomberUnit);
+TYPE_BOOL_FUNC(IsGroundUnit);
+
 
 
 #define TYPE_MODEL_FUNC(name, param)                  \
 	static int name(lua_State* L, const void* data)   \
 	{                                                 \
-		const UnitDef* ud = ((const UnitDef*) data);  \
+		const UnitDef* ud = (const UnitDef*) data;    \
 		const S3DModel* model = ud->LoadModel();      \
 		lua_pushnumber(L, model->param);              \
 		return 1;                                     \
@@ -585,15 +586,15 @@ TYPE_STRING_FUNC(MetalExtractor);
 
 TYPE_MODEL_FUNC(ModelHeight, height);
 TYPE_MODEL_FUNC(ModelRadius, radius);
-TYPE_MODEL_FUNC(ModelMinx,   minx);
+TYPE_MODEL_FUNC(ModelMinx,   mins.x);
 TYPE_MODEL_FUNC(ModelMidx,   relMidPos.x);
-TYPE_MODEL_FUNC(ModelMaxx,   maxx);
-TYPE_MODEL_FUNC(ModelMiny,   miny);
+TYPE_MODEL_FUNC(ModelMaxx,   maxs.x);
+TYPE_MODEL_FUNC(ModelMiny,   mins.y);
 TYPE_MODEL_FUNC(ModelMidy,   relMidPos.y);
-TYPE_MODEL_FUNC(ModelMaxy,   maxy);
-TYPE_MODEL_FUNC(ModelMinz,   minz);
+TYPE_MODEL_FUNC(ModelMaxy,   maxs.y);
+TYPE_MODEL_FUNC(ModelMinz,   mins.z);
 TYPE_MODEL_FUNC(ModelMidz,   relMidPos.z);
-TYPE_MODEL_FUNC(ModelMaxz,   maxz);
+TYPE_MODEL_FUNC(ModelMaxz,   maxs.z);
 
 
 /******************************************************************************/
@@ -605,10 +606,8 @@ static bool InitParamMap()
 	paramMap["pairs"] = DataElement(READONLY_TYPE);
 
 	// dummy UnitDef for address lookups
-	const UnitDef ud;
+	const UnitDef& ud = *unitDefHandler->unitDefs[0];
 	const char* start = ADDRESS(ud);
-
-//	ADD_BOOL(valid, ud.valid);
 
 // ADD_INT("weaponCount", weaponCount); // CUSTOM
 /*
@@ -637,14 +636,11 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FUNCTION("stockpileWeaponDef", ud.stockpileWeaponDef, WeaponDefToID);
 	ADD_FUNCTION("iconType",           ud.iconType,           SafeIconType);
 
-	ADD_FUNCTION("isBomber",         ud.type, IsBomber);
-	ADD_FUNCTION("isBuilder",        ud.type, IsBuilder);
-	ADD_FUNCTION("isBuilding",       ud.type, IsBuilding);
-	ADD_FUNCTION("isFactory",        ud.type, IsFactory);
-	ADD_FUNCTION("isFighter",        ud.type, IsFighter);
-	ADD_FUNCTION("isTransport",      ud.type, IsTransport);
-	ADD_FUNCTION("isGroundUnit",     ud.type, IsGroundUnit);
-	ADD_FUNCTION("isMetalExtractor", ud.type, IsMetalExtractor);
+	ADD_FUNCTION("isBuilding",       ud, IsImmobileUnit); // !
+	ADD_FUNCTION("isFactory",        ud, IsFactoryUnit);
+	ADD_FUNCTION("isFighter",        ud, IsFighterUnit);
+	ADD_FUNCTION("isBomber",         ud, IsBomberUnit);
+	ADD_FUNCTION("isGroundUnit",     ud, IsGroundUnit);
 
 	ADD_FUNCTION("height",  ud, ModelHeight);
 	ADD_FUNCTION("radius",  ud, ModelRadius);
@@ -659,6 +655,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FUNCTION("maxz",    ud, ModelMaxz);
 
 	ADD_INT("id", ud.id);
+	ADD_INT("cobID", ud.cobID);
 
 	ADD_STRING("name",      ud.name);
 	ADD_STRING("humanName", ud.humanName);
@@ -666,23 +663,15 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 
 	ADD_STRING("tooltip", ud.tooltip);
 
-	ADD_STRING("type", ud.type);
-
-	ADD_STRING("gaia", ud.gaia);
-
-	ADD_STRING("TEDClass", ud.TEDClassString);
-
 	ADD_STRING("wreckName", ud.wreckName);
 	ADD_STRING("deathExplosion", ud.deathExplosion);
 	ADD_STRING("selfDExplosion", ud.selfDExplosion);
 
 	ADD_STRING("buildpicname", ud.buildPicName);
 
-	ADD_INT("aihint", ud.aihint);
-	ADD_INT("cobID",  ud.cobID);
-
 	ADD_INT("techLevel",   ud.techLevel);
 	ADD_INT("maxThisUnit", ud.maxThisUnit);
+	ADD_BOOL("transportableBuilding", ud.transportableBuilding);
 
 	ADD_FLOAT("metalUpkeep",    ud.metalUpkeep);
 	ADD_FLOAT("energyUpkeep",   ud.energyUpkeep);
@@ -700,7 +689,6 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("energyStorage",  ud.energyStorage);
 
 	ADD_BOOL("extractSquare", ud.extractSquare);
-	ADD_BOOL("isMetalMaker",  ud.isMetalMaker);
 
 	ADD_FLOAT("power", ud.power);
 
@@ -719,13 +707,12 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("turnInPlaceDistance", ud.turnInPlaceDistance);
 	ADD_FLOAT("turnInPlaceSpeedLimit", ud.turnInPlaceSpeedLimit);
 
-	ADD_BOOL("upright",   ud.upright);
+	ADD_BOOL("upright", ud.upright);
 	ADD_BOOL("collide", ud.collide);
 
 	ADD_FLOAT("losHeight",     ud.losHeight);
 	ADD_FLOAT("losRadius",     ud.losRadius);
 	ADD_FLOAT("airLosRadius",  ud.airLosRadius);
-	ADD_FLOAT("controlRadius", ud.controlRadius);
 
 	ADD_INT("radarRadius",    ud.radarRadius);
 	ADD_INT("sonarRadius",    ud.sonarRadius);
@@ -852,8 +839,6 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_INT("xsize", ud.xsize);
 	ADD_INT("zsize", ud.zsize);
 
-	ADD_INT("buildangle", ud.buildangle);
-
 	// transport stuff
 	ADD_INT(  "transportCapacity",     ud.transportCapacity);
 	ADD_INT(  "transportSize",         ud.transportSize);
@@ -866,8 +851,8 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_BOOL( "cantBeTransported",     ud.cantBeTransported);
 	ADD_BOOL( "transportByEnemy",      ud.transportByEnemy);
 	ADD_INT(  "transportUnloadMethod", ud.transportUnloadMethod);
-	ADD_FLOAT("fallSpeed",			       ud.fallSpeed);
-	ADD_FLOAT("unitFallSpeed",		     ud.unitFallSpeed);
+	ADD_FLOAT("fallSpeed",             ud.fallSpeed);
+	ADD_FLOAT("unitFallSpeed",         ud.unitFallSpeed);
 
 	ADD_BOOL( "startCloaked",     ud.startCloaked);
 	ADD_FLOAT("cloakCost",        ud.cloakCost);
@@ -875,6 +860,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("decloakDistance",  ud.decloakDistance);
 	ADD_BOOL( "decloakSpherical", ud.decloakSpherical);
 	ADD_BOOL( "decloakOnFire",    ud.decloakOnFire);
+	ADD_INT(  "cloakTimeout",     ud.cloakTimeout);
 
 	ADD_BOOL( "canKamikaze",    ud.canKamikaze);
 	ADD_FLOAT("kamikazeDist",   ud.kamikazeDist);

@@ -1,4 +1,4 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 
@@ -35,9 +35,6 @@ extern "C" int backtrace (void **array, int size);
 #define LOGFILE_SERVER   "syncdebug-server.log"
 #define LOGFILE_CLIENT   "syncdebug-client.log"
 
-
-// externals
-extern bool globalQuit;
 
 
 /**
@@ -200,9 +197,9 @@ void CSyncDebugger::Backtrace(int index, const char* prefix) const
 			logger.AddLine("%s#%u {%p}", prefix, i, historybt[index].bt[i]);
 #else
 			if (sizeof(void*) == 8)
-				logger.AddLine("%s#%u {%llx}", prefix, i, (uint64_t)historybt[index].bt[i]);
+				logger.AddLine("%s#%u {%llx}", prefix, i, (boost::uint64_t)historybt[index].bt[i]);
 			else
-				logger.AddLine("%s#%u {%x}", prefix, i, (uint32_t)historybt[index].bt[i]);
+				logger.AddLine("%s#%u {%x}", prefix, i, (boost::uint32_t)historybt[index].bt[i]);
 #endif
 		}
 	}
@@ -243,7 +240,7 @@ bool CSyncDebugger::ServerReceived(const unsigned char* inbuf)
 				logger.AddLine("Server: received checksum response of %d instead of %d bytes", *(short*)&inbuf[1], HISTORY_SIZE * 4 + 12);
 			} else {
 				int player = inbuf[3];
-				if(player >= playerHandler->ActivePlayers() || player < 0) {
+				if (!playerHandler->IsValidPlayer(player)) {
 					logger.AddLine("Server: got invalid playernum %d in checksum response", player);
 				} else {
 					logger.AddLine("Server: got checksum response from %d", player);
@@ -251,7 +248,7 @@ bool CSyncDebugger::ServerReceived(const unsigned char* inbuf)
 					const unsigned* end = begin + HISTORY_SIZE;
 					players[player].checksumResponses.resize(HISTORY_SIZE);
 					std::copy(begin, end, players[player].checksumResponses.begin());
-					players[player].remoteFlop = *(uint64_t*)&inbuf[4];
+					players[player].remoteFlop = *(boost::uint64_t*)&inbuf[4];
 					assert(!players[player].checksumResponses.empty());
 					int i = 0;
 					while (i < playerHandler->ActivePlayers() && !players[i].checksumResponses.empty()) ++i;
@@ -268,7 +265,7 @@ bool CSyncDebugger::ServerReceived(const unsigned char* inbuf)
 				logger.AddLine("Server: received block response of %d instead of %d bytes", *(short*)&inbuf[1], BLOCK_SIZE * 4 + 4);
 			} else {
 				int player = inbuf[3];
-				if(player >= playerHandler->ActivePlayers() || player < 0) {
+				if (!playerHandler->IsValidPlayer(player)) {
 					logger.AddLine("Server: got invalid playernum %d in block response", player);
 				} else {
 					const unsigned* begin = (unsigned*)&inbuf[4];
@@ -396,7 +393,7 @@ void CSyncDebugger::ClientSendChecksumResponse()
 void CSyncDebugger::ServerQueueBlockRequests()
 {
 	logger.AddLine("Server: queuing block requests");
-	uint64_t correctFlop = 0;
+	boost::uint64_t correctFlop = 0;
 	for (int j = 0; j < playerHandler->ActivePlayers(); ++j) {
 		if (correctFlop) {
 			if (players[j].remoteFlop != correctFlop)

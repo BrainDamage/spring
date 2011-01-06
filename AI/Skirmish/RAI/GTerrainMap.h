@@ -13,13 +13,14 @@
 #ifndef RAI_GLOBAL_TERRAIN_MAP_H
 #define RAI_GLOBAL_TERRAIN_MAP_H
 
-#include "ExternalAI/IAICallback.h"
-#include "Sim/Units/UnitDef.h"
+#include "LegacyCpp/IAICallback.h"
+#include "LegacyCpp/UnitDef.h"
 #include "LogFile.h"
 #include <map>
 #include <list>
 #include <set>
 #include <cstdio>
+#include <string.h>
 using namespace std;
 
 //#include "GPathfinder.h"
@@ -34,16 +35,17 @@ struct TerrainMapAreaSector
 {
 	TerrainMapAreaSector()
 	{
-		area=0;
-		areaClosest=0;
+		S=NULL;
+		area=NULL;
+		areaClosest=NULL;
 	};
 	// NOTE: some of these values are loaded as they become needed, use GlobalTerrainMap functions
 	TerrainMapSector *S;	// always valid
 	TerrainMapArea* area;		// The TerrainMapArea this sector belongs to, otherwise = 0 until
-	TerrainMapArea* areaClosest;// uninitalized, = the TerrainMapArea closest to this sector
+	TerrainMapArea* areaClosest;// uninitialized, = the TerrainMapArea closest to this sector
 	// Use this to find the closest sector useable by a unit with a different MoveType, the 0 pointer may be valid as a key index
-	map<TerrainMapMobileType*,TerrainMapAreaSector*> sectorAlternativeM; // uninitalized
-	map<TerrainMapImmobileType*,TerrainMapSector*> sectorAlternativeI; // uninitalized
+	map<TerrainMapMobileType*,TerrainMapAreaSector*> sectorAlternativeM; // uninitialized
+	map<TerrainMapImmobileType*,TerrainMapSector*> sectorAlternativeI; // uninitialized
 };
 
 struct TerrainMapArea
@@ -53,16 +55,17 @@ struct TerrainMapArea
 		index=areaIUSize;
 		mobileType = TMMobileType;
 		percentOfMap=0.0;
+		areaUsable=0;
 	};
 	bool areaUsable; // Should units of this type be used in this area
 	int index;
 	TerrainMapMobileType* mobileType;
 	map<int,TerrainMapAreaSector*> sector;			// key = sector index, a list of all sectors belonging to it
 	map<int,TerrainMapAreaSector*> sectorClosest;	// key = sector indexes not in "sector", indicates the sector belonging to this map-area with the closest distance
-												// NOTE: use GlobalTerrainMap->GetClosestSector: these values are not initalized but are instead loaded as they become needed
+												// NOTE: use GlobalTerrainMap->GetClosestSector: these values are not initialized but are instead loaded as they become needed
 	float percentOfMap; // 0-100
 };
-
+#define MAP_AREA_LIST_SIZE 50
 struct TerrainMapMobileType
 {
 	TerrainMapMobileType()
@@ -71,21 +74,25 @@ struct TerrainMapMobileType
 		sector = 0;
 		areaSize = 0;
 		areaLargest = 0;
-//		PF = 0;
 		udSize = 0;
+		MD = NULL;
+		canFloat = 0;
+		canHover = 0;
+		minElevation = 0.0;
+		maxElevation = 0.0;
+		maxSlope = 0.0;
+		memset(area,NULL,MAP_AREA_LIST_SIZE);
+		
 	};
 	~TerrainMapMobileType()
 	{
-//		if( PF != 0 )
-//			delete PF;
-		if( sector != 0 )
-			delete [] sector;
+		delete [] sector;
 		for(int i=0; i<areaSize; i++)
 			delete area[i];
 	};
 	bool typeUsable; // Should units of this type be used on this map
 	TerrainMapAreaSector *sector;	// Each MoveType has it's own sector list, GlobalTerrainMap->GetSectorIndex() gives an index
-	TerrainMapArea *area[50];	// Each MoveType has it's own MapArea list
+	TerrainMapArea *area[MAP_AREA_LIST_SIZE];	// Each MoveType has it's own MapArea list
 	TerrainMapArea *areaLargest;// Largest area usable by this type, otherwise = 0
 	int areaSize;
 
@@ -105,6 +112,9 @@ struct TerrainMapSector
 	{
 		percentLand = 0.0;
 		maxSlope = 0.0;
+		maxElevation = 0.0;
+		minElevation = 0.0;
+		isWater = 0;
 	};
 
 	bool isWater;		// (Water = true) (Land = false)
@@ -122,6 +132,12 @@ struct TerrainMapImmobileType
 	TerrainMapImmobileType()
 	{
 		udSize = 0;
+		canFloat = 0;
+		canHover = 0;
+		minElevation = 0.0;
+		maxElevation = 0.0;
+		typeUsable = 0;
+		
 	};
 
 	bool typeUsable; // Should units of this type be used on this map

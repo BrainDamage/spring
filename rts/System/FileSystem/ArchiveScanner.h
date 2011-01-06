@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef __ARCHIVE_SCANNER_H
 #define __ARCHIVE_SCANNER_H
 
@@ -44,8 +46,8 @@ public:
 		std::vector<std::string> replaces;			// This archive obsoletes these ones
 	};
 
-	CArchiveScanner(void);
-	~CArchiveScanner(void);
+	CArchiveScanner();
+	~CArchiveScanner();
 
 	const std::string& GetFilename() const;
 
@@ -70,6 +72,26 @@ public:
 	ArchiveData GetArchiveData(const std::string& name) const;
 	ArchiveData GetArchiveDataByArchive(const std::string& archive) const;
 
+	/**
+	 * Returns a value > 0 if the file is rated as a meta-file.
+	 * First class means, it is essential for the archive, and will be read by
+	 * pretty much every software that scanns through archives.
+	 * Second class means, it is not essential for the archive, but it may be
+	 * read by certain tools that generate spezialized indices while scanning
+	 * through archives.
+	 * Examples:
+	 * "objects3d/ddm.s3o" -> 0
+	 * "ModInfo.lua" -> 1
+	 * "maps/dsd.smf" -> 1
+	 * "LuaAI.lua" -> 2
+	 * "sides/arm.bmp" -> 2
+	 * @param filePath file path, relative to archive-root
+	 * @return 0 if the file is not a meta-file,
+	 *         1 if the file is a first class meta-file,
+	 *         2 if the file is a second class meta-file
+	 */
+	static unsigned char GetMetaFileClass(const std::string& filePath);
+
 private:
 	struct ArchiveInfo
 	{
@@ -80,6 +102,13 @@ private:
 		unsigned int checksum;
 		bool updated;
 		std::string replaced;					// If not empty, use that archive instead
+	};
+	struct BrokenArchive
+	{
+		std::string path;
+		unsigned int modified;
+		bool updated;
+		std::string problem;
 	};
 
 	void ScanDirs(const std::vector<std::string>& dirs, bool checksum = false);
@@ -95,9 +124,14 @@ private:
 	void WriteCacheData(const std::string& filename);
 
 	std::map<std::string, ArchiveInfo> archiveInfo;
+	std::map<std::string, BrokenArchive> brokenArchives;
 	ArchiveData GetArchiveData(const LuaTable& archiveTable);
 	IFileFilter* CreateIgnoreFilter(CArchiveBase* ar);
 	unsigned int GetCRC(CArchiveBase* ar);
+	/**
+	 * Get CRC of the data in the specified archive.
+     * Returns 0 if file could not be opened.
+	 */
 	unsigned int GetCRC(const std::string& filename);
 	bool isDirty;
 	std::string cachefile;

@@ -1,16 +1,17 @@
-// NamedTextures.cpp: implementation of the CNamedTextures class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "mmgr.h"
 
-#include "bitops.h"
 #include "NamedTextures.h"
-#include "Rendering/GL/myGL.h"
+
+#include "bitops.h"
 #include "Bitmap.h"
-#include "GlobalUnsynced.h"
-#include "Vec2.h"
+#include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/myGL.h"
+#include "System/GlobalUnsynced.h"
+#include "System/TimeProfiler.h"
+#include "System/Vec2.h"
 
 
 map<string, CNamedTextures::TexInfo> CNamedTextures::texMap;
@@ -76,8 +77,10 @@ bool CNamedTextures::Bind(const string& texName)
 }
 
 
-bool CNamedTextures::Load(const string& texName, GLuint texID)
+bool CNamedTextures::Load(const string& texName, unsigned int texID)
 {
+	ScopedTimer timer("Textures::NamedTextures");
+
 	//! strip off the qualifiers
 	string filename = texName;
 	bool border  = false;
@@ -195,7 +198,7 @@ bool CNamedTextures::Load(const string& texName, GLuint texID)
 
 			//! Note: NPOTs + nearest filtering seems broken on ATIs
 			if ( !(count_bits_set(bitmap.xsize)==1 && count_bits_set(bitmap.ysize)==1) &&
-				(!GLEW_ARB_texture_non_power_of_two || (gu->atiHacks && nearest)) )
+				(!GLEW_ARB_texture_non_power_of_two || (globalRendering->atiHacks && nearest)) )
 			{
 				bitmap = bitmap.CreateRescaled(next_power_of_2(bitmap.xsize),next_power_of_2(bitmap.ysize));
 			}
@@ -246,7 +249,7 @@ void CNamedTextures::Update()
 		return;
 	}
 	glPushAttrib(GL_TEXTURE_BIT);
-	for (std::vector<string>::iterator it = texWaiting.begin(); it != texWaiting.end(); it++) {
+	for (std::vector<string>::iterator it = texWaiting.begin(); it != texWaiting.end(); ++it) {
 		map<string, TexInfo>::iterator mit = texMap.find(*it);
 		if (mit != texMap.end()) {
 			Load(*it,mit->second.id);

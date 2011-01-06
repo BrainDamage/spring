@@ -18,6 +18,8 @@
 
 #include "JvmLocater_common.h"
 
+#include "System/maindefines.h"
+
 #include <unistd.h>
 
 
@@ -63,11 +65,6 @@ const char* GetArchPath()
 			return LIBARCHNAME;
 	}
 }
-
-/*
-common java libs location
-/usr/share/java/jna.jar
-*/
 
 /*
  * On Solaris VM choosing is done by the launcher (java.c).

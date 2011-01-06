@@ -1,20 +1,23 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef PLAYER_H
 #define PLAYER_H
-// Player.h: interface for the CPlayer class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <string>
 #include <set>
 
-#include "creg/creg_cond.h"
 #include "PlayerBase.h"
 #include "PlayerStatistics.h"
-#include "float3.h"
+#include "System/creg/creg_cond.h"
+#include "System/float3.h"
 
 class CPlayer;
 class CUnit;
+
 struct DirectControlStruct {
+
+	DirectControlStruct();
+
 	bool forward;
 	bool back;
 	bool left;
@@ -35,6 +38,8 @@ struct DirectControlClientState {
 		oldHeading = 0;
 		oldState   = 255;
 		oldDCpos   = ZeroVector;
+
+		playerControlledUnit = NULL;
 	}
 
 	void SendStateUpdate(bool*);
@@ -44,7 +49,7 @@ struct DirectControlClientState {
 	unsigned char oldState;      //! unsynced
 	float3 oldDCpos;             //! unsynced
 
-	// todo: relocate the CUnit* from GlobalUnsynced
+	// TODO: relocate the CUnit* from GlobalUnsynced
 	// to here as well so everything is in one place
 };
 
@@ -60,12 +65,15 @@ public:
 		return (controlledTeams.find(teamID) != controlledTeams.end());
 	}
 	void SetControlledTeams();
-	static void UpdateControlledTeams(); // SetControlledTeams() for all players
+	/// SetControlledTeams() for all players
+	static void UpdateControlledTeams();
 
 	void StartSpectating();
 	void GameFrame(int frameNum);
 
-	void operator=(const PlayerBase& base) { PlayerBase::operator=(base); };
+	CPlayer& operator=(const PlayerBase& base) { PlayerBase::operator=(base); return *this; }
+
+	void StopControllingUnit();
 
 	bool active;
 
@@ -79,8 +87,6 @@ public:
 
 	DirectControlStruct myControl;
 	DirectControlClientState dccs;
-
-	void StopControllingUnit();
 
 private:
 	std::set<int> controlledTeams;

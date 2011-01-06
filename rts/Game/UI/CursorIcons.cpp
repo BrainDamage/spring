@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include <algorithm>
 
@@ -11,12 +13,10 @@
 #include "Game/Camera.h"
 #include "Game/GameHelper.h"
 #include "Rendering/glFont.h"
+#include "Rendering/UnitDrawer.h"
 #include "Rendering/GL/myGL.h"
-#include "Rendering/UnitModels/UnitDrawer.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitDefHandler.h"
-
-
 
 
 CCursorIcons cursorIcons;
@@ -123,11 +123,11 @@ void CCursorIcons::DrawCursors()
 
 void CCursorIcons::DrawTexts()
 {
-	glViewport(gu->viewPosX, 0, gu->viewSizeX, gu->viewSizeY);
+	glViewport(globalRendering->viewPosX, 0, globalRendering->viewSizeX, globalRendering->viewSizeY);
 	glColor4f(1.0f,  1.0f, 1.0f, 1.0f);
 
 	const float fontScale = 1.0f;
-	const float yOffset = 50.0f * gu->pixelY;
+	const float yOffset = 50.0f * globalRendering->pixelY;
 
 	font->Begin();
 	font->SetColors(); //default
@@ -136,8 +136,8 @@ void CCursorIcons::DrawTexts()
 	for (it = texts.begin(); it != texts.end(); ++it) {
 		const float3 winPos = camera->CalcWindowCoordinates(it->pos);
 		if (winPos.z <= 1.0f) {
-			const float x = (winPos.x * gu->pixelX);
-			const float y = (winPos.y * gu->pixelY) + yOffset;
+			const float x = (winPos.x * globalRendering->pixelX);
+			const float y = (winPos.y * globalRendering->pixelY) + yOffset;
 
 			if (guihandler->GetOutlineFonts()) {
 				font->glPrint(x, y, fontScale, FONT_OUTLINE | FONT_CENTER | FONT_TOP | FONT_SCALE | FONT_NORM, it->text);
@@ -152,7 +152,7 @@ void CCursorIcons::DrawTexts()
 
 void CCursorIcons::DrawBuilds()
 {
-	glViewport(gu->viewPosX, 0, gu->viewSizeX, gu->viewSizeY);
+	glViewport(globalRendering->viewPosX, 0, globalRendering->viewSizeX, globalRendering->viewSizeY);
 
 	glEnable(GL_DEPTH_TEST);
 	glColor4f(1.0f, 1.0f, 1.0f, 0.3f);
@@ -176,7 +176,7 @@ CMouseCursor* CCursorIcons::GetCursor(int cmd)
 		case CMD_WAIT:            cursorName = "Wait";         break;
 		case CMD_TIMEWAIT:        cursorName = "TimeWait";     break;
 		case CMD_SQUADWAIT:       cursorName = "SquadWait";    break;
-		case CMD_DEATHWAIT:       cursorName = "DeathWait";    break;
+		case CMD_DEATHWAIT:       cursorName = "Wait";         break; // there is a "DeathWait" cursor, but to prevent cheating, we have to use the same like for CMD_WAIT
 		case CMD_GATHERWAIT:      cursorName = "GatherWait";   break;
 		case CMD_MOVE:            cursorName = "Move";         break;
 		case CMD_PATROL:          cursorName = "Patrol";       break;

@@ -13,13 +13,20 @@ CR_REG_METADATA(CDefenseMatrix, (
 	CR_MEMBER(ThreatMapYSize),
 	CR_MEMBER(TotalCells),
 	CR_MEMBER(ai),
+// These two only matter during one frame, at AI-Init mid-game -> do not care
+//	CR_MEMBER(defAddQueue),
+//	CR_MEMBER(defRemoveQueue),
 	CR_RESERVED(16),
 	CR_POSTLOAD(PostLoad)
 ));
 
-
-CDefenseMatrix::CDefenseMatrix(AIClasses *ai) {
-	this->ai = ai;
+CDefenseMatrix::CDefenseMatrix(AIClasses *ai)
+	: spotFinder(NULL)
+	, ThreatMapXSize(-1)
+	, ThreatMapYSize(-1)
+	, TotalCells(-1)
+	, ai(ai)
+{
 }
 CDefenseMatrix::~CDefenseMatrix() {
 }
@@ -39,10 +46,20 @@ void CDefenseMatrix::Init() {
 
 	spotFinder = new CSpotFinder(ai, ai->pather->PathMapYSize, ai->pather->PathMapXSize);
 	spotFinder->SetBackingArray(&ChokePointArray.front(), ai->pather->PathMapYSize, ai->pather->PathMapXSize);
+
+	std::vector<DefPos>::const_iterator def;
+	for (def = defAddQueue.begin(); def != defAddQueue.end(); ++def) {
+		AddDefense(def->pos, def->def);
+	}
+	for (def = defRemoveQueue.begin(); def != defRemoveQueue.end(); ++def) {
+		RemoveDefense(def->pos, def->def);
+	}
+	defAddQueue.clear();
+	defRemoveQueue.clear();
 }
 
 void CDefenseMatrix::MaskBadBuildSpot(float3 pos) {
-	if (pos.IsInBounds()) {
+	if (MAPPOS_IN_BOUNDS(pos)) {
 		const int f3multiplier = 8 * THREATRES;
 		const int x = (int) (pos.x / f3multiplier);
 		const int y = (int) (pos.z / f3multiplier);
@@ -53,6 +70,7 @@ void CDefenseMatrix::MaskBadBuildSpot(float3 pos) {
 
 float3 CDefenseMatrix::GetDefensePos(const UnitDef* def, float3 builderpos) {
 	ai->ut->UpdateChokePointArray();
+
 	int f3multiplier = 8 * THREATRES;
 	int Range = int(ai->ut->GetMaxRange(def) / f3multiplier);
 	int bestspotx = 0;
@@ -159,6 +177,13 @@ float3 CDefenseMatrix::GetDefensePos(const UnitDef* def, float3 builderpos) {
 
 
 void CDefenseMatrix::AddDefense(float3 pos, const UnitDef* def) {
+
+	if (!IsInitialized()) {
+		DefPos defPos = {pos, def};
+		defAddQueue.push_back(defPos);
+		return;
+	}
+
 	int f3multiplier = 8 * THREATRES;
 	int Range = int(ai->ut->GetMaxRange(def) / f3multiplier);
 	int squarerange = Range * Range;
@@ -180,11 +205,18 @@ void CDefenseMatrix::AddDefense(float3 pos, const UnitDef* def) {
 	}
 
 	spotFinder->InvalidateSumMap(x, y, Range + 1);
-	// ai->debug->MakeBWTGA(Chokepointmap, ai->tm->ThreatMapWidth, ai->tm->ThreatMapHeight, "DebugPathMatrix", 1);
+	// ai->debug->MakeBWTGA(Chokepointmap, ai->tm->GetThreatMapWidth(), ai->tm->GetThreatMapHeight(), "DebugPathMatrix", 1);
 }
 
 
 void CDefenseMatrix::RemoveDefense(float3 pos, const UnitDef* def) {
+
+	if (!IsInitialized()) {
+		DefPos defPos = {pos, def};
+		defRemoveQueue.push_back(defPos);
+		return;
+	}
+
 	int f3multiplier = 8 * THREATRES;
 	int Range = int(ai->ut->GetMaxRange(def) / f3multiplier);
 	int squarerange = Range * Range;

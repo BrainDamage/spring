@@ -1,6 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef UPDATERWINDOW_H
 #define UPDATERWINDOW_H
-
 
 #include "aGui/Window.h"
 
@@ -23,7 +24,7 @@ public:
 	void ShowAggreement(const std::string& text);
 	void AcceptAgreement();
 	void RejectAgreement();
-	
+
 	void ServerLabel(const std::string& text);
 	void Label(const std::string& text);
 
@@ -35,6 +36,5 @@ private:
 	agui::Window* agreement;
 	Connection* con;
 };
-
 
 #endif

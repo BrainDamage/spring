@@ -1,13 +1,14 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /*
-creg - Code compoment registration system
-Copyright 2005 Jelmer Cnossen
-*/
-#include "StdAfx.h"
+ * creg - Code compoment registration system
+ * Classes for serialization of registrated class instances
+ */
 
 #include <map>
 #include <string.h>
 
-#include "mmgr.h"
+#include "System/mmgr.h"
 
 // creg has to be made aware of mmgr explicitly
 #ifdef USE_MMGR
@@ -20,7 +21,8 @@ Copyright 2005 Jelmer Cnossen
 # define	operator_delete		::operator delete
 #endif
 
-#include "Util.h"
+#include "System/Util.h"
+
 #include "creg_cond.h"
 
 using namespace creg;
@@ -135,7 +137,7 @@ std::vector<Class*> Class::GetImplementations()
 		if (!dc->IsAbstract())
 			classes.push_back(dc);
 
-		std::vector<Class*> impl = dc->GetImplementations();
+		const std::vector<Class*> &impl = dc->GetImplementations();
 		classes.insert(classes.end(), impl.begin(), impl.end());
 	}
 

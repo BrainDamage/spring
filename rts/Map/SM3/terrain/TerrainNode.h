@@ -1,33 +1,7 @@
-/*
----------------------------------------------------------------------
-   Terrain Renderer using texture splatting and geomipmapping
-   Copyright (c) 2006 Jelmer Cnossen
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-   This software is provided 'as-is', without any express or implied
-   warranty. In no event will the authors be held liable for any
-   damages arising from the use of this software.
-
-   Permission is granted to anyone to use this software for any
-   purpose, including commercial applications, and to alter it and
-   redistribute it freely, subject to the following restrictions:
-
-   1. The origin of this software must not be misrepresented; you
-      must not claim that you wrote the original software. If you use
-      this software in a product, an acknowledgment in the product
-      documentation would be appreciated but is not required.
-
-   2. Altered source versions must be plainly marked as such, and
-      must not be misrepresented as being the original software.
-
-   3. This notice may not be removed or altered from any source
-      distribution.
-
-   Jelmer Cnossen
-   j.cnossen at gmail dot com
----------------------------------------------------------------------
-*/
-#ifndef JC_TERRAIN_NODE_H
-#define JC_TERRAIN_NODE_H
+#ifndef _TERRAIN_NODE_H_
+#define _TERRAIN_NODE_H_
 
 #include "TerrainVertexBuffer.h"
 
@@ -71,7 +45,7 @@ namespace terrain
 	public:
 		TQuad();
 		~TQuad();
-		bool isLeaf () { return childs[0]==0; }
+		bool isLeaf () const { return childs[0]==0; }
 		// sqStart=start in square coordinates
 		// hmStart=start pixel on hm
 		void Build (Heightmap *hm, int2 sqStart, int2 hmStart, int2 quadPos, int w, int depth);
@@ -203,7 +177,7 @@ namespace terrain
 
 		float& at(int x,int y) { return data[y*w+x]; }
 		uchar* GetNormal(int x,int y) { return &normalData[3*(y*w+x)]; }
-		float HeightAt(int x,int y) { return data[y*w+x]; }// * scale + offset; }
+		float HeightAt(int x,int y) const { return data[y*w+x]; }// * scale + offset; }
 
 		int w,h;
 		float *data;
@@ -301,7 +275,7 @@ namespace terrain
 		typedef unsigned short index_t;
 		IndexTable ();
 
-		GLenum IndexType() { return GL_UNSIGNED_SHORT; }
+		GLenum IndexType() const { return GL_UNSIGNED_SHORT; }
 
 		int size[NUM_TABLES];
 		IndexBuffer buffers[NUM_TABLES];
@@ -311,5 +285,5 @@ namespace terrain
 
 };
 
+#endif // _TERRAIN_NODE_H_
 
-#endif

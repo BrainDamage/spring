@@ -1,9 +1,10 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include <algorithm>
 #include <cctype>
 #include "mmgr.h"
 
-#include "FileSystem/FileSystem.h"
 #include "GroundDecalHandler.h"
 #include "Game/Camera.h"
 #include "Lua/LuaParser.h"
@@ -11,17 +12,21 @@
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
-#include "ConfigHandler.h"
-#include "ShadowHandler.h"
-#include "GL/VertexArray.h"
-#include "Textures/Bitmap.h"
+#include "Rendering/GlobalRendering.h"
+#include "Rendering/ShadowHandler.h"
+#include "Rendering/UnitDrawer.h"
+#include "Rendering/GL/myGL.h"
+#include "Rendering/GL/VertexArray.h"
+#include "Rendering/Textures/Bitmap.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitTypes/Building.h"
-#include "GlobalUnsynced.h"
-#include "LogOutput.h"
-#include "Util.h"
-#include "Exceptions.h"
+#include "System/ConfigHandler.h"
+#include "System/Exceptions.h"
+#include "System/GlobalUnsynced.h"
+#include "System/LogOutput.h"
+#include "System/FileSystem/FileSystem.h"
+#include "System/Util.h"
 
 using std::list;
 using std::min;
@@ -30,7 +35,7 @@ using std::max;
 CGroundDecalHandler* groundDecals = NULL;
 
 
-CGroundDecalHandler::CGroundDecalHandler(void)
+CGroundDecalHandler::CGroundDecalHandler()
 {
 	drawDecals = false;
 	decalLevel = std::max(0, configHandler->Get("GroundDecals", 1));
@@ -75,14 +80,14 @@ CGroundDecalHandler::CGroundDecalHandler(void)
 	delete[] buf;
 
 	if (shadowHandler->canUseShadows) {
-		decalVP    = LoadVertexProgram("GroundDecals.vp");
-		decalFPsmf = LoadFragmentProgram("GroundDecalsSMF.fp");
-		decalFPsm3 = LoadFragmentProgram("GroundDecalsSM3.fp");
+		decalVP    = LoadVertexProgram("ARB/GroundDecals.vp");
+		decalFPsmf = LoadFragmentProgram("ARB/GroundDecalsSMF.fp");
+		decalFPsm3 = LoadFragmentProgram("ARB/GroundDecalsSM3.fp");
 	}
 }
 
 
-CGroundDecalHandler::~CGroundDecalHandler(void)
+CGroundDecalHandler::~CGroundDecalHandler()
 {
 	for (std::vector<TrackType*>::iterator tti = trackTypes.begin(); tti != trackTypes.end(); ++tti) {
 		for (set<UnitTrackStruct*>::iterator ti = (*tti)->tracks.begin(); ti != (*tti)->tracks.end(); ++ti) {
@@ -356,10 +361,10 @@ inline void CGroundDecalHandler::DrawGroundScar(CGroundDecalHandler::Scar* scar,
 				float tx2 = max(0.0f, (pos.x - px2) / radius4 + 0.25f);
 				float tz1 = min(0.5f, (pos.z - pz1) / radius4 + 0.25f);
 				float tz2 = max(0.0f, (pos.z - pz2) / radius4 + 0.25f);
-				float h1 = ground->GetHeight2(px1, pz1);
-				float h2 = ground->GetHeight2(px2, pz1);
-				float h3 = ground->GetHeight2(px2, pz2);
-				float h4 = ground->GetHeight2(px1, pz2);
+				float h1 = ground->GetHeightReal(px1, pz1);
+				float h2 = ground->GetHeightReal(px2, pz1);
+				float h3 = ground->GetHeightReal(px2, pz2);
+				float h4 = ground->GetHeightReal(px1, pz2);
 
 				scar->va->AddVertexTC(float3(px1, h1, pz1), tx1 + tx, tz1 + ty, color);
 				scar->va->AddVertexTC(float3(px2, h2, pz1), tx2 + tx, tz1 + ty, color);
@@ -401,7 +406,7 @@ inline void CGroundDecalHandler::DrawGroundScar(CGroundDecalHandler::Scar* scar,
 }
 
 
-void CGroundDecalHandler::Draw(void)
+void CGroundDecalHandler::Draw()
 {
 	if (!drawDecals) {
 		return;
@@ -489,7 +494,7 @@ void CGroundDecalHandler::Draw(void)
 					if (decal->owner && decal->owner->buildProgress >= 0) {
 						decal->alpha = decal->owner->buildProgress;
 					} else if (!decal->gbOwner) {
-						decal->alpha -= decal->alphaFalloff * gu->lastFrameTime * gs->speedFactor;
+						decal->alpha -= decal->alphaFalloff * globalRendering->lastFrameTime * gs->speedFactor;
 					}
 
 					if (decal->alpha < 0.0f) {
@@ -729,7 +734,7 @@ void CGroundDecalHandler::Draw(void)
 }
 
 
-void CGroundDecalHandler::Update(void)
+void CGroundDecalHandler::Update()
 {
 	for(std::vector<CUnit *>::iterator i=moveUnits.begin(); i!=moveUnits.end(); ++i)
 		UnitMovedNow(*i);
@@ -745,7 +750,9 @@ void CGroundDecalHandler::UnitMoved(CUnit* unit)
 
 void CGroundDecalHandler::UnitMovedNow(CUnit* unit)
 {
-	if(decalLevel == 0)
+	if (decalLevel == 0)
+		return;
+	if (unit->unitDef->trackType < 0)
 		return;
 
 	int zp = (int(unit->pos.z)/SQUARE_SIZE*2);
@@ -760,11 +767,11 @@ void CGroundDecalHandler::UnitMovedNow(CUnit* unit)
 
 	float3 pos = unit->pos+unit->frontdir*unit->unitDef->trackOffset;
 
-	TrackPart *tp = new TrackPart;
+	TrackPart* tp = new TrackPart;
 	tp->pos1 = pos+unit->rightdir*unit->unitDef->trackWidth*0.5f;
-	tp->pos1.y = ground->GetHeight2(tp->pos1.x,tp->pos1.z);
+	tp->pos1.y = ground->GetHeightReal(tp->pos1.x,tp->pos1.z);
 	tp->pos2 = pos-unit->rightdir*unit->unitDef->trackWidth*0.5f;
-	tp->pos2.y = ground->GetHeight2(tp->pos2.x,tp->pos2.z);
+	tp->pos2.y = ground->GetHeightReal(tp->pos2.x,tp->pos2.z);
 	tp->creationTime = gs->frameNum;
 
 	TrackToAdd tta;
@@ -811,7 +818,6 @@ void CGroundDecalHandler::RemoveUnit(CUnit* unit)
 
 int CGroundDecalHandler::GetTrackType(const std::string& name)
 {
-
 	if (decalLevel == 0) {
 		return 0;
 	}
@@ -879,7 +885,7 @@ void CGroundDecalHandler::AddExplosion(float3 pos, float damage, float radius)
 	if (decalLevel == 0)
 		return;
 
-	float height = pos.y - ground->GetHeight2(pos.x, pos.z);
+	float height = pos.y - ground->GetHeightReal(pos.x, pos.z);
 	if (height >= radius)
 		return;
 
@@ -1049,6 +1055,15 @@ void CGroundDecalHandler::AddBuilding(CBuilding* building)
 {
 	if (decalLevel == 0)
 		return;
+	if (!building->unitDef->useBuildingGroundDecal)
+		return;
+	if (building->unitDef->buildingDecalType < 0)
+		return;
+
+	GML_STDMUTEX_LOCK(decal); // AddBuilding
+
+	if (building->buildingDecal)
+		return;
 
 	int posx = int(building->pos.x / 8);
 	int posy = int(building->pos.z / 8);
@@ -1076,20 +1091,24 @@ void CGroundDecalHandler::AddBuilding(CBuilding* building)
 	decal->posx = posx - (decal->xsize / 2);
 	decal->posy = posy - (decal->ysize / 2);
 
-	GML_STDMUTEX_LOCK(decal); // AddBuilding
-
 	building->buildingDecal = decal;
 	buildingDecalTypes[building->unitDef->buildingDecalType]->buildingDecals.insert(decal);
 }
 
 
-void CGroundDecalHandler::RemoveBuilding(CBuilding* building, CUnitDrawer::GhostBuilding* gb)
+void CGroundDecalHandler::RemoveBuilding(CBuilding* building, GhostBuilding* gb)
 {
+	if (!building->unitDef->useBuildingGroundDecal)
+		return;
+
 	GML_STDMUTEX_LOCK(decal); // RemoveBuilding
 
 	BuildingGroundDecal* decal = building->buildingDecal;
 	if (!decal)
 		return;
+
+	if(gb)
+		gb->decal = decal;
 
 	decal->owner = 0;
 	decal->gbOwner = gb;
@@ -1102,24 +1121,20 @@ void CGroundDecalHandler::RemoveBuilding(CBuilding* building, CUnitDrawer::Ghost
  */
 void CGroundDecalHandler::ForceRemoveBuilding(CBuilding* building)
 {
-	GML_STDMUTEX_LOCK(decal); // ForcedRemoveBuilding
-
-	if (!building || !building->buildingDecal)
+	if (!building)
+		return;
+	if (!building->unitDef->useBuildingGroundDecal)
 		return;
 
-	std::vector<BuildingDecalType*>& types = buildingDecalTypes;
-	std::vector<BuildingDecalType*>::iterator bdt;
+	GML_STDMUTEX_LOCK(decal); // ForcedRemoveBuilding
 
-	for (bdt = types.begin(); bdt != types.end(); ++bdt) {
-		std::set<BuildingGroundDecal*>& decals = (*bdt)->buildingDecals;
-		std::set<BuildingGroundDecal*>::iterator bgd = decals.find(building->buildingDecal);
-		if (bgd != decals.end()) {
-			BuildingGroundDecal* decal = *bgd;
-			decals.erase(bgd);
-			building->buildingDecal = NULL;
-			delete decal;
-		}
-	}
+	BuildingGroundDecal* decal = building->buildingDecal;
+	if (!decal)
+		return;
+
+	decal->owner = NULL;
+	decal->alpha = 0.0f;
+	building->buildingDecal = NULL;
 }
 
 
@@ -1140,14 +1155,14 @@ int CGroundDecalHandler::GetBuildingDecalType(const std::string& name)
 		++a;
 	}
 
-	BuildingDecalType* tt = new BuildingDecalType;
-	tt->name = lowerName;
 	const std::string fullName = "unittextures/" + lowerName;
 	CBitmap bm;
 	if (!bm.Load(fullName)) {
 		throw content_error("Could not load building decal from file " + fullName);
 	}
 
+	BuildingDecalType* tt = new BuildingDecalType;
+	tt->name = lowerName;
 	tt->texture = bm.CreateTexture(true);
 
 //	GML_STDMUTEX_LOCK(decaltype); // GetBuildingDecalType
@@ -1157,15 +1172,10 @@ int CGroundDecalHandler::GetBuildingDecalType(const std::string& name)
 	return (buildingDecalTypes.size() - 1);
 }
 
+BuildingGroundDecal::~BuildingGroundDecal() {
+	SafeDelete(va);
+}
 
-void CGroundDecalHandler::SetTexGen(float scalex,float scaley, float offsetx, float offsety)
-{
-	GLfloat plan[]={scalex,0,0,offsetx};
-	glTexGeni(GL_S,GL_TEXTURE_GEN_MODE,GL_EYE_LINEAR);
-	glTexGenfv(GL_S,GL_EYE_PLANE,plan);
-	glEnable(GL_TEXTURE_GEN_S);
-	GLfloat plan2[]={0,0,scaley,offsety};
-	glTexGeni(GL_T,GL_TEXTURE_GEN_MODE,GL_EYE_LINEAR);
-	glTexGenfv(GL_T,GL_EYE_PLANE,plan2);
-	glEnable(GL_TEXTURE_GEN_T);
+CGroundDecalHandler::Scar::~Scar() {
+	SafeDelete(va);
 }

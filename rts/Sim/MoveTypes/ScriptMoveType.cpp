@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -7,12 +9,9 @@
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
 #include "Rendering/GroundDecalHandler.h"
-#include "Rendering/UnitModels/3DModel.h"
+#include "Rendering/Models/3DModel.h"
 #include "Sim/Misc/Wind.h"
 #include "Sim/Misc/AirBaseHandler.h"
-#include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/QuadField.h"
-#include "Sim/Misc/RadarHandler.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitTypes/Building.h"
 #include "GlobalUnsynced.h"
@@ -43,16 +42,11 @@ CR_REG_METADATA(CScriptMoveType, (
 	CR_MEMBER(slopeStop),
 	CR_MEMBER(collideStop),
 	CR_MEMBER(leaveTracks),
-	CR_MEMBER(hasDecal),
-	CR_MEMBER(isBuilding),
-	CR_MEMBER(isBlocking), // copy of CSolidObject::blocking (no longer used)
 	CR_MEMBER(rotOffset),
 	CR_MEMBER(lastTrackUpdate),
-	CR_MEMBER(oldPos),
-	CR_MEMBER(oldSlowUpdatePos),
 	CR_MEMBER(scriptNotify),
 	CR_RESERVED(64)
-	));
+));
 
 
 CScriptMoveType::CScriptMoveType(CUnit* owner):
@@ -79,22 +73,14 @@ CScriptMoveType::CScriptMoveType(CUnit* owner):
 	slopeStop(false),
 	collideStop(false),
 	leaveTracks(true),
-	hasDecal(false),
-	isBuilding(false),
 	rotOffset(0.0f, 0.0f, 0.0f),
 	lastTrackUpdate(0),
-	oldPos(owner ? owner->pos:float3(0,0,0)),
-	oldSlowUpdatePos(oldPos),
 	scriptNotify(0)
 {
 	useHeading = false; // use the transformation matrix instead of heading
 
-	if (owner) {
-		const UnitDef* unitDef = owner->unitDef;
-		isBuilding = (unitDef->type == "Building");
-	} else {
-		isBuilding = false;
-	}
+	oldPos = owner? owner->pos: ZeroVector;
+	oldSlowUpdatePos = oldPos;
 }
 
 
@@ -134,41 +120,16 @@ inline void CScriptMoveType::CalcDirections()
 }
 
 
-void CScriptMoveType::SlowUpdate()
-{
-	const float3& pos = owner->pos;
-
-	// make sure the unit is in the map
-	// pos.CheckInBounds();
-
-	// don't need the rest if the pos hasn't changed
-	if (pos == oldSlowUpdatePos) {
-		return;
-	}
-	oldSlowUpdatePos = pos;
-
-	const int newmapSquare = ground->GetSquare(pos);
-	if (newmapSquare != owner->mapSquare){
-		owner->mapSquare = newmapSquare;
-
-		loshandler->MoveUnit(owner, false);
-		if (owner->hasRadarCapacity) {
-			radarhandler->MoveUnit(owner);
-		}
-	}
-	qf->MovedUnit(owner);
-
-	owner->isUnderWater = ((owner->pos.y + owner->model->height) < 0.0f);
-};
-
 
 void CScriptMoveType::CheckNotify()
 {
 	if (scriptNotify) {
+		scriptNotify = 0;
+
 		if (luaRules && luaRules->MoveCtrlNotify(owner, scriptNotify)) {
+			//! deletes <this>
 			owner->DisableScriptMoveType();
 		}
-		scriptNotify = 0;
 	}
 }
 
@@ -197,8 +158,8 @@ void CScriptMoveType::Update()
 	}
 
 	if (trackGround) {
-		const float gndMin =
-			ground->GetHeight2(owner->pos.x, owner->pos.z) + groundOffset;
+		const float gndMin = ground->GetHeightReal(owner->pos.x, owner->pos.z) + groundOffset;
+
 		if (owner->pos.y <= gndMin) {
 			owner->pos.y = gndMin;
 			owner->speed.y = 0.0f;
@@ -233,7 +194,7 @@ void CScriptMoveType::Update()
 		owner->Block();
 	}
 
-	if (groundDecals && owner->unitDef->leaveTracks && leaveTracks &&
+	if (owner->unitDef->leaveTracks && leaveTracks &&
 	    (lastTrackUpdate < (gs->frameNum - 7)) &&
 	    ((owner->losStatus[gu->myAllyTeam] & LOS_INLOS) || gu->spectatingFullView)) {
 		lastTrackUpdate = gs->frameNum;
@@ -241,7 +202,7 @@ void CScriptMoveType::Update()
 	}
 
 	CheckNotify();
-};
+}
 
 
 void CScriptMoveType::CheckLimits()

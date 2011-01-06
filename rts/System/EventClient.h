@@ -1,8 +1,7 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef EVENT_CLIENT_H
 #define EVENT_CLIENT_H
-// EventClient.h: interface for the CEventClient class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <string>
 #include <vector>
@@ -20,7 +19,8 @@ class CFeature;
 class CProjectile;
 struct Command;
 class CLogSubsystem;
-
+typedef void* zipFile;
+class CArchiveBase;
 
 class CEventClient
 {
@@ -58,12 +58,17 @@ class CEventClient
 
 	public:
 		// Synced events
+		virtual void Load(CArchiveBase* archive);
+
 		virtual void GamePreload();
 		virtual void GameStart();
-		virtual void GameOver();
+		virtual void GameOver(std::vector<unsigned char> winningAllyTeams);
+		virtual void GamePaused(int playerID, bool paused);
+		virtual void GameFrame(int gameFrame);
 		virtual void TeamDied(int teamID);
 		virtual void TeamChanged(int teamID);
 		virtual void PlayerChanged(int playerID);
+		virtual void PlayerAdded(int playerID);
 		virtual void PlayerRemoved(int playerID, int reason);
 
 		virtual void UnitCreated(const CUnit* unit, const CUnit* builder);
@@ -99,13 +104,28 @@ class CEventClient
 		virtual void UnitCloaked(const CUnit* unit);
 		virtual void UnitDecloaked(const CUnit* unit);
 
+		virtual void RenderUnitCreated(const CUnit* unit, int cloaked);
+		virtual void RenderUnitDestroyed(const CUnit* unit);
+		virtual void RenderUnitCloakChanged(const CUnit* unit, int cloaked);
+		virtual void RenderUnitLOSChanged(const CUnit* unit, int allyTeam, int newStatus);
+
+		virtual void UnitUnitCollision(const CUnit* collider, const CUnit* collidee);
+		virtual void UnitFeatureCollision(const CUnit* collider, const CFeature* collidee);
 		virtual void UnitMoveFailed(const CUnit* unit);
 
 		virtual void FeatureCreated(const CFeature* feature);
 		virtual void FeatureDestroyed(const CFeature* feature);
+		virtual void FeatureMoved(const CFeature* feature);
+
+		virtual void RenderFeatureCreated(const CFeature* feature);
+		virtual void RenderFeatureDestroyed(const CFeature* feature);
+		virtual void RenderFeatureMoved(const CFeature* feature);
 
 		virtual void ProjectileCreated(const CProjectile* proj);
 		virtual void ProjectileDestroyed(const CProjectile* proj);
+
+		virtual void RenderProjectileCreated(const CProjectile* proj);
+		virtual void RenderProjectileDestroyed(const CProjectile* proj);
 
 		virtual void StockpileChanged(const CUnit* unit,
 		                              const CWeapon* weapon, int oldCount);
@@ -113,6 +133,8 @@ class CEventClient
 		virtual bool Explosion(int weaponID, const float3& pos, const CUnit* owner);
 
 		// Unsynced events
+		virtual void Save(zipFile archive);
+
 		virtual void Update();
 
 		virtual bool KeyPress(unsigned short key, bool isRepeat);

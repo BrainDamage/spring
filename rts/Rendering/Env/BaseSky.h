@@ -1,5 +1,4 @@
-// BaseSky.h
-///////////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef __BASE_SKY_H__
 #define __BASE_SKY_H__
@@ -9,12 +8,12 @@
 class CBaseSky
 {
 public:
-	CBaseSky(void);
-	virtual ~CBaseSky(void);
+	CBaseSky();
+	virtual ~CBaseSky();
 
-	virtual void Update()=0;
-	virtual void Draw()=0;
-	virtual void DrawSun(void)=0;
+	virtual void Update() = 0;
+	virtual void Draw() = 0;
+	virtual void DrawSun() = 0;
 
 	static CBaseSky* GetSky();
 

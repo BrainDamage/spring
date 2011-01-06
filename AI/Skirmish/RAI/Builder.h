@@ -12,12 +12,8 @@ class cBuilder;
 
 #include "RAI.h"
 #include "PowerManager.h"
-//#include <map>
-//#include <set>
 #include <deque>
 #include <list>
-//#include "Sim/Units/UnitDef.h"
-//#include "ExternalAI/IAICallback.h"
 
 struct sBuildQuarry
 {
@@ -39,6 +35,8 @@ struct sBuildQuarry
 	int deletionFrame;		// If a unit does not choose to build the option by this frame, then delete the Build Quarry
 	int tryCount;			// failed to build, probably due to enemy attacks
 };
+
+#define BUILD_QUARRY_SIZE 40
 
 class cBuilder
 {
@@ -73,7 +71,7 @@ private:
 	cLogFile *l;			// G->l
 	IAICallback *cb;		// G->cb
 
-	void CreateBuildOrders();
+	void CreateBuildOrders() const;
 	int LastBuildOrder;
 
 	float MCostLimit;
@@ -102,7 +100,7 @@ private:
 	bool MetalIsFavorable(float storage=0.50f,float production=1.0f); // returns true if there is no metal production or the ratio of both is met
 	bool EnergyIsFavorable(float storage=0.50f,float production=1.0f); // returns true if there is no energy production or the ratio of both is met
 
-	sBuildQuarry *BQ[40];
+	sBuildQuarry *BQ[BUILD_QUARRY_SIZE];
 	sBuildQuarry *Prerequisite; // Limits RAI from building more than one at a time
 	int BQSize[8]; // index 0 = total, other indexs accessed by iType.  Value of index is equal to counter
 	void BQAssignBuilder(int index, const int& unit, UnitInfo* U);

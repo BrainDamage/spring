@@ -1,24 +1,26 @@
-#ifndef EXPGENSPAWNER_H
-#define EXPGENSPAWNER_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef EXP_GEN_SPAWNER_H
+#define EXP_GEN_SPAWNER_H
 
 #include "Projectile.h"
 
 class CExplosionGenerator;
 
-//class used to spawn an explosiongenerator after a delay
+/// Spawn an explosiongenerator after a delay
 class CExpGenSpawner : public CProjectile
 {
 	CR_DECLARE(CExpGenSpawner);
 public:
+	CExpGenSpawner();
+	~CExpGenSpawner();
+
+	void Update();
+	void Draw() {};
+
 	int delay;
-	float3 dir;
 	float damage;
 	CExplosionGenerator* explosionGenerator;
-
-	CExpGenSpawner(void);
-	~CExpGenSpawner(void);
-	void Update();
-	void Draw(){};
 };
 
-#endif
+#endif // EXP_GEN_SPAWNER_H

@@ -1,5 +1,5 @@
 // GML - OpenGL Multithreading Library
-// for Spring http://spring.clan-sy.com
+// for Spring http://springrts.com
 // Author: Mattias "zerver" Radeskog
 // (C) Ware Zerver Tech. http://zerver.net
 // Ware Zerver Tech. licenses this library
@@ -294,6 +294,8 @@
 #undef glUniform2fv
 #undef glUniform3fv
 #undef glUniform4fv
+#undef glMapBufferRange
+#undef glPrimitiveRestartIndexNV
 
 // #####################################################################
 
@@ -584,3 +586,5 @@
 #define glUniform2fv gmlUniform2fv
 #define glUniform3fv gmlUniform3fv
 #define glUniform4fv gmlUniform4fv
+#define glMapBufferRange gmlMapBufferRange
+#define glPrimitiveRestartIndexNV gmlPrimitiveRestartIndexNV

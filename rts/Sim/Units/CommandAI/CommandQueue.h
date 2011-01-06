@@ -1,22 +1,18 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef __COMMAND_QUEUE_H__
 #define __COMMAND_QUEUE_H__
 
-#ifndef BUILDING_AI
-#include "Rendering/GL/myGL.h"
-#else
-#define GML_STDMUTEX_LOCK(x)
-#endif
+#include "lib/gml/gml.h"
+
 #include <deque>
 #include "Command.h"
 
-// A wrapper class for  std::deque<Command>  to keep track of commands
-
-
+/// A wrapper class for std::deque<Command> to keep track of commands
 class CCommandQueue {
 
 	friend class CCommandAI;
 	friend class CFactoryCAI;
-	friend class CAIAICallback; // the C++ AI interface wrapper
 
 	// see CommandAI.cpp for further creg stuff for this class
 	CR_DECLARE(CCommandQueue);
@@ -52,13 +48,13 @@ class CCommandQueue {
 		inline iterator insert(iterator pos, const Command& cmd);
 
 		inline void pop_back()
-		{ 
+		{
 			GML_STDMUTEX_LOCK(cai); // pop_back
 
 			queue.pop_back(); 
 		}
 		inline void pop_front()
-		{ 
+		{
 			GML_STDMUTEX_LOCK(cai); // pop_front
 
 			queue.pop_front(); 
@@ -77,7 +73,7 @@ class CCommandQueue {
 			return queue.erase(first, last);
 		}
 		inline void clear()
-		{ 
+		{
 			GML_STDMUTEX_LOCK(cai); // clear 
 
 			queue.clear(); 

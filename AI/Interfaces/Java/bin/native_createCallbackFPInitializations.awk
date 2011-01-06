@@ -1,4 +1,4 @@
-#!/bin/awk
+#!/usr/bin/awk -f
 #
 # This awk script creates the function pointer initializations
 # for the C callbacks; eg:
@@ -21,8 +21,12 @@ function rtrim(s) { sub(/[ \t]+$/, "", s); return s; }
 function trim(s)  { return rtrim(ltrim(s)); }
 
 
-function printInit(functionName) {
-	print("	callback->" functionName " = &_" functionName ";")
+function printInit(functionPointerName) {
+
+	functionName = functionPointerName;
+	sub(/Clb_/, "skirmishAiCallback_", functionName);
+
+	print("	callback->" functionPointerName " = &" functionName ";")
 }
 
 

@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include <SDL_keysym.h>
 #include "mmgr.h"
@@ -10,14 +12,12 @@
 #include "QuitBox.h"
 #include "Game/PlayerHandler.h"
 #include "Game/GameSetup.h"
-#include "LoadSaveHandler.h"
+#include "LoadSave/LoadSaveHandler.h"
 #include "TimeUtil.h"
 #include "FileSystem/FileSystem.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Rendering/glFont.h"
 #include "Rendering/GL/myGL.h"
-
-extern bool globalQuit;
 
 CQuitBox::CQuitBox(void)
 {
@@ -221,7 +221,7 @@ bool CQuitBox::MousePress(int x, int y, int button)
 			int team=(int)((box.y1+teamBox.y2-my)/0.025f);
 			if(team>=gu->myTeam)
 				team++;
-			if(team<teamHandler->ActiveTeams() && !teamHandler->Team(team)->isDead){
+			if(teamHandler->IsValidTeam(team) && !teamHandler->Team(team)->isDead){
 				// we don't want to give everything to the enemy if there are allies left
 				if(noAlliesLeft || (!noAlliesLeft && teamHandler->Ally(gu->myAllyTeam, teamHandler->AllyTeam(team)))){
 					shareTeam=team;
@@ -255,25 +255,25 @@ void CQuitBox::MouseRelease(int x,int y,int button)
 				std::string timeStr = CTimeUtil::GetCurrentTimeStr();
 				std::string saveFileName(timeStr + "_" + modInfo.filename + "_" + gameSetup->mapName);
 				saveFileName = "Saves/" + saveFileName + ".ssf";
-				if (filesystem.GetFilesize(saveFileName) == 0) {
+				if (!filesystem.FileExists(saveFileName)) {
 					logOutput.Print("Saving game to %s\n", saveFileName.c_str());
-					CLoadSaveHandler ls;
-					ls.mapName = gameSetup->mapName;
-					ls.modName = modInfo.filename;
-					ls.SaveGame(saveFileName);
+					ILoadSaveHandler* ls = ILoadSaveHandler::Create();
+					ls->mapName = gameSetup->mapName;
+					ls->modName = modInfo.filename;
+					ls->SaveGame(saveFileName);
+					delete ls;
 				} else {
 					logOutput.Print("Error: File %s already exists, game NOT saved!\n", saveFileName.c_str());
 				}
 			}
 		}
 	}
-	else if(InBox(mx,my,box+quitBox))
-	{
+	else if (InBox(mx, my, box + quitBox)) {
 		logOutput.Print("User exited");
-		globalQuit=true;
+		gu->globalQuit = true;
 	}
 	// if we're still in the game, remove the resign box
-	if(InBox(mx,my,box+resignBox) || InBox(mx,my,box+saveBox) || InBox(mx,my,box+giveAwayBox) || InBox(mx,my,box+cancelBox)){
+	if(InBox(mx,my,box+resignBox) || InBox(mx,my,box+saveBox) || InBox(mx,my,box+giveAwayBox) || InBox(mx,my,box+cancelBox) || InBox(mx,my,box+quitBox)){
 		delete this;
 		return;
 	}
@@ -294,7 +294,7 @@ void CQuitBox::MouseMove(int x, int y, int dx,int dy, int button)
 		int team=(int)((box.y1+teamBox.y2-my)/0.025f);
 		if(team>=gu->myTeam)
 			team++;
-		if(team<teamHandler->ActiveTeams() && !teamHandler->Team(team)->isDead){
+		if(teamHandler->IsValidTeam(team) && !teamHandler->Team(team)->isDead){
 			// we don't want to give everything to the enemy if there are allies left
 			if(noAlliesLeft || (!noAlliesLeft && teamHandler->Ally(gu->myAllyTeam, teamHandler->AllyTeam(team)))){
 				shareTeam=team;

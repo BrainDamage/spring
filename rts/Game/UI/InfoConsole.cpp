@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// InfoConsole.cpp: implementation of the CInfoConsole class.
-//
-//////////////////////////////////////////////////////////////////////
 #include "Rendering/GL/myGL.h"
 #include <fstream>
 
@@ -28,14 +27,17 @@
 const size_t CInfoConsole::maxRawLines   = 1024;
 const size_t CInfoConsole::maxLastMsgPos = 10;
 
-CInfoConsole::CInfoConsole():
-	disabled(false), lastMsgIter(lastMsgPositions.begin()), newLines(0),
-	rawId(0)
+CInfoConsole::CInfoConsole() :
+	  fontScale(1.0f)
+	, disabled(false)
+	, lastMsgIter(lastMsgPositions.begin())
+	, newLines(0)
+	, rawId(0)
+	, lastTime(0)
 {
 	data.clear();
 
-	lastTime=0;
-	lifetime     = configHandler->Get("InfoMessageTime", 400);
+	lifetime = configHandler->Get("InfoMessageTime", 400);
 
 	const std::string geo = configHandler->GetString("InfoConsoleGeometry",
                                                   "0.26 0.96 0.41 0.205");
@@ -48,7 +50,6 @@ CInfoConsole::CInfoConsole():
 		height = 0.205f;
 	}
 
-	fontScale = 1.0f;
 	fontSize = fontScale * smallFont->GetSize();
 
 	logOutput.AddSubscriber(this);
@@ -80,10 +81,10 @@ void CInfoConsole::Draw()
 		glEnd();
 	}
 
-	const float fontHeight = fontSize * smallFont->GetLineHeight() * gu->pixelY;
+	const float fontHeight = fontSize * smallFont->GetLineHeight() * globalRendering->pixelY;
 
-	float curX = xpos + border * gu->pixelX;
-	float curY = ypos - border * gu->pixelY;
+	float curX = xpos + border * globalRendering->pixelX;
+	float curY = ypos - border * globalRendering->pixelY;
 
 	smallFont->Begin();
 	smallFont->SetColors(); // default
@@ -92,7 +93,7 @@ void CInfoConsole::Draw()
 		fontOptions |= FONT_OUTLINE;
 
 	std::deque<InfoLine>::iterator ili;
-	for (ili = data.begin(); ili != data.end(); ili++) {
+	for (ili = data.begin(); ili != data.end(); ++ili) {
 		curY -= fontHeight;
 		smallFont->glPrint(curX, curY, fontSize, fontOptions, ili->text);
 	}
@@ -104,12 +105,14 @@ void CInfoConsole::Draw()
 void CInfoConsole::Update()
 {
 	boost::recursive_mutex::scoped_lock scoped_lock(infoConsoleMutex);
-	if(lastTime>0)
+	if (lastTime > 0) {
 		lastTime--;
-	if(!data.empty()){
+	}
+	if (!data.empty()) {
 		data.begin()->time--;
-		if(data[0].time<=0)
+		if (data[0].time <= 0) {
 			data.pop_front();
+		}
 	}
 }
 
@@ -155,14 +158,14 @@ void CInfoConsole::NotifyLogMsg(const CLogSubsystem& subsystem, const std::strin
 		newLines++;
 	}
 
-	const float maxWidth  = width * gu->viewSizeX - border * 2;
-	const float maxHeight = height * gu->viewSizeY - border * 2;
+	const float maxWidth  = width * globalRendering->viewSizeX - border * 2;
+	const float maxHeight = height * globalRendering->viewSizeY - border * 2;
 	const unsigned int numLines = math::floor(maxHeight / (fontSize * smallFont->GetLineHeight()));
 
 	std::list<std::string> lines = smallFont->Wrap(text,fontSize,maxWidth);
 
 	std::list<std::string>::iterator il;
-	for (il = lines.begin(); il != lines.end(); il++) {
+	for (il = lines.begin(); il != lines.end(); ++il) {
 		//! add the line to the console
 		InfoLine l;
 		data.push_back(l);

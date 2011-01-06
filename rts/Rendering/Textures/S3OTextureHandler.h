@@ -1,16 +1,15 @@
-#ifndef S3OTEXTUREHANDLER_H
-#define S3OTEXTUREHANDLER_H
-// S3OTextureHandler.h: interface for the CS3OTextureHandler class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef S3O_TEXTURE_HANDLER_H
+#define S3O_TEXTURE_HANDLER_H
 
 #include <map>
 #include <string>
 #include <vector>
 #include "Rendering/GL/myGL.h"
-#include "Rendering/UnitModels/3DModel.h"
 
 struct TexFile;
+struct S3DModel;
 class CFileHandler;
 
 class CS3OTextureHandler
@@ -29,10 +28,9 @@ public:
 	CS3OTextureHandler();
 	virtual ~CS3OTextureHandler();
 
-	std::vector<S3DModel* > loadTextures;
 	void Update();
 	void LoadS3OTexture(S3DModel* model);
-	int LoadS3OTextureNow(const std::string& tex1, const std::string& tex2);
+	int LoadS3OTextureNow(const S3DModel* model);
 	void SetS3oTexture(int num);
 
 	const S3oTex* GetS3oTex(int num) {
@@ -49,4 +47,4 @@ private:
 
 extern CS3OTextureHandler* texturehandlerS3O;
 
-#endif /* S3OTEXTUREHANDLER_H */
+#endif /* S3O_TEXTURE_HANDLER_H */

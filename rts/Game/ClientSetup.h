@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef CLIENT_SETUP_H
 #define CLIENT_SETUP_H
 
@@ -6,8 +8,6 @@
 class ClientSetup
 {
 public:
-	static const unsigned int DEFAULT_HOST_PORT = 8452;
-
 	ClientSetup();
 
 	void Init(const std::string& setup);
@@ -15,14 +15,14 @@ public:
 	std::string myPlayerName;
 	std::string myPasswd;
 
-	std::string hostip;
-	int hostport;
-	int sourceport; ///< the port clients will try to connect from
-	std::string autohostip;
-	int autohostport;
+	//! if this client is not the server player, the IP address we connect to
+	//! if this client is the server player, the IP address that other players connect to
+	std::string hostIP;
+	//! if this client is not the server player, the port which we connect over
+	//! if this client is the server player, the port over which we accept incoming connections
+	int hostPort;
 
 	bool isHost;
 };
 
 #endif // CLIENT_SETUP_H
-

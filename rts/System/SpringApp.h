@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef SPRING_APP
 #define SPRING_APP
 
@@ -6,7 +8,9 @@
 
 class BaseCmd;
 class CGameController;
+class COffscreenGLContext;
 union SDL_Event;
+
 /**
  * @brief Spring App
  *
@@ -19,6 +23,7 @@ public:
 	~SpringApp();
 
 	int Run(int argc, char *argv[]);                //!< Run game loop
+	static void Shutdown();                         //!< Shuts down application
 
 protected:
 	bool Initialize();                              //!< Initialize app
@@ -29,16 +34,15 @@ protected:
 	void UpdateOldConfigs();                        //!< Forces an update to new config defaults
 	void LoadFonts();                               //!< Initialize glFonts (font & smallFont)
 	bool SetSDLVideoMode();                         //!< Sets SDL video mode
-	void Shutdown();                                //!< Shuts down application
+	void SetProcessAffinity(int) const;
 	int Update();                                   //!< Run simulation and draw
 
 #if defined(USE_GML) && GML_ENABLE_SIM
 	int Sim();                                      //!< Simulation  loop
 	static void Simcb(void *c) {((SpringApp *)c)->Sim();}
-	volatile int gmlKeepRunning;
+	static volatile int gmlKeepRunning;
 #endif
 
-	void UpdateSDLKeys();                           //!< Update SDL key array
 	bool GetDisplayGeometry();
 	void SetupViewportGeometry();
 
@@ -69,14 +73,14 @@ protected:
 	/**
 	 * @brief window position - X
 	 *
-	 * Game window position from the left of the screen (if not fullscreen)
+	 * Game window position from the left of the screen (if not full-screen)
 	 */
 	int windowPosX;
 
 	/**
 	 * @brief window position - Y
 	 *
-	 * Game window position from the top of the screen (if not fullscreen)
+	 * Game window position from the top of the screen (if not full-screen)
 	 */
 	int windowPosY;
 
@@ -90,7 +94,7 @@ protected:
 	/**
 	 * @brief FSAA
 	 *
-	 * Level of fullscreen anti-aliasing
+	 * Level of full-screen anti-aliasing
 	 */
 	bool FSAA;
 
@@ -108,6 +112,8 @@ protected:
 	 */
 	int lastRequiredDraw;
 
+	static COffscreenGLContext* ogc;
+
 private:
 	bool MainEventHandler(const SDL_Event& ev);
 };
@@ -119,34 +125,5 @@ private:
  * (could be a PreGame, could be a Game, etc)
  */
 extern CGameController* activeController;
-
-/**
- * @brief global quit
- *
- * Global boolean indicating whether the user
- * wants to quit
- */
-extern bool globalQuit;
-
-/**
- * @brief keys
- *
- * Array of possible keys, and which are being pressed
- */
-extern boost::uint8_t *keys;
-
-/**
- * @brief currentUnicode
- *
- * Unicode character for the current KeyPressed or KeyReleased
- */
-extern boost::uint16_t currentUnicode;
-
-/**
- * @brief fullscreen
- *
- * Whether or not the game is running in fullscreen
- */
-extern bool fullscreen;
 
 #endif

@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "Rendering/GL/myGL.h"
 #include <map>
@@ -5,49 +7,51 @@
 #include <SDL_timer.h>
 #include <set>
 #include <cfloat>
-
 #include "mmgr.h"
 
 #include "PreGame.h"
-#include "Game.h"
-#include "GameVersion.h"
-#include "Player.h"
-#include "Sim/Misc/TeamHandler.h"
+
+#include "ClientSetup.h"
 #include "FPUCheck.h"
+#include "Game.h"
+#include "GameData.h"
 #include "GameServer.h"
 #include "GameSetup.h"
-#include "ClientSetup.h"
-#include "GameData.h"
-#include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/GlobalConstants.h"
-#include "ExternalAI/SkirmishAIHandler.h"
-#include "NetProtocol.h"
-#include "Net/RawPacket.h"
-#include "DemoRecorder.h"
-#include "DemoReader.h"
-#include "LoadSaveHandler.h"
-#include "TdfParser.h"
-#include "FileSystem/ArchiveScanner.h"
-#include "FileSystem/FileHandler.h"
-#include "FileSystem/VFSHandler.h"
-#include "Sound/Sound.h"
-#include "Sound/Music.h"
+#include "GameVersion.h"
+#include "LoadScreen.h"
+#include "Player.h"
+#include "PlayerHandler.h"
+#include "TimeProfiler.h"
+#include "UI/InfoConsole.h"
+
+#include "aGui/Gui.h"
 #include "Map/MapInfo.h"
 #include "Map/Generated/MapGenerator.h"
-#include "ConfigHandler.h"
-#include "FileSystem/FileSystem.h"
+#include "ExternalAI/SkirmishAIHandler.h"
 #include "Rendering/glFont.h"
-#include "UI/InfoConsole.h"
-#include "aGui/Gui.h"
-#include "Exceptions.h"
-#include "TimeProfiler.h"
+#include "Sim/Misc/GlobalSynced.h"
+#include "Sim/Misc/GlobalConstants.h"
+#include "Sim/Misc/TeamHandler.h"
+#include "System/ConfigHandler.h"
+#include "System/Exceptions.h"
+#include "System/NetProtocol.h"
+#include "System/TdfParser.h"
+#include "System/Input/KeyInput.h"
+#include "System/FileSystem/ArchiveScanner.h"
+#include "System/FileSystem/FileHandler.h"
+#include "System/FileSystem/FileSystem.h"
+#include "System/FileSystem/VFSHandler.h"
+#include "System/LoadSave/DemoRecorder.h"
+#include "System/LoadSave/DemoReader.h"
+#include "System/LoadSave/LoadSaveHandler.h"
+#include "System/Net/RawPacket.h"
+#include "System/Net/UnpackPacket.h"
+#include "System/Platform/errorhandler.h"
 
-CPreGame* pregame = NULL;
 using netcode::RawPacket;
 using std::string;
 
-extern boost::uint8_t* keys;
-extern bool globalQuit;
+CPreGame* pregame = NULL;
 
 CPreGame::CPreGame(const ClientSetup* setup) :
 		settings(setup),
@@ -56,16 +60,12 @@ CPreGame::CPreGame(const ClientSetup* setup) :
 	net = new CNetProtocol();
 	activeController=this;
 
-	if(!settings->isHost)
-	{
-		net->InitClient(settings->hostip.c_str(), settings->hostport, settings->sourceport, settings->myPlayerName, settings->myPasswd, SpringVersion::GetFull());
+	if (!settings->isHost) {
+		net->InitClient(settings->hostIP.c_str(), settings->hostPort, settings->myPlayerName, settings->myPasswd, SpringVersion::GetFull());
 		timer = SDL_GetTicks();
-	}
-	else
-	{
+	} else {
 		net->InitLocalClient();
 	}
-	sound = new CSound(); // should have finished until server response arrives
 }
 
 
@@ -73,6 +73,8 @@ CPreGame::~CPreGame()
 {
 	// don't delete infoconsole, its beeing reused by CGame
 	agui::gui->Draw(); // delete leftover gui elements (remove once the gui is drawn ingame)
+
+	pregame = NULL;
 }
 
 void CPreGame::LoadSetupscript(const std::string& script)
@@ -92,17 +94,17 @@ void CPreGame::LoadDemo(const std::string& demo)
 void CPreGame::LoadSavefile(const std::string& save)
 {
 	assert(settings->isHost);
-	savefile = new CLoadSaveHandler();
-	savefile->LoadGameStartInfo(savefile->FindSaveFile(save.c_str()));
+	savefile = ILoadSaveHandler::Create();
+	savefile->LoadGameStartInfo(save.c_str());
 	StartServer(savefile->scriptText);
 }
 
 int CPreGame::KeyPressed(unsigned short k,bool isRepeat)
 {
-	if (k == SDLK_ESCAPE){
-		if(keys[SDLK_LSHIFT]){
+	if (k == SDLK_ESCAPE) {
+		if (keyInput->IsKeyPressed(SDLK_LSHIFT)) {
 			logOutput.Print("User exited");
-			globalQuit=true;
+			gu->globalQuit = true;
 		} else
 			logOutput.Print("Use shift-esc to quit");
 	}
@@ -136,6 +138,7 @@ bool CPreGame::Draw()
 
 	font->glFormat(0.60f, 0.35f, 1.0f, FONT_SCALE | FONT_NORM, "User name: %s", settings->myPlayerName.c_str());
 
+	font->glFormat(0.5f,0.25f,0.8f,FONT_CENTER | FONT_SCALE | FONT_NORM, "Press SHIFT + ESC to quit");
 	// credits
 	font->glFormat(0.5f,0.06f,1.0f,FONT_CENTER | FONT_SCALE | FONT_NORM, "Spring %s", SpringVersion::GetFull().c_str());
 	font->glPrint(0.5f,0.02f,0.6f,FONT_CENTER | FONT_SCALE | FONT_NORM, "This program is distributed under the GNU General Public License, see license.html for more info");
@@ -179,14 +182,14 @@ void CPreGame::StartServer(const std::string& setupscript)
 	// (Which is OK, since unitsync does not have map options available either.)
 	setup->LoadStartPositions();
 
-	const std::string modArchive = archiveScanner->ArchiveFromName(setup->modName);
+	const std::string& modArchive = archiveScanner->ArchiveFromName(setup->modName);
+	const std::string& mapArchive = archiveScanner->ArchiveFromName(setup->mapName);
 	startupData->SetModChecksum(archiveScanner->GetArchiveCompleteChecksum(modArchive));
-	const std::string mapArchive = archiveScanner->ArchiveFromName(setup->mapName);
 	startupData->SetMapChecksum(archiveScanner->GetArchiveCompleteChecksum(mapArchive));
 
 	good_fpu_control_registers("before CGameServer creation");
 	startupData->SetSetup(setup->gameSetupText);
-	gameServer = new CGameServer(settings.get(), false, startupData, setup);
+	gameServer = new CGameServer(settings->hostIP, settings->hostPort, startupData, setup);
 	delete startupData;
 	gameServer->AddLocalClient(settings->myPlayerName, SpringVersion::GetFull());
 	good_fpu_control_registers("after CGameServer creation");
@@ -195,55 +198,76 @@ void CPreGame::StartServer(const std::string& setupscript)
 
 void CPreGame::UpdateClientNet()
 {
-	if (!net->Active())
+	if (net->CheckTimeout(0, true))
 	{
 		logOutput.Print("Server not reachable");
-		globalQuit = true;
+		gu->globalQuit = true;
 		return;
 	}
 
 	boost::shared_ptr<const RawPacket> packet;
-	while ((packet = net->GetData()))
+	while ((packet = net->GetData(gs->frameNum)))
 	{
 		const unsigned char* inbuf = packet->data;
 		switch (inbuf[0]) {
 			case NETMSG_QUIT: {
-				const std::string message((char*)(inbuf+3));
-				logOutput.Print(message);
-				throw std::runtime_error(message);
+				try {
+					netcode::UnpackPacket pckt(packet, 3);
+					std::string message;
+					pckt >> message;
+					logOutput.Print(message);
+					handleerror(NULL, message, "Quit message", MBF_OK | MBF_EXCL);
+				} catch (netcode::UnpackPacketException &e) {
+					logOutput.Print("Got invalid QuitMessage: %s", e.err.c_str());
+				}		
 				break;
 			}
-			case NETMSG_GAMEDATA: { // server first sends this to let us know about teams, allyteams etc.
+			case NETMSG_CREATE_NEWPLAYER: { // server will send this first if we're using midgame join feature, to let us know about ourself (we won't be in gamedata), otherwise skip to gamedata
+				try {
+					netcode::UnpackPacket pckt(packet, 3);
+					unsigned char spectator, team, playerNum;
+					std::string name;
+					// since the >> operator uses dest size to extract data from the packet, we need to use temp variables
+					// of the same size of the packet, then convert to dest variable
+					pckt >> playerNum;
+					pckt >> spectator;
+					pckt >> team;
+					pckt >> name;
+
+					CPlayer player;
+					player.name = name;
+					player.spectator = spectator;
+					player.team = team;
+					player.playerNum = playerNum;
+					// add ourself, to avoid crashing if our player num gets queried
+					// we'll receive the same message later, in the game class, which is the global broadcast version
+					// the global broadcast will overwrite the user with the same values as here
+					playerHandler->AddPlayer(player);
+				} catch (netcode::UnpackPacketException &e) {
+					logOutput.Print("Got invalid New player message: %s", e.err.c_str());
+				}
+				break;
+			}
+			case NETMSG_GAMEDATA: { // server first ( not if we're joining midgame as extra players ) sends this to let us know about teams, allyteams etc.
+				if (gameSetup)
+					throw content_error("Duplicate game data received from server");
 				GameDataReceived(packet);
 				break;
 			}
 			case NETMSG_SETPLAYERNUM: { // this is sent afterwards to let us know which playernum we have
-				gu->SetMyPlayer(packet->data[1]);
+				if (!gameSetup)
+					throw content_error("No game data received from server");
+
+				unsigned char playerNum = packet->data[1];
+				if (!playerHandler->IsValidPlayer(playerNum))
+					throw content_error("Invalid player number received from server");
+
+				gu->SetMyPlayer(playerNum);
 				logOutput.Print("User number %i (team %i, allyteam %i)", gu->myPlayerNum, gu->myTeam, gu->myAllyTeam);
 
-				// When calling this function, mod archives have to be loaded
-				// and gu->myPlayerNum has to be set.
-				skirmishAIHandler.LoadPreGame();
+				CLoadScreen::CreateInstance(gameSetup->MapFile(), modArchive, savefile);
 
-				const CTeam* team = teamHandler->Team(gu->myTeam);
-				assert(team);
-				std::string mapStartPic(mapInfo->GetStringValue("Startpic"));
-				if (mapStartPic.empty())
-					RandomStartPicture(team->side);
-				else
-					LoadStartPicture(mapStartPic);
-
-				std::string mapStartMusic(mapInfo->GetStringValue("Startmusic"));
-				if (!mapStartMusic.empty())
-					Channels::BGMusic.Play(mapStartMusic);
-
-				game = new CGame(gameSetup->MapFile(), modArchive, savefile);
-
-				if (savefile) {
-					savefile->LoadGame();
-				}
-
-				pregame=0;
+				pregame = NULL;
 				delete this;
 				return;
 			}
@@ -267,7 +291,12 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 	{
 		if (buf->data[0] == NETMSG_GAMEDATA)
 		{
-			GameData *data = new GameData(boost::shared_ptr<const RawPacket>(buf));
+			GameData* data = NULL;
+			try {
+				data = new GameData(boost::shared_ptr<const RawPacket>(buf));
+			} catch (netcode::UnpackPacketException &e) {
+				throw content_error("Demo contains invalid GameData: " + e.err);
+			}
 
 			CGameSetup* demoScript = new CGameSetup();
 			if (!demoScript->Init(data->GetSetup()))
@@ -282,6 +311,7 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 			tgame->AddPair("MapName", demoScript->mapName);
 			tgame->AddPair("Gametype", demoScript->modName);
 			tgame->AddPair("Demofile", demoName);
+			tgame->AddPair("OnlyLocal", 1);
 
 			for (std::map<std::string, TdfParser::TdfSection*>::iterator it = tgame->sections.begin(); it != tgame->sections.end(); ++it)
 			{
@@ -330,9 +360,11 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 			}
 			logOutput.Print("Starting GameServer");
 			good_fpu_control_registers("before CGameServer creation");
-			gameServer = new CGameServer(settings.get(), true, data, tempSetup);
+
+			gameServer = new CGameServer(settings->hostIP, settings->hostPort, data, tempSetup);
 			gameServer->AddLocalClient(settings->myPlayerName, SpringVersion::GetFull());
 			delete data;
+
 			good_fpu_control_registers("after CGameServer creation");
 			logOutput.Print("GameServer started");
 			break;
@@ -374,32 +406,17 @@ void CPreGame::LoadMap(const CGameSetup* setup)
 	}
 }
 
-
-void CPreGame::LoadMod(const std::string& modName)
-{
-	static bool alreadyLoaded = false;
-
-	if (!alreadyLoaded) {
-		// Map all required archives depending on selected mod(s)
-		std::string modArchive = archiveScanner->ArchiveFromName(modName);
-		vector<string> ars = archiveScanner->GetArchives(modArchive);
-		if (ars.empty()) {
-			throw content_error("Couldn't find any archives for mod '" + modName + "'");
-		}
-		for (vector<string>::iterator i = ars.begin(); i != ars.end(); ++i) {
-
-			if (!vfsHandler->AddArchive(*i, false)) {
-				throw content_error("Couldn't load archive '" + *i + "' for mod '" + modName + "'.");
-			}
-		}
-		alreadyLoaded = true;
-	}
-}
-
 void CPreGame::GameDataReceived(boost::shared_ptr<const netcode::RawPacket> packet)
 {
 	ScopedOnceTimer startserver("Loading client data");
-	gameData.reset(new GameData(packet));
+
+	try {
+		GameData *data = new GameData(packet);
+
+		gameData.reset(data);
+	} catch (netcode::UnpackPacketException &e) {
+		throw content_error("Server sent us invalid GameData: " + e.err);
+	}
 
 	CGameSetup* temp = new CGameSetup();
 
@@ -412,14 +429,29 @@ void CPreGame::GameDataReceived(boost::shared_ptr<const netcode::RawPacket> pack
 			setupTextFile.close();
 		}
 		gameSetup = temp;
+		gu->LoadFromSetup(gameSetup);
 		gs->LoadFromSetup(gameSetup);
 		CPlayer::UpdateControlledTeams();
 	} else {
 		throw content_error("Server sent us incorrect script");
 	}
 
+	// some sanity checks
+	for (int p = 0; p < playerHandler->ActivePlayers(); ++p) {
+		const CPlayer* player = playerHandler->Player(p);
+		if (!playerHandler->IsValidPlayer(player->playerNum)) {
+			throw content_error("Invalid player in game data");
+		}
+		if (!teamHandler->IsValidTeam(player->team)) {
+			throw content_error("Invalid team in game data");
+		}
+		if (!teamHandler->IsValidAllyTeam(teamHandler->AllyTeam(player->team))) { // TODO: seems not to make sense really
+			throw content_error("Invalid ally team in game data");
+		}
+	}
+
 	gs->SetRandSeed(gameData->GetRandomSeed(), true);
-	LogObject() << "Using map " << gameSetup->mapName << "\n";
+	LogObject() << "Using map: " << gameSetup->mapName << "\n";
 
 	if (net && net->GetDemoRecorder()) {
 		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
@@ -429,15 +461,14 @@ void CPreGame::GameDataReceived(boost::shared_ptr<const netcode::RawPacket> pack
 	LoadMap(gameSetup);
 	archiveScanner->CheckArchive(gameSetup->mapName, gameData->GetMapChecksum());
 
-	// This MUST be loaded this late, since this executes map Lua code which
-	// may call Spring.GetMapOptions(), which NEEDS gameSetup to be set!
-	if (!mapInfo) {
-		mapInfo = new CMapInfo(gameSetup->MapFile());
-	}
-
-	LogObject() << "Using mod " << gameSetup->modName << "\n";
-	LoadMod(gameSetup->modName);
+	LogObject() << "Using mod: " << gameSetup->modName << "\n";
+	vfsHandler->AddArchiveWithDeps(gameSetup->modName, false);
 	modArchive = archiveScanner->ArchiveFromName(gameSetup->modName);
-	LogObject() << "Using mod archive " << modArchive << "\n";
+	LogObject() << "Using mod archive: " << modArchive << "\n";
 	archiveScanner->CheckArchive(modArchive, gameData->GetModChecksum());
+
+	if (net && net->GetDemoRecorder()) {
+		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
+		LogObject() << "Recording Demo to " << net->GetDemoRecorder()->GetName() << "\n";
+	}
 }

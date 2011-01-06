@@ -1,9 +1,5 @@
-/*---------------------------------------------------------------------
- Terrain Renderer using texture splatting and geomipmapping
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
- Copyright (2006) Jelmer Cnossen
- This code is released under GPL license (See LICENSE.html for info)
----------------------------------------------------------------------*/
 #include "StdAfx.h"
 
 #include "TdfParser.h"
@@ -93,6 +89,8 @@ namespace terrain {
 		lightmap = 0;
 		flatBumpmap = 0;
 		shadowMapParams = 0;
+		optimizeEpsilon = 0.0f;
+		useBumpMaps = false;
 	}
 
 	TerrainTexture::~TerrainTexture ()
@@ -566,7 +564,7 @@ namespace terrain {
 		shaderHandler->BeginTexturing();
 	}
 
-	int TerrainTexture::NumPasses() {
+	int TerrainTexture::NumPasses() const {
 		return maxPasses;
 	}
 

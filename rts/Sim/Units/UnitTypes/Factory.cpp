@@ -1,15 +1,13 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// Factory.cpp: implementation of the CFactory class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include "Factory.h"
-#include "Game/Camera.h"
 #include "Game/GameHelper.h"
 #include "Game/WaitCommandsAI.h"
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
-#include "Rendering/UnitModels/3DOParser.h"
+#include "Rendering/GlobalRendering.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/TeamHandler.h"
@@ -22,13 +20,12 @@
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/UnitLoader.h"
 #include "Sim/Units/UnitDefHandler.h"
-#include "Sync/SyncTracer.h"
-#include "GlobalUnsynced.h"
-#include "EventHandler.h"
-#include "Sound/AudioChannel.h"
-#include "LogOutput.h"
-#include "Matrix44f.h"
-#include "myMath.h"
+#include "System/GlobalUnsynced.h"
+#include "System/EventHandler.h"
+#include "System/Matrix44f.h"
+#include "System/myMath.h"
+#include "System/Sound/IEffectChannel.h"
+#include "System/Sync/SyncTracer.h"
 #include "mmgr.h"
 
 CR_BIND_DERIVED(CFactory, CBuilding, );
@@ -59,15 +56,13 @@ CFactory::CFactory():
 {
 }
 
-
-CFactory::~CFactory()
-{
-	// if uh == NULL then all pointers to units should be considered dangling pointers
-	if (uh && curBuild) {
+CFactory::~CFactory() {
+	if (curBuild != NULL) {
 		curBuild->KillUnit(false, true, NULL);
 		curBuild = NULL;
 	}
 }
+
 
 
 void CFactory::PostLoad()
@@ -81,10 +76,10 @@ void CFactory::PostLoad()
 	}
 }
 
-void CFactory::UnitInit (const UnitDef* def, int team, const float3& position)
+void CFactory::PreInit(const UnitDef* def, int team, int facing, const float3& position, bool build)
 {
-	buildSpeed = def->buildSpeed / 32.0f;
-	CBuilding::UnitInit(def, team, position);
+	buildSpeed = def->buildSpeed / TEAM_SLOWUPDATE_RATE;
+	CBuilding::PreInit(def, team, facing, position, build);
 }
 
 int CFactory::GetBuildPiece()
@@ -121,9 +116,8 @@ void CFactory::Update()
 
 		if (solidObj == NULL || (dynamic_cast<const CUnit*>(solidObj) == this)) {
 			quedBuild = false;
-			CUnit* b = unitLoader.LoadUnit(nextBuild, buildPos + float3(0.01f, 0.01f, 0.01f), team,
+			CUnit* b = unitLoader->LoadUnit(nextBuild, buildPos + float3(0.01f, 0.01f, 0.01f), team,
 											true, buildFacing, this);
-			b->lineage = this->lineage;
 
 			if (!unitDef->canBeAssisted) {
 				b->soloBuilder = this;
@@ -142,7 +136,7 @@ void CFactory::Update()
 					unitDef->sounds.build.getVolume(0));
 			}
 		} else {
-			helper->BuggerOff(buildPos - float3(0.01f, 0, 0.02f), radius + 8);
+			helper->BuggerOff(buildPos - float3(0.01f, 0, 0.02f), radius + 8, true, true, team, NULL);
 		}
 	}
 
@@ -155,21 +149,18 @@ void CFactory::Update()
 
 			// buildPiece is the rotating platform
 			const int buildPiece = GetBuildPiece();
+			const float3& buildPos = CalcBuildPos(buildPiece);
 			const CMatrix44f& mat = script->GetPieceMatrix(buildPiece);
-			const int h = GetHeadingFromVector(mat[2], mat[10]);
+			const int h = GetHeadingFromVector(mat[2], mat[10]); //! x.z, z.z
 
 			// rotate unit nanoframe with platform
-			curBuild->heading = (h + GetHeadingFromFacing(buildFacing)) & 65535;
-
-			const float3 buildPos = CalcBuildPos(buildPiece);
+			curBuild->heading = (h + GetHeadingFromFacing(buildFacing)) & (SPRING_CIRCLE_DIVS - 1);
 			curBuild->pos = buildPos;
 
-			if (curBuild->floatOnWater) {
-				float waterline = ground->GetHeight(buildPos.x, buildPos.z) - curBuild->unitDef->waterline;
-				if (waterline > curBuild->pos.y)
-					curBuild->pos.y = waterline;
-			}
-			curBuild->midPos = curBuild->pos + (UpVector * curBuild->relMidPos.y);
+			if (curBuild->floatOnWater && (buildPos.y <= 0.0f))
+				curBuild->pos.y = -curBuild->unitDef->waterline;
+
+			curBuild->UpdateMidPos();
 
 			const CCommandQueue& queue = commandAI->commandQue;
 
@@ -195,28 +186,8 @@ void CFactory::Update()
 					(dynamic_cast<CMobileCAI*>(curBuild->commandAI) &&
 					 ((CMobileCAI*)curBuild->commandAI)->unimportantMove)) {
 				userOrders = false;
-				const CFactoryCAI* facAI = (CFactoryCAI*) commandAI;
-				const CCommandQueue& newUnitCmds = facAI->newUnitCommands;
 
-				if (newUnitCmds.empty()) {
-					SendToEmptySpot(curBuild);
-				} else {
-					// XXX the pathfinder sometimes... makes mistakes, try to hack around it
-					// XXX note this qualifies as HACK HACK HACK
-					float3 testpos = curBuild->pos + frontdir * (this->radius - 1.0f);
-					Command c;
-					c.id = CMD_MOVE;
-					c.params.push_back(testpos.x);
-					c.params.push_back(testpos.y);
-					c.params.push_back(testpos.z);
-					curBuild->commandAI->GiveCommand(c);
-
-					for (CCommandQueue::const_iterator ci = newUnitCmds.begin(); ci != newUnitCmds.end(); ++ci) {
-						c = *ci;
-						c.options |= SHIFT_KEY;
-						curBuild->commandAI->GiveCommand(c);
-					}
-				}
+				AssignBuildeeOrders(curBuild);
 				waitCommandsAI.AddLocalUnit(curBuild, this);
 			}
 			eventHandler.UnitFromFactory(curBuild, this, userOrders);
@@ -269,7 +240,7 @@ void CFactory::StopBuild()
 			AddMetal(curBuild->metalCost * curBuild->buildProgress, false);
 			curBuild->KillUnit(false, true, NULL);
 		}
-		DeleteDeathDependence(curBuild);
+		DeleteDeathDependence(curBuild, DEPENDENCE_BUILD);
 	}
 	curBuild = 0;
 	quedBuild = false;
@@ -289,6 +260,8 @@ void CFactory::FinishedBuilding(void)
 	CBuilding::FinishedBuilding();
 }
 
+
+
 void CFactory::SendToEmptySpot(CUnit* unit)
 {
 	float r = radius * 1.7f + unit->radius * 4;
@@ -296,7 +269,7 @@ void CFactory::SendToEmptySpot(CUnit* unit)
 
 	for (int a = 0; a < 20; ++a) {
 		float3 testPos = pos + frontdir * r * cos(a * PI / 10) + rightdir * r * sin(a * PI / 10);
-		testPos.y = ground->GetHeight(testPos.x, testPos.z);
+		testPos.y = ground->GetHeightAboveWater(testPos.x, testPos.z);
 
 		if (qf->GetSolidsExact(testPos, unit->radius * 1.5f).empty()) {
 			foundPos = testPos;
@@ -313,9 +286,63 @@ void CFactory::SendToEmptySpot(CUnit* unit)
 	unit->commandAI->GiveCommand(c);
 }
 
+void CFactory::AssignBuildeeOrders(CUnit* unit) {
+	const CFactoryCAI* facAI = (CFactoryCAI*) commandAI;
+	const CCommandQueue& newUnitCmds = facAI->newUnitCommands;
+
+	if (newUnitCmds.empty()) {
+		SendToEmptySpot(unit);
+		return;
+	}
+
+	Command c;
+	c.id = CMD_MOVE;
+
+	if (!unit->unitDef->canfly) {
+
+		// HACK: when a factory has a rallypoint set far enough away
+		// to trigger the non-admissable path estimators, we want to
+		// avoid units getting stuck inside by issuing them an extra
+		// move-order. However, this order can *itself* cause the PF
+		// system to consider the path blocked if the extra waypoint
+		// falls within the factory's confines, so use a wide berth.
+		const float xs = unitDef->xsize * SQUARE_SIZE * 0.5f;
+		const float zs = unitDef->zsize * SQUARE_SIZE * 0.5f;
+
+		float tmpDst = 2.0f;
+		float3 tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
+
+		if (buildFacing == FACING_NORTH || buildFacing == FACING_SOUTH) {
+			while ((tmpPos.z >= unit->pos.z - zs && tmpPos.z <= unit->pos.z + zs)) {
+				tmpDst += 0.5f;
+				tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
+			}
+		} else {
+			while ((tmpPos.x >= unit->pos.x - xs && tmpPos.x <= unit->pos.x + xs)) {
+				tmpDst += 0.5f;
+				tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
+			}
+		}
+
+		c.params.push_back(tmpPos.x);
+		c.params.push_back(tmpPos.y);
+		c.params.push_back(tmpPos.z);
+		unit->commandAI->GiveCommand(c);
+	}
+
+	for (CCommandQueue::const_iterator ci = newUnitCmds.begin(); ci != newUnitCmds.end(); ++ci) {
+		c = *ci;
+		c.options |= SHIFT_KEY;
+		unit->commandAI->GiveCommand(c);
+	}
+}
+
+
+
 void CFactory::SlowUpdate(void)
 {
-	helper->BuggerOff(pos - float3(0.01f, 0, 0.02f), radius);
+	if (!transporter)
+		helper->BuggerOff(pos - float3(0.01f, 0, 0.02f), radius, true, true, team, NULL);
 	CBuilding::SlowUpdate();
 }
 
@@ -346,7 +373,7 @@ void CFactory::CreateNanoParticle(void)
 		dif += gu->usRandVector() * 0.15f;
 		float3 color = unitDef->nanoColor;
 
-		if (gu->teamNanospray) {
+		if (globalRendering->teamNanospray) {
 			unsigned char* tcol = teamHandler->Team(team)->color;
 			color = float3(tcol[0] * (1.0f / 255.0f), tcol[1] * (1.0f / 255.0f), tcol[2] * (1.0f / 255.0f));
 		}

@@ -1,19 +1,4 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
-
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef _AISCOMMANDS_H
 #define	_AISCOMMANDS_H
@@ -23,7 +8,6 @@
 // major though in advance, and deliberation with hoijui!
 
 #include "aidefines.h"
-#include "SAIFloat3.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -55,17 +39,17 @@ enum CommandTopic {
 	COMMAND_DRAWER_LINE_ADD                       =  2,
 	COMMAND_DRAWER_POINT_REMOVE                   =  3,
 	COMMAND_SEND_START_POS                        =  4,
-	COMMAND_CHEATS_SET_MY_HANDICAP                =  5,
+	COMMAND_CHEATS_SET_MY_INCOME_MULTIPLIER       =  5,
 	COMMAND_SEND_TEXT_MESSAGE                     =  6,
 	COMMAND_SET_LAST_POS_MESSAGE                  =  7,
 	COMMAND_SEND_RESOURCES                        =  8,
 	COMMAND_SEND_UNITS                            =  9,
 	COMMAND_UNUSED_0                              = 10, // unused
 	COMMAND_UNUSED_1                              = 11, // unused
-	COMMAND_GROUP_CREATE                          = 12,
-	COMMAND_GROUP_ERASE                           = 13,
-	COMMAND_GROUP_ADD_UNIT                        = 14,
-	COMMAND_GROUP_REMOVE_UNIT                     = 15,
+	COMMAND_GROUP_CREATE                          = 12, // unused
+	COMMAND_GROUP_ERASE                           = 13, // unused
+	COMMAND_GROUP_ADD_UNIT                        = 14, // unused
+	COMMAND_GROUP_REMOVE_UNIT                     = 15, // unused
 	COMMAND_PATH_INIT                             = 16,
 	COMMAND_PATH_GET_APPROXIMATE_LENGTH           = 17,
 	COMMAND_PATH_GET_NEXT_WAYPOINT                = 18,
@@ -113,7 +97,7 @@ enum CommandTopic {
 	COMMAND_UNIT_UNLOAD_UNITS_AREA                = 60,
 	COMMAND_UNIT_UNLOAD_UNIT                      = 61,
 	COMMAND_UNIT_SET_ON_OFF                       = 62,
-	COMMAND_UNIT_RECLAIM                          = 63,
+	COMMAND_UNIT_RECLAIM_UNIT                     = 63,
 	COMMAND_UNIT_RECLAIM_AREA                     = 64,
 	COMMAND_UNIT_CLOAK                            = 65,
 	COMMAND_UNIT_STOCKPILE                        = 66,
@@ -132,6 +116,7 @@ enum CommandTopic {
 	COMMAND_CHEATS_GIVE_ME_NEW_UNIT               = 79,
 	COMMAND_TRACE_RAY                             = 80,
 	COMMAND_PAUSE                                 = 81,
+	COMMAND_UNIT_RECLAIM_FEATURE                  = 82,
 //const int COMMAND_UNIT_ATTACK_POS
 //const int COMMAND_UNIT_INSERT
 //const int COMMAND_UNIT_REMOVE
@@ -139,8 +124,21 @@ enum CommandTopic {
 //const int COMMAND_UNIT_ATTACK_LOOPBACK
 //const int COMMAND_UNIT_GROUP_SELECT
 //const int COMMAND_UNIT_INTERNAL
+	COMMAND_DEBUG_DRAWER_GRAPH_SET_POS            = 83,
+	COMMAND_DEBUG_DRAWER_GRAPH_SET_SIZE           = 84,
+	COMMAND_DEBUG_DRAWER_GRAPH_LINE_ADD_POINT     = 85,
+	COMMAND_DEBUG_DRAWER_GRAPH_LINE_DELETE_POINTS = 86,
+	COMMAND_DEBUG_DRAWER_GRAPH_LINE_SET_COLOR     = 87,
+	COMMAND_DEBUG_DRAWER_GRAPH_LINE_SET_LABEL     = 88,
+	COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_ADD       = 89,
+	COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_UPDATE    = 90,
+	COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_DELETE    = 91,
+	COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_SET_POS   = 92,
+	COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_SET_SIZE  = 93,
+	COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_SET_LABEL = 94,
+	COMMAND_TRACE_RAY_FEATURE                     = 95,
 };
-const unsigned int NUM_CMD_TOPICS                 = 82;
+const int NUM_CMD_TOPICS = 96;
 
 
 /**
@@ -166,7 +164,7 @@ enum UnitCommandOptions {
 
 
 #define AIINTERFACE_COMMANDS_ABI_VERSION     ( \
-		  sizeof(struct SSetMyHandicapCheatCommand) \
+		  sizeof(struct SSetMyIncomeMultiplierCheatCommand) \
 		+ sizeof(struct SGiveMeResourceCheatCommand) \
 		+ sizeof(struct SGiveMeNewUnitCheatCommand) \
 		+ sizeof(struct SSendTextMessageCommand) \
@@ -175,8 +173,6 @@ enum UnitCommandOptions {
 		+ sizeof(struct SSendUnitsCommand) \
 		+ sizeof(struct SCreateGroupCommand) \
 		+ sizeof(struct SEraseGroupCommand) \
-		+ sizeof(struct SAddUnitToGroupCommand) \
-		+ sizeof(struct SRemoveUnitFromGroupCommand) \
 		+ sizeof(struct SInitPathCommand) \
 		+ sizeof(struct SGetApproximateLengthPathCommand) \
 		+ sizeof(struct SGetNextWaypointPathCommand) \
@@ -227,7 +223,7 @@ enum UnitCommandOptions {
 		+ sizeof(struct SUnloadUnitCommand) \
 		+ sizeof(struct SUnloadUnitsAreaUnitCommand) \
 		+ sizeof(struct SSetOnOffUnitCommand) \
-		+ sizeof(struct SReclaimUnitCommand) \
+		+ sizeof(struct SReclaimUnitUnitCommand) \
 		+ sizeof(struct SReclaimAreaUnitCommand) \
 		+ sizeof(struct SCloakUnitCommand) \
 		+ sizeof(struct SStockpileUnitCommand) \
@@ -245,32 +241,50 @@ enum UnitCommandOptions {
 		+ sizeof(struct SCustomUnitCommand) \
 		+ sizeof(struct STraceRayCommand) \
 		+ sizeof(struct SPauseCommand) \
+		+ sizeof(struct SReclaimFeatureUnitCommand) \
+		+ sizeof(struct SSetPositionGraphDrawerDebugCommand) \
+		+ sizeof(struct SSetSizeGraphDrawerDebugCommand) \
+		+ sizeof(struct SAddPointLineGraphDrawerDebugCommand) \
+		+ sizeof(struct SDeletePointsLineGraphDrawerDebugCommand) \
+		+ sizeof(struct SSetColorLineGraphDrawerDebugCommand) \
+		+ sizeof(struct SSetLabelLineGraphDrawerDebugCommand) \
+		+ sizeof(struct SAddOverlayTextureDrawerDebugCommand) \
+		+ sizeof(struct SUpdateOverlayTextureDrawerDebugCommand) \
+		+ sizeof(struct SDeleteOverlayTextureDrawerDebugCommand) \
+		+ sizeof(struct SSetPositionOverlayTextureDrawerDebugCommand) \
+		+ sizeof(struct SSetSizeOverlayTextureDrawerDebugCommand) \
+		+ sizeof(struct SSetLabelOverlayTextureDrawerDebugCommand) \
+		+ sizeof(struct SFeatureTraceRayCommand) \
 		)
 
 /**
- * This function has the same effect as setting a handicap value
- * in the GameSetup script (currently gives a bonus on collected
- * resources)
+ * Allows to give an income (dis-)advantage to the team
+ * controlled by the Skimrish AI.
+ * This value can also be set through the GameSetup script,
+ * with the difference that it causes an instant desync when set here.
  */
-struct SSetMyHandicapCheatCommand {
-	float handicap;
-}; // COMMAND_CHEATS_SET_MY_HANDICAP
+struct SSetMyIncomeMultiplierCheatCommand {
+	/// default: 1.0; common: [0.0, 2.0]; valid: [0.0, FLOAT_MAX]
+	float factor;
+}; //$ COMMAND_CHEATS_SET_MY_INCOME_MULTIPLIER Cheats_setMyIncomeMultiplier
+
 /**
  * The AI team receives the specified amount of units of the specified resource.
  */
 struct SGiveMeResourceCheatCommand {
 	int resourceId;
 	float amount;
-}; // COMMAND_CHEATS_GIVE_ME_RESOURCE
+}; //$ COMMAND_CHEATS_GIVE_ME_RESOURCE Cheats_giveMeResource REF:resourceId->Resource
+
 /**
  * Creates a new unit with the selected name at pos,
  * and returns its unit ID in ret_newUnitId.
  */
 struct SGiveMeNewUnitCheatCommand {
 	int unitDefId;
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	int ret_newUnitId;
-}; // COMMAND_CHEATS_GIVE_ME_NEW_UNIT
+}; //$ COMMAND_CHEATS_GIVE_ME_NEW_UNIT Cheats_giveMeUnit REF:unitDefId->UnitDef REF:ret_newUnitId->Unit
 
 /**
  * @brief Sends a chat/text message to other players.
@@ -279,14 +293,14 @@ struct SGiveMeNewUnitCheatCommand {
 struct SSendTextMessageCommand {
 	const char* text;
 	int zone;
-}; // COMMAND_SEND_TEXT_MESSAGE
+}; //$ COMMAND_SEND_TEXT_MESSAGE Game_sendTextMessage
 
 /**
  * Assigns a map location to the last text message sent by the AI.
  */
 struct SSetLastPosMessageCommand {
-	struct SAIFloat3 pos;
-}; // COMMAND_SET_LAST_POS_MESSAGE
+	float* pos_posF3;
+}; //$ COMMAND_SET_LAST_POS_MESSAGE Game_setLastMessagePosition
 
 /**
  * Give <amount> units of resource <resourceId> to team <receivingTeam>.
@@ -297,9 +311,9 @@ struct SSetLastPosMessageCommand {
 struct SSendResourcesCommand {
 	int resourceId;
 	float amount;
-	int receivingTeam;
+	int receivingTeamId;
 	bool ret_isExecuted;
-}; // COMMAND_SEND_RESOURCES
+}; //$ COMMAND_SEND_RESOURCES Economy_sendResource REF:resourceId->Resource REF:receivingTeamId->Team
 
 /**
  * Give units specified by <unitIds> to team <receivingTeam>.
@@ -313,41 +327,26 @@ struct SSendResourcesCommand {
  */
 struct SSendUnitsCommand {
 	int* unitIds;
-	int numUnitIds;
-	int receivingTeam;
+	int unitIds_size;
+	int receivingTeamId;
 	int ret_sentUnits;
-}; // COMMAND_SEND_UNITS
+}; //$ COMMAND_SEND_UNITS Economy_sendUnits REF:MULTI:unitIds->Unit REF:receivingTeamId->Team
 
 /// Creates a group and returns the id it was given, returns -1 on failure
 struct SCreateGroupCommand {
 	int ret_groupId;
-}; // COMMAND_GROUP_CREATE
+}; //$ COMMAND_GROUP_CREATE Group_create REF:ret_groupId->Group STATIC
+
 /// Erases a specified group
 struct SEraseGroupCommand {
 	int groupId;
-}; // COMMAND_GROUP_ERASE
-/**
- * @brief Adds a unit to a specific group.
- * If it was previously in a group, it is removed from that.
- * Returns false if the group did not exist or did not accept the unit.
- */
-struct SAddUnitToGroupCommand {
-	int groupId;
-	int unitId;
-	bool ret_isExecuted;
-}; // COMMAND_GROUP_ADD_UNIT
-/// Removes a unit from its group
-struct SRemoveUnitFromGroupCommand {
-	int unitId;
-	bool ret_isExecuted;
-}; // COMMAND_GROUP_REMOVE_UNIT
-
+}; //$ COMMAND_GROUP_ERASE Group_erase REF:groupId->Group
 
 /**
  * The following functions allow the AI to use the built-in path-finder.
  *
- * - call InitPath and you get a pathid back
- * - use this to call GetNextWaypoint to get subsequent waypoints,
+ * - call InitPath and you get a pathId back
+ * - use this to call GetNextWaypoint to get subsequent waypoints;
  *   the waypoints are centered on 8*8 squares
  * - note that the pathfinder calculates the waypoints as needed,
  *   so do not retrieve them until they are needed
@@ -356,101 +355,130 @@ struct SRemoveUnitFromGroupCommand {
  *   y >= 0: worked ok
  *   y = -2: still thinking, call again
  *   y = -1: end of path reached or path is invalid
+ * - for pathType {Ground_Move=0, Hover_Move=1, Ship_Move=2},
+ *   @see UnitDef_MoveData_getMoveType()
+ * - goalRadius defines a goal area within which any square could be accepted as
+ *   path target. If a singular goal position is wanted, use 0.0f.
+ *   default: 8.0f
  */
 struct SInitPathCommand {
-	struct SAIFloat3 start;
-	struct SAIFloat3 end;
+	/// The starting location of the requested path
+	float* start_posF3;
+	/// The goal location of the requested path
+	float* end_posF3;
+	/// For what type of unit should the path be calculated
 	int pathType;
+	/// default: 8.0f
+	float goalRadius;
 	int ret_pathId;
-}; // COMMAND_PATH_INIT
+}; //$ COMMAND_PATH_INIT Pathing_initPath REF:ret_pathId->Path
+
 /**
- * Returns the approximate path cost between two points
- * This needs to calculate the complete path, so it is somewhat expensive.
- *
- * NOTE: currently disabled, always returns 0
+ * Returns the approximate path cost between two points.
+ * - for pathType {Ground_Move=0, Hover_Move=1, Ship_Move=2},
+ *   @see UnitDef_MoveData_getMoveType()
+ * - goalRadius defines a goal area within which any square could be accepted as
+ *   path target. If a singular goal position is wanted, use 0.0f.
+ *   default: 8.0f
  */
 struct SGetApproximateLengthPathCommand {
-	struct SAIFloat3 start;
-	struct SAIFloat3 end;
+	/// The starting location of the requested path
+	float* start_posF3;
+	/// The goal location of the requested path
+	float* end_posF3;
+	/// For what type of unit should the path be calculated
 	int pathType;
+	/// default: 8.0f
+	float goalRadius;
 	int ret_approximatePathLength;
-}; // COMMAND_PATH_GET_APPROXIMATE_LENGTH
+}; //$ COMMAND_PATH_GET_APPROXIMATE_LENGTH Pathing_getApproximateLength
+
 struct SGetNextWaypointPathCommand {
 	int pathId;
-	struct SAIFloat3 ret_nextWaypoint;
-}; // COMMAND_PATH_GET_NEXT_WAYPOINT
+	float* ret_nextWaypoint_posF3_out;
+}; //$ COMMAND_PATH_GET_NEXT_WAYPOINT Pathing_getNextWaypoint REF:pathId->Path
+
 struct SFreePathCommand {
 	int pathId;
-}; // COMMAND_PATH_FREE
+}; //$ COMMAND_PATH_FREE Pathing_freePath REF:pathId->Path
 
 struct SCallLuaRulesCommand {
-	/// Can be setup to NULL to skip passing in a string
+	/// Can be set to NULL to skip passing in a string
 	const char* data;
 	/// If this is less than 0, the data size is calculated using strlen()
 	int inSize;
-	int* outSize;
-	/// this is subject to lua garbage collection, copy it if you wish to continue using it
+	/// this is subject to Lua garbage collection, copy it if you wish to continue using it
 	const char* ret_outData;
-}; // COMMAND_CALL_LUA_RULES
+}; //$ COMMAND_CALL_LUA_RULES Lua_callRules
 
 struct SSendStartPosCommand {
 	bool ready;
 	/// on this position, only x and z matter
-	struct SAIFloat3 pos;
-}; // COMMAND_SEND_START_POS
+	float* pos_posF3;
+}; //$ COMMAND_SEND_START_POS Game_sendStartPosition
 
 struct SAddNotificationDrawerCommand {
 	/// on this position, only x and z matter
-	struct SAIFloat3 pos;
-	struct SAIFloat3 color;
-	float alpha;
-}; // COMMAND_DRAWER_ADD_NOTIFICATION
+	float* pos_posF3;
+	short* color_colorS3;
+	short alpha;
+}; //$ COMMAND_DRAWER_ADD_NOTIFICATION Map_Drawer_addNotification
+
 struct SAddPointDrawCommand {
 	/// on this position, only x and z matter
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	/// create this text on pos in my team color
 	const char* label;
-}; // COMMAND_DRAWER_POINT_ADD
+}; //$ COMMAND_DRAWER_POINT_ADD Map_Drawer_addPoint
+
 struct SRemovePointDrawCommand {
 	/// remove map points and lines near this point (100 distance)
-	struct SAIFloat3 pos;
-}; // COMMAND_DRAWER_POINT_REMOVE
+	float* pos_posF3;
+}; //$ COMMAND_DRAWER_POINT_REMOVE Map_Drawer_deletePointsAndLines
+
 struct SAddLineDrawCommand {
 	/// draw line from this pos
-	struct SAIFloat3 posFrom;
+	float* posFrom_posF3;
 	/// to this pos, again only x and z matter
-	struct SAIFloat3 posTo;
-}; // COMMAND_DRAWER_LINE_ADD
+	float* posTo_posF3;
+}; //$ COMMAND_DRAWER_LINE_ADD Map_Drawer_addLine
 
 struct SStartPathDrawerCommand {
-	struct SAIFloat3 pos;
-	struct SAIFloat3 color;
-	float alpha;
-}; // COMMAND_DRAWER_PATH_START
+	float* pos_posF3;
+	short* color_colorS3;
+	short alpha;
+}; //$ COMMAND_DRAWER_PATH_START Map_Drawer_PathDrawer_start
+
 struct SFinishPathDrawerCommand {
-}; // COMMAND_DRAWER_PATH_FINISH
+// TODO: FIXME: commands should not be empty, add a useless var if needed
+}; //$ COMMAND_DRAWER_PATH_FINISH Map_Drawer_PathDrawer_finish
+
 struct SDrawLinePathDrawerCommand {
-	struct SAIFloat3 endPos;
-	struct SAIFloat3 color;
-	float alpha;
-}; // COMMAND_DRAWER_PATH_DRAW_LINE
+	float* endPos_posF3;
+	short* color_colorS3;
+	short alpha;
+}; //$ COMMAND_DRAWER_PATH_DRAW_LINE Map_Drawer_PathDrawer_drawLine
+
 struct SDrawLineAndIconPathDrawerCommand {
 	int cmdId;
-	struct SAIFloat3 endPos;
-	struct SAIFloat3 color;
-	float alpha;
-}; // COMMAND_DRAWER_PATH_DRAW_LINE_AND_ICON
+	float* endPos_posF3;
+	short* color_colorS3;
+	short alpha;
+}; //$ COMMAND_DRAWER_PATH_DRAW_LINE_AND_ICON Map_Drawer_PathDrawer_drawLineAndCommandIcon REF:cmdId->Command
+
 struct SDrawIconAtLastPosPathDrawerCommand {
 	int cmdId;
-}; // COMMAND_DRAWER_PATH_DRAW_ICON_AT_LAST_POS
+}; //$ COMMAND_DRAWER_PATH_DRAW_ICON_AT_LAST_POS Map_Drawer_PathDrawer_drawIcon REF:cmdId->Command
+
 struct SBreakPathDrawerCommand {
-	struct SAIFloat3 endPos;
-	struct SAIFloat3 color;
-	float alpha;
-}; // COMMAND_DRAWER_PATH_BREAK
+	float* endPos_posF3;
+	short* color_colorS3;
+	short alpha;
+}; //$ COMMAND_DRAWER_PATH_BREAK Map_Drawer_PathDrawer_suspend
+
 struct SRestartPathDrawerCommand {
 	bool sameColor;
-}; // COMMAND_DRAWER_PATH_RESTART
+}; //$ COMMAND_DRAWER_PATH_RESTART Map_Drawer_PathDrawer_restart
 
 
 /**
@@ -465,10 +493,10 @@ struct SRestartPathDrawerCommand {
  * - <arrow> == true means that the figure will get an arrow at the end
  */
 struct SCreateSplineFigureDrawerCommand {
-	struct SAIFloat3 pos1;
-	struct SAIFloat3 pos2;
-	struct SAIFloat3 pos3;
-	struct SAIFloat3 pos4;
+	float* pos1_posF3;
+	float* pos2_posF3;
+	float* pos3_posF3;
+	float* pos4_posF3;
 	float width;
 	/// true: means that the figure will get an arrow at the end
 	bool arrow;
@@ -478,7 +506,8 @@ struct SCreateSplineFigureDrawerCommand {
 	int figureGroupId;
 	/// the new group
 	int ret_newFigureGroupId;
-}; // COMMAND_DRAWER_FIGURE_CREATE_SPLINE
+}; //$ COMMAND_DRAWER_FIGURE_CREATE_SPLINE Map_Drawer_Figure_drawSpline REF:figureGroupId->FigureGroup REF:ret_newFigureGroupId->FigureGroup
+
 /**
  * @brief Creates a straight line
  * Creates a straight line from pos1 to pos2.
@@ -491,8 +520,8 @@ struct SCreateSplineFigureDrawerCommand {
  * @param arrow true means that the figure will get an arrow at the end
  */
 struct SCreateLineFigureDrawerCommand {
-	struct SAIFloat3 pos1;
-	struct SAIFloat3 pos2;
+	float* pos1_posF3;
+	float* pos2_posF3;
 	float width;
 	/// true: means that the figure will get an arrow at the end
 	bool arrow;
@@ -502,22 +531,24 @@ struct SCreateLineFigureDrawerCommand {
 	int figureGroupId;
 	/// the new group
 	int ret_newFigureGroupId;
-}; // COMMAND_DRAWER_FIGURE_CREATE_LINE
+}; //$ COMMAND_DRAWER_FIGURE_CREATE_LINE Map_Drawer_Figure_drawLine REF:figureGroupId->FigureGroup REF:ret_newFigureGroupId->FigureGroup
+
 /**
  * Sets the color used to draw all lines of figures in a figure group.
  */
 struct SSetColorFigureDrawerCommand {
 	int figureGroupId;
 	/// (x, y, z) -> (red, green, blue)
-	struct SAIFloat3 color;
-	float alpha;
-}; // COMMAND_DRAWER_FIGURE_SET_COLOR
+	short* color_colorS3;
+	short alpha;
+}; //$ COMMAND_DRAWER_FIGURE_SET_COLOR Map_Drawer_Figure_setColor REF:figureGroupId->FigureGroup
+
 /**
  * Removes a figure group, which means it will not be drawn anymore.
  */
 struct SDeleteFigureDrawerCommand {
 	int figureGroupId;
-}; // COMMAND_DRAWER_FIGURE_DELETE
+}; //$ COMMAND_DRAWER_FIGURE_DELETE Map_Drawer_Figure_remove REF:figureGroupId->FigureGroup
 
 /**
  * This function allows you to draw units onto the map.
@@ -526,7 +557,7 @@ struct SDeleteFigureDrawerCommand {
  */
 struct SDrawUnitDrawerCommand {
 	int toDrawUnitDefId;
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	/// in radians
 	float rotation;
 	/// specifies how many frames a figure should live before being auto-removed; 0 means no removal
@@ -536,7 +567,7 @@ struct SDrawUnitDrawerCommand {
 	bool transparent;
 	bool drawBorder;
 	int facing;
-}; // COMMAND_DRAWER_DRAW_UNIT
+}; //$ COMMAND_DRAWER_DRAW_UNIT Map_Drawer_drawUnit REF:toDrawUnitDefId->UnitDef
 
 
 
@@ -544,36 +575,50 @@ struct SBuildUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toBuildUnitDefId;
-	struct SAIFloat3 buildPos;
+	float* buildPos_posF3;
 	/// set it to UNIT_COMMAND_BUILD_NO_FACING, if you do not want to specify a certain facing
 	int facing;
-}; // COMMAND_UNIT_BUILD
+}; //$ COMMAND_UNIT_BUILD Unit_build REF:toBuildUnitDefId->UnitDef
 
 struct SStopUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
-}; // COMMAND_UNIT_STOP
+}; //$ COMMAND_UNIT_STOP Unit_stop
 
 //struct SInsertUnitCommand {
 //	int unitId;
 //	int groupId;
-//	unsigned int options; // see enum UnitCommandOptions
+//	short options; // see enum UnitCommandOptions
 //	int timeOut; // command execution-time in ?seconds?
 //};
 //
 //struct SRemoveUnitCommand {
 //	int unitId;
 //	int groupId;
-//	unsigned int options; // see enum UnitCommandOptions
+//	short options; // see enum UnitCommandOptions
 //	int timeOut; // command execution-time in ?seconds?
 //};
 
@@ -581,118 +626,210 @@ struct SWaitUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
-}; // COMMAND_UNIT_WAIT
+}; //$ COMMAND_UNIT_WAIT Unit_wait
 
 struct STimeWaitUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	/// the time in seconds to wait
 	int time;
-}; // COMMAND_UNIT_WAIT_TIME
+}; //$ COMMAND_UNIT_WAIT_TIME Unit_waitFor
 
+/**
+ * Wait until an other unit is dead, units will not wait on themselves.
+ * Example:
+ * A group of aircrafts waits for an enemy's anti-air defenses to die,
+ * before passing over their ruins to attack.
+ */
 struct SDeathWaitUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	/// wait until this unit is dead
 	int toDieUnitId;
-}; // COMMAND_UNIT_WAIT_DEATH
+}; //$ COMMAND_UNIT_WAIT_DEATH Unit_waitForDeathOf REF:toDieUnitId->Unit
 
+/**
+ * Wait for a specific ammount of units.
+ * Usually used with factories, but does work on groups without a factory too.
+ * Example:
+ * Pick a factory and give it a rallypoint, then add a SquadWait command
+ * with the number of units you want in your squads.
+ * Units will wait at the initial rally point until enough of them
+ * have arrived to make up a squad, then they will continue along their queue.
+ */
 struct SSquadWaitUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int numUnits;
-}; // COMMAND_UNIT_WAIT_SQUAD
+}; //$ COMMAND_UNIT_WAIT_SQUAD Unit_waitForSquadSize
 
+/**
+ * Wait for the arrival of all units included in the command.
+ * Only makes sense for a group of units.
+ * Use it after a movement command of some sort (move / fight).
+ * Units will wait until all members of the GatherWait command have arrived
+ * at their destinations before continuing.
+ */
 struct SGatherWaitUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
-}; // COMMAND_UNIT_WAIT_GATHER
+}; //$ COMMAND_UNIT_WAIT_GATHER Unit_waitForAll
 
 struct SMoveUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 toPos;
-}; // COMMAND_UNIT_MOVE
+	float* toPos_posF3;
+}; //$ COMMAND_UNIT_MOVE Unit_moveTo
 
 struct SPatrolUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 toPos;
-}; // COMMAND_UNIT_PATROL
+	float* toPos_posF3;
+}; //$ COMMAND_UNIT_PATROL Unit_patrolTo
 
 struct SFightUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 toPos;
-}; // COMMAND_UNIT_FIGHT
+	float* toPos_posF3;
+}; //$ COMMAND_UNIT_FIGHT Unit_fight
 
 struct SAttackUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toAttackUnitId;
-}; // COMMAND_UNIT_ATTACK
+}; //$ COMMAND_UNIT_ATTACK Unit_attack REF:toAttackUnitId->Unit
 
 //	struct SAttackPosUnitCommand {
+
 struct SAttackAreaUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 toAttackPos;
+	float* toAttackPos_posF3;
 	float radius;
-}; // COMMAND_UNIT_ATTACK_AREA
+}; //$ COMMAND_UNIT_ATTACK_AREA Unit_attackArea
 
 //struct SAttackAreaUnitCommand {
 //	int unitId;
 //	int groupId;
 //	/// see enum UnitCommandOptions
-//	unsigned int options;
-//	/// max command execution-time in frames; if it takes longer then this -> abort
+//	short options;
 //	int timeOut;
 //};
 
@@ -700,28 +837,42 @@ struct SGuardUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toGuardUnitId;
-}; // COMMAND_UNIT_GUARD
+}; //$ COMMAND_UNIT_GUARD Unit_guard REF:toGuardUnitId->Unit
 
+// TODO: docu (is it usefull at all?)
 struct SAiSelectUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
-}; // COMMAND_UNIT_AI_SELECT
+}; //$ COMMAND_UNIT_AI_SELECT Unit_aiSelect
 
 //struct SGroupSelectUnitCommand {
 //	int unitId;
 //	int groupId;
 //	/// see enum UnitCommandOptions
-//	unsigned int options;
-//	/// max command execution-time in frames; if it takes longer then this -> abort
+//	short options;
 //	int timeOut;
 //};
 
@@ -729,74 +880,115 @@ struct SGroupAddUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toGroupId;
-}; // COMMAND_UNIT_GROUP_ADD
+}; //$ COMMAND_UNIT_GROUP_ADD Unit_addToGroup REF:toGroupId->Group
 
 struct SGroupClearUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
-}; // COMMAND_UNIT_GROUP_CLEAR
+}; //$ COMMAND_UNIT_GROUP_CLEAR Unit_removeFromGroup
 
 struct SRepairUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toRepairUnitId;
-}; // COMMAND_UNIT_REPAIR
+}; //$ COMMAND_UNIT_REPAIR Unit_repair REF:toRepairUnitId->Unit
 
 struct SSetFireStateUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	/// can be: 0=hold fire, 1=return fire, 2=fire at will
 	int fireState;
-}; // COMMAND_UNIT_SET_FIRE_STATE
+}; //$ COMMAND_UNIT_SET_FIRE_STATE Unit_setFireState
 
 struct SSetMoveStateUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	/// 0=hold pos, 1=maneuvre, 2=roam
 	int moveState;
-}; // COMMAND_UNIT_SET_MOVE_STATE
+}; //$ COMMAND_UNIT_SET_MOVE_STATE Unit_setMoveState
 
 struct SSetBaseUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 basePos;
-}; // COMMAND_UNIT_SET_BASE
+	float* basePos_posF3;
+}; //$ COMMAND_UNIT_SET_BASE Unit_setBase
 
 //struct SInternalUnitCommand {
 //	int unitId;
 //	int groupId;
 //	/// see enum UnitCommandOptions
-//	unsigned int options;
-//	/// max command execution-time in frames; if it takes longer then this -> abort
+//	short options;
 //	int timeOut;
 //};
 
@@ -804,300 +996,572 @@ struct SSelfDestroyUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
-}; // COMMAND_UNIT_SELF_DESTROY
+}; //$ COMMAND_UNIT_SELF_DESTROY Unit_selfDestruct
 
 struct SSetWantedMaxSpeedUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	float wantedMaxSpeed;
-}; // COMMAND_UNIT_SET_WANTED_MAX_SPEED
+}; //$ COMMAND_UNIT_SET_WANTED_MAX_SPEED Unit_setWantedMaxSpeed
 
 struct SLoadUnitsUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
+	short options;
 	int timeOut; // command execution-time in ?milli-seconds?
 
 	int* toLoadUnitIds;
-	int numToLoadUnits;
-}; // COMMAND_UNIT_LOAD_UNITS
+	int toLoadUnitIds_size;
+}; //$ COMMAND_UNIT_LOAD_UNITS Unit_loadUnits REF:MULTI:toLoadUnitIds->Unit
 
 struct SLoadUnitsAreaUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	float radius;
-}; // COMMAND_UNIT_LOAD_UNITS_AREA
+}; //$ COMMAND_UNIT_LOAD_UNITS_AREA Unit_loadUnitsInArea
 
 struct SLoadOntoUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int transporterUnitId;
-}; // COMMAND_UNIT_LOAD_ONTO
+}; //$ COMMAND_UNIT_LOAD_ONTO Unit_loadOnto REF:transporterUnitId->Unit
 
 struct SUnloadUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 toPos;
+	float* toPos_posF3;
 	int toUnloadUnitId;
-}; // COMMAND_UNIT_UNLOAD_UNIT
+}; //$ COMMAND_UNIT_UNLOAD_UNIT Unit_unload REF:toUnloadUnitId->Unit
 
 struct SUnloadUnitsAreaUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 toPos;
+	float* toPos_posF3;
 	float radius;
-}; // COMMAND_UNIT_UNLOAD_UNITS_AREA
+}; //$ COMMAND_UNIT_UNLOAD_UNITS_AREA Unit_unloadUnitsInArea
 
 struct SSetOnOffUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	bool on;
-}; // COMMAND_UNIT_SET_ON_OFF
+}; //$ COMMAND_UNIT_SET_ON_OFF Unit_setOn
 
-struct SReclaimUnitCommand {
+struct SReclaimUnitUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	int toReclaimUnitIdOrFeatureId;
-}; // COMMAND_UNIT_RECLAIM
+	int toReclaimUnitId;
+}; //$ COMMAND_UNIT_RECLAIM_UNIT Unit_reclaimUnit REF:toReclaimUnitId->Unit
+
+struct SReclaimFeatureUnitCommand {
+	int unitId;
+	int groupId;
+	/// see enum UnitCommandOptions
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
+	int timeOut;
+
+	int toReclaimFeatureId;
+}; //$ COMMAND_UNIT_RECLAIM_FEATURE Unit_reclaimFeature REF:toReclaimFeatureId->Feature
 
 struct SReclaimAreaUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	float radius;
-}; // COMMAND_UNIT_RECLAIM_AREA
+}; //$ COMMAND_UNIT_RECLAIM_AREA Unit_reclaimInArea
 
 struct SCloakUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	bool cloak;
-}; // COMMAND_UNIT_CLOAK
+}; //$ COMMAND_UNIT_CLOAK Unit_cloak
 
 struct SStockpileUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
-}; // COMMAND_UNIT_STOCKPILE
+}; //$ COMMAND_UNIT_STOCKPILE Unit_stockpile
 
 struct SDGunUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toAttackUnitId;
-}; // COMMAND_UNIT_D_GUN
+}; //$ COMMAND_UNIT_D_GUN Unit_dGun REF:toAttackUnitId->Unit
 
 struct SDGunPosUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 pos;
-}; // COMMAND_UNIT_D_GUN_POS
+	float* pos_posF3;
+}; //$ COMMAND_UNIT_D_GUN_POS Unit_dGunPosition
 
 struct SRestoreAreaUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	float radius;
-}; // COMMAND_UNIT_RESTORE_AREA
+}; //$ COMMAND_UNIT_RESTORE_AREA Unit_restoreArea
 
 struct SSetRepeatUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	bool repeat;
-}; // COMMAND_UNIT_SET_REPEAT
+}; //$ COMMAND_UNIT_SET_REPEAT Unit_setRepeat
 
+/// Tells weapons that support it to try to use a high trajectory
 struct SSetTrajectoryUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
+	/// 0: low-trajectory, 1: high-trajectory
 	int trajectory;
-}; // COMMAND_UNIT_SET_TRAJECTORY
+}; //$ COMMAND_UNIT_SET_TRAJECTORY Unit_setTrajectory
 
 struct SResurrectUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toResurrectFeatureId;
-}; // COMMAND_UNIT_RESURRECT
+}; //$ COMMAND_UNIT_RESURRECT Unit_resurrect REF:toResurrectFeatureId->Feature
 
 struct SResurrectAreaUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	float radius;
-}; // COMMAND_UNIT_RESURRECT_AREA
+}; //$ COMMAND_UNIT_RESURRECT_AREA Unit_resurrectInArea
 
 struct SCaptureUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int toCaptureUnitId;
-}; // COMMAND_UNIT_CAPTURE
+}; //$ COMMAND_UNIT_CAPTURE Unit_capture REF:toCaptureUnitId->Unit
 
 struct SCaptureAreaUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
-	struct SAIFloat3 pos;
+	float* pos_posF3;
 	float radius;
-}; // COMMAND_UNIT_CAPTURE_AREA
+}; //$ COMMAND_UNIT_CAPTURE_AREA Unit_captureInArea
 
+/**
+ * Set the percentage of health at which a unit will return to a save place.
+ * This only works for a few units so far, mainly aircraft.
+ */
 struct SSetAutoRepairLevelUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
+	/// 0: 0%, 1: 30%, 2: 50%, 3: 80%
 	int autoRepairLevel;
-}; // COMMAND_UNIT_SET_AUTO_REPAIR_LEVEL
+}; //$ COMMAND_UNIT_SET_AUTO_REPAIR_LEVEL Unit_setAutoRepairLevel
 
 //struct SAttackLoopbackUnitCommand {
 //	int unitId;
 //	int groupId;
 //	/// see enum UnitCommandOptions
-//	unsigned int options;
-//	/// max command execution-time in frames; if it takes longer then this -> abort
+//	short options;
 //	int timeOut;
 //};
 
+/**
+ * Set what a unit should do when it is idle.
+ * This only works for a few units so far, mainly aircraft.
+ */
 struct SSetIdleModeUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
+	/// 0: fly, 1: land
 	int idleMode;
-}; // COMMAND_UNIT_SET_IDLE_MODE
+}; //$ COMMAND_UNIT_SET_IDLE_MODE Unit_setIdleMode
 
 struct SCustomUnitCommand {
 	int unitId;
 	int groupId;
 	/// see enum UnitCommandOptions
-	unsigned int options;
-	/// max command execution-time in frames; if it takes longer then this -> abort
+	short options;
+	/**
+	 * At which frame the command will time-out and consequently be removed,
+	 * if execution of it has not yet begun.
+	 * Can only be set locally, is not sent over the network, and is used
+	 * for temporary orders.
+	 * default: MAX_INT (-> do not time-out)
+	 * example: currentFrame + 15
+	 */
 	int timeOut;
 
 	int cmdId;
 	float* params;
-	int numParams;
-}; // COMMAND_UNIT_CUSTOM
+	int params_size;
+}; //$ COMMAND_UNIT_CUSTOM Unit_executeCustomCommand ARRAY:params
 
+// TODO: add docu
 struct STraceRayCommand {
-	struct SAIFloat3 rayPos;
-	struct SAIFloat3 rayDir;
-	float rayLen;
-	int srcUID;
-	int hitUID;
+	float* rayPos_posF3;
+	float* rayDir_posF3;
+	float rayLen; // would also be ret, but we want only one ret per command
+	int srcUnitId;
+	int ret_hitUnitId;
 	int flags;
-}; // COMMAND_TRACE_RAY
+}; //$ COMMAND_TRACE_RAY Map_Drawer_traceRay REF:srcUnitId->Unit REF:ret_hitUnitId->Unit
+
+struct SFeatureTraceRayCommand {
+	float* rayPos_posF3;
+	float* rayDir_posF3;
+	float rayLen; // would also be ret, but we want only one ret per command
+	int srcUnitId;
+	int ret_hitFeatureId;
+	int flags;
+}; //$ COMMAND_TRACE_RAY_FEATURE Map_Drawer_traceRayFeature REF:srcUnitId->Unit REF:ret_hitFeatureId->Feature
 
 /**
  * Pause or unpauses the game.
  * This is meant for debugging purposes.
- * Keep in mind that pause does not happen immediatly.
+ * Keep in mind that pause does not happen immediately.
  * It can take 1-2 frames in single- and up to 10 frames in multiplayer matches.
  */
 struct SPauseCommand {
 	bool enable;
 	/// reason for the (un-)pause, or NULL
 	const char* reason;
-}; // COMMAND_PAUSE
+}; //$ COMMAND_PAUSE Game_setPause
+
+
+struct SSetPositionGraphDrawerDebugCommand {
+	float x;
+	float y;
+}; //$ COMMAND_DEBUG_DRAWER_GRAPH_SET_POS Debug_GraphDrawer_setPosition
+
+struct SSetSizeGraphDrawerDebugCommand {
+	float w;
+	float h;
+}; //$ COMMAND_DEBUG_DRAWER_GRAPH_SET_SIZE Debug_GraphDrawer_setSize
+
+struct SAddPointLineGraphDrawerDebugCommand {
+	int lineId;
+	float x;
+	float y;
+}; //$ COMMAND_DEBUG_DRAWER_GRAPH_LINE_ADD_POINT Debug_GraphDrawer_GraphLine_addPoint
+
+struct SDeletePointsLineGraphDrawerDebugCommand {
+	int lineId;
+	int numPoints;
+}; //$ COMMAND_DEBUG_DRAWER_GRAPH_LINE_DELETE_POINTS Debug_GraphDrawer_GraphLine_deletePoints
+
+struct SSetColorLineGraphDrawerDebugCommand {
+	int lineId;
+	short* color_colorS3;
+}; //$ COMMAND_DEBUG_DRAWER_GRAPH_LINE_SET_COLOR Debug_GraphDrawer_GraphLine_setColor
+
+struct SSetLabelLineGraphDrawerDebugCommand {
+	int lineId;
+	const char* label;
+}; //$ COMMAND_DEBUG_DRAWER_GRAPH_LINE_SET_LABEL Debug_GraphDrawer_GraphLine_setLabel
+
+
+struct SAddOverlayTextureDrawerDebugCommand {
+	int ret_overlayTextureId;
+	const float* texData;
+	int w;
+	int h;
+}; //$ COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_ADD Debug_addOverlayTexture REF:ret_textureId->OverlayTexture
+
+struct SUpdateOverlayTextureDrawerDebugCommand {
+	int overlayTextureId;
+	const float* texData;
+	int x;
+	int y;
+	int w;
+	int h;
+}; //$ COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_UPDATE Debug_OverlayTexture_update
+
+struct SDeleteOverlayTextureDrawerDebugCommand {
+	int overlayTextureId;
+}; //$ COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_DELETE Debug_OverlayTexture_remove
+
+struct SSetPositionOverlayTextureDrawerDebugCommand {
+	int overlayTextureId;
+	float x;
+	float y;
+}; //$ COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_SET_POS Debug_OverlayTexture_setPosition
+
+struct SSetSizeOverlayTextureDrawerDebugCommand {
+	int overlayTextureId;
+	float w;
+	float h;
+}; //$ COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_SET_SIZE Debug_OverlayTexture_setSize
+
+struct SSetLabelOverlayTextureDrawerDebugCommand {
+	int overlayTextureId;
+	const char* label;
+}; //$ COMMAND_DEBUG_DRAWER_OVERLAYTEXTURE_SET_LABEL Debug_OverlayTexture_setLabel
+
+
 
 /**
  * @brief Sets default values
@@ -1116,8 +1580,10 @@ struct Command;
 
 /**
  * @brief Allocates memory for a C Command struct
+ * @param  maxUnits  should be the value returned by uh->MaxUnits()
+ *                   -> max units per team for the current game
  */
-void* mallocSUnitCommand(int unitId, int groupId, const Command* c, int* sCommandId);
+void* mallocSUnitCommand(int unitId, int groupId, const Command* c, int* sCommandId, int maxUnits);
 
 /**
  * @brief Frees memory of a C Command struct
@@ -1135,13 +1601,16 @@ int toInternalUnitCommandTopic(int aiCmdTopic, void* sUnitCommandData);
  * Returns the C AI Interface command topic ID that corresponds
  * to the engine internal C++ unit command (topic) ID specified by
  * <code>internalUnitCmdTopic</code>.
+ * @param  maxUnits  should be the value returned by uh->MaxUnits()
+ *                   -> max units per team for the current game
  */
-int extractAICommandTopic(const Command* internalUnitCmd);
+int extractAICommandTopic(const Command* internalUnitCmd, int maxUnits);
 
 /**
  * @brief creates - with new - an engine C++ Command struct
  */
-Command* newCommand(void* sUnitCommandData, int sCommandId);
+Command* newCommand(void* sUnitCommandData, int sCommandId, int maxUnits);
+
 #endif	// __cplusplus
 
 

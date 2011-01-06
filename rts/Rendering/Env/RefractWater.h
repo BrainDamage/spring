@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef REFRACTEDWATER_H
 #define REFRACTEDWATER_H
 
@@ -12,7 +14,8 @@ public:
 	void LoadGfx();
 
 	void Draw();
-	int GetID() const { return 3; }
+	int GetID() const { return WATER_RENDERER_REFL_REFR; }
+	const char* GetName() const { return "reflective&refractive"; }
 
 protected:
 	void SetupWaterDepthTex();

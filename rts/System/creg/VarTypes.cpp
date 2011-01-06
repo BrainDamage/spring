@@ -1,13 +1,17 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 /*
-creg - Code compoment registration system
-Copyright 2005 Jelmer Cnossen
-*/
-#include "StdAfx.h"
+ * creg - Code compoment registration system
+ * Classes for serialization of registrated class instances
+ */
+
 #include <assert.h>
-#include "mmgr.h"
+
+#include "System/mmgr.h"
 
 #include "VarTypes.h"
-#include "Util.h"
+
+#include "System/Util.h"
 
 using namespace std;
 using namespace creg;

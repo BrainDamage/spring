@@ -1,26 +1,10 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
+#ifndef TIME_UTIL_H
+#define TIME_UTIL_H
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-#ifndef TIMEUTIL_H
-#define TIMEUTIL_H
-
-#include "Util.h"
-#include <string.h>
-#include <time.h>
+#include <string>
+#include <ctime>
 
 #ifdef __GNUC__
 #define __time64_t time_t
@@ -48,4 +32,4 @@ public:
 	static std::string GetCurrentTimeStr();
 };
 
-#endif // TIMEUTIL_H
+#endif // TIME_UTIL_H

@@ -1,9 +1,4 @@
-/*---------------------------------------------------------------------
- Terrain Renderer using texture splatting and geomipmapping
-
- Copyright (2006) Jelmer Cnossen
- This code is released under GPL license (See LICENSE.html for info)
----------------------------------------------------------------------*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 
@@ -55,7 +50,7 @@ void Frustum::CalcCameraPlanes (Vector3 *cbase, Vector3 *cright, Vector3* cup, V
 	planes[1].MakePlane (base, pos[2], pos[3]); // left
 	planes[2].MakePlane (base, pos[3], pos[0]); // up
 	planes[3].MakePlane (base, pos[0], pos[1]); // right
-	planes[4].MakePlane (base, pos[1], pos[2]);// down
+	planes[4].MakePlane (base, pos[1], pos[2]); // down
 
 	right.ANormalize();
 	up.ANormalize();

@@ -43,10 +43,20 @@ if    (BUILD_${myName}_AIWRAPPER)
 	SetGlobal(${myName}_Creg_AIWRAPPER_TARGET ${myCregTarget})
 
 	# Assemble the Legacy C++ AI sources
-	aux_source_directory("${mySourceDir}" mySources)
-	list(APPEND mySources ${ai_common_SRC})
-	list(APPEND mySources ${rts}/System/float3)
-	list(APPEND mySources ${rts}/Sim/Misc/DamageArray)
+	set(mySources
+		"${mySourceDir}/AIAI"
+		"${mySourceDir}/AIAICallback"
+		"${mySourceDir}/AIAICheats"
+		"${mySourceDir}/AIGlobalAICallback"
+		"${mySourceDir}/Command"
+		"${mySourceDir}/CommandQueue"
+		"${mySourceDir}/DamageArray"
+		"${mySourceDir}/MoveData"
+		"${mySourceDir}/UnitDef"
+		"${rts}/ExternalAI/AISCommands"
+		"${rts}/System/float3"
+		${ai_common_SRC}
+		)
 
 	# Compile the Legacy C++ AI wrapper static library
 	add_library(${myTarget}     STATIC ${mySources})

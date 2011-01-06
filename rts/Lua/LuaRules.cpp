@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// LuaRules.cpp: implementation of the CLuaRules class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <set>
 #include <cctype>
@@ -22,36 +21,30 @@
 #include "LuaWeaponDefs.h"
 #include "LuaOpenGL.h"
 
-#include "Sim/Units/CommandAI/Command.h"
 #include "Game/Game.h"
-#include "Rendering/UnitModels/UnitDrawer.h"
-#include "Rendering/UnitModels/IModelParser.h"
-#include "Rendering/UnitModels/3DOParser.h"
-#include "Rendering/UnitModels/s3oParser.h"
+#include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Projectiles/Projectile.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/COB/CobInstance.h"
-#include "LogOutput.h"
-#include "FileSystem/FileHandler.h"
-#include "FileSystem/FileSystem.h"
+#include "Sim/Weapons/Weapon.h"
+#include "System/LogOutput.h"
+#include "System/FileSystem/FileHandler.h"
+#include "System/FileSystem/FileSystem.h"
+
 #include <assert.h>
 
 CLuaRules* luaRules = NULL;
-
-string CLuaRules::configString;
 
 static const char* LuaRulesSyncedFilename   = "LuaRules/main.lua";
 static const char* LuaRulesUnsyncedFilename = "LuaRules/draw.lua";
 
 const int* CLuaRules::currentCobArgs = NULL;
-
-vector<float>    CLuaRules::gameParams;
-map<string, int> CLuaRules::gameParamsMap;
 
 
 /******************************************************************************/
@@ -77,17 +70,11 @@ void CLuaRules::FreeHandler()
 }
 
 
-void CLuaRules::SetConfigString(const string& cfg)
-{
-	configString = cfg;
-}
-
-
 /******************************************************************************/
 /******************************************************************************/
 
 CLuaRules::CLuaRules()
-: CLuaHandleSynced("LuaRules", LUA_HANDLE_ORDER_RULES, ".luarules ")
+: CLuaHandleSynced("LuaRules", LUA_HANDLE_ORDER_RULES)
 {
 	luaRules = this;
 
@@ -119,13 +106,20 @@ CLuaRules::CLuaRules()
 	haveAllowResourceTransfer  = HasCallIn("AllowResourceTransfer");
 	haveAllowDirectUnitControl = HasCallIn("AllowDirectUnitControl");
 	haveAllowStartPosition     = HasCallIn("AllowStartPosition");
+
 	haveMoveCtrlNotify         = HasCallIn("MoveCtrlNotify");
 	haveTerraformComplete      = HasCallIn("TerraformComplete");
-	haveDrawUnit               = HasCallIn("DrawUnit");
-	haveAICallIn               = HasCallIn("AICallIn");
+	haveAllowWeaponTargetCheck = HasCallIn("AllowWeaponTargetCheck");
+	haveAllowWeaponTarget      = HasCallIn("AllowWeaponTarget");
 	haveUnitPreDamaged         = HasCallIn("UnitPreDamaged");
+	haveShieldPreDamaged       = HasCallIn("ShieldPreDamaged");
+
+	haveDrawUnit    = HasCallIn("DrawUnit");
+	haveDrawFeature = HasCallIn("DrawFeature");
+	haveAICallIn    = HasCallIn("AICallIn");
 
 	SetupUnsyncedFunction("DrawUnit");
+	SetupUnsyncedFunction("DrawFeature");
 	SetupUnsyncedFunction("AICallIn");
 }
 
@@ -150,18 +144,7 @@ CLuaRules::~CLuaRules()
 bool CLuaRules::AddSyncedCode()
 {
 	lua_getglobal(L, "Script");
-	LuaPushNamedCFunc(L, "GetConfigString", GetConfigString);
 	LuaPushNamedCFunc(L, "PermitHelperAIs", PermitHelperAIs);
-	lua_pop(L, 1);
-
-	lua_getglobal(L, "Spring");
-	LuaPushNamedCFunc(L, "SetRulesInfoMap",       SetRulesInfoMap);
-	LuaPushNamedCFunc(L, "SetUnitRulesParam",     SetUnitRulesParam);
-	LuaPushNamedCFunc(L, "SetTeamRulesParam",     SetTeamRulesParam);
-	LuaPushNamedCFunc(L, "SetGameRulesParam",     SetGameRulesParam);
-	LuaPushNamedCFunc(L, "CreateUnitRulesParams", CreateUnitRulesParams);
-	LuaPushNamedCFunc(L, "CreateTeamRulesParams", CreateTeamRulesParams);
-	LuaPushNamedCFunc(L, "CreateGameRulesParams", CreateGameRulesParams);
 	lua_pop(L, 1);
 
 	return true;
@@ -172,11 +155,6 @@ bool CLuaRules::AddUnsyncedCode()
 {
 	lua_pushstring(L, "UNSYNCED");
 	lua_gettable(L, LUA_REGISTRYINDEX);
-
-	lua_pushstring(L, "Script");
-	lua_rawget(L, -2);
-	LuaPushNamedCFunc(L, "GetConfigString", GetConfigString);
-	lua_pop(L, 1); // Script
 
 	lua_pushstring(L, "Spring");
 	lua_rawget(L, -2);
@@ -193,20 +171,6 @@ bool CLuaRules::AddUnsyncedCode()
 
 
 /******************************************************************************/
-
-const vector<float>& CLuaRules::GetGameParams()
-{
-	return gameParams;
-}
-
-
-const map<string, int>& CLuaRules::GetGameParamsMap()
-{
-	return gameParamsMap;
-}
-
-
-/******************************************************************************/
 /******************************************************************************/
 //
 // LuaRules Call-Ins
@@ -214,64 +178,47 @@ const map<string, int>& CLuaRules::GetGameParamsMap()
 
 bool CLuaRules::SyncedUpdateCallIn(const string& name)
 {
-	if (name == "CommandFallback") {
-		haveCommandFallback        = HasCallIn("CommandFallback");
-	} else if (name == "AllowCommand") {
-		haveAllowCommand           = HasCallIn("AllowCommand");
-	} else if (name == "AllowUnitCreation") {
-		haveAllowUnitCreation      = HasCallIn("AllowUnitCreation");
-	} else if (name == "AllowUnitTransfer") {
-		haveAllowUnitTransfer      = HasCallIn("AllowUnitTransfer");
-	} else if (name == "AllowUnitBuildStep") {
-		haveAllowUnitBuildStep     = HasCallIn("AllowUnitBuildStep");
-	} else if (name == "AllowFeatureCreation") {
-		haveAllowFeatureCreation   = HasCallIn("AllowFeatureCreation");
-	} else if (name == "AllowFeatureBuildStep") {
-		haveAllowFeatureBuildStep  = HasCallIn("AllowFeatureBuildStep");
-	} else if (name == "AllowResourceLevel") {
-		haveAllowResourceLevel     = HasCallIn("AllowResourceLevel");
-	} else if (name == "AllowResourceTransfer") {
-		haveAllowResourceTransfer  = HasCallIn("AllowResourceTransfer");
-	} else if (name == "AllowDirectUnitControl") {
-		haveAllowDirectUnitControl = HasCallIn("AllowDirectUnitControl");
-	} else if (name == "AllowStartPosition") {
-		haveAllowStartPosition     = HasCallIn("AllowStartPosition");
-	} else if (name == "MoveCtrlNotify") {
-		haveMoveCtrlNotify         = HasCallIn("MoveCtrlNotify");
-	} else if (name == "TerraformComplete") {
-		haveTerraformComplete      = HasCallIn("TerraformComplete");
-	} else {
+	#define UPDATE_HAVE_CALLIN(callinName) \
+		have ## callinName = HasCallIn( #callinName );
+
+	     if (name == "CommandFallback"       ) { UPDATE_HAVE_CALLIN(CommandFallback); }
+	else if (name == "AllowCommand"          ) { UPDATE_HAVE_CALLIN(AllowCommand); }
+	else if (name == "AllowUnitCreation"     ) { UPDATE_HAVE_CALLIN(AllowUnitCreation); }
+	else if (name == "AllowUnitTransfer"     ) { UPDATE_HAVE_CALLIN(AllowUnitTransfer); }
+	else if (name == "AllowUnitBuildStep"    ) { UPDATE_HAVE_CALLIN(AllowUnitBuildStep); }
+	else if (name == "AllowFeatureCreation"  ) { UPDATE_HAVE_CALLIN(AllowFeatureCreation); }
+	else if (name == "AllowFeatureBuildStep" ) { UPDATE_HAVE_CALLIN(AllowFeatureBuildStep); }
+	else if (name == "AllowResourceLevel"    ) { UPDATE_HAVE_CALLIN(AllowResourceLevel); }
+	else if (name == "AllowResourceTransfer" ) { UPDATE_HAVE_CALLIN(AllowResourceTransfer); }
+	else if (name == "AllowDirectUnitControl") { UPDATE_HAVE_CALLIN(AllowDirectUnitControl); }
+	else if (name == "AllowStartPosition"    ) { UPDATE_HAVE_CALLIN(AllowStartPosition); }
+	else if (name == "MoveCtrlNotify"        ) { UPDATE_HAVE_CALLIN(MoveCtrlNotify); }
+	else if (name == "TerraformComplete"     ) { UPDATE_HAVE_CALLIN(TerraformComplete); }
+	else if (name == "UnitPreDamaged"        ) { UPDATE_HAVE_CALLIN(UnitPreDamaged); }
+	else if (name == "ShieldPreDamaged"      ) { UPDATE_HAVE_CALLIN(ShieldPreDamaged); }
+	else if (name == "AllowWeaponTargetCheck") { UPDATE_HAVE_CALLIN(AllowWeaponTargetCheck); }
+	else if (name == "AllowWeaponTarget"     ) { UPDATE_HAVE_CALLIN(AllowWeaponTarget); }
+	else {
 		return CLuaHandleSynced::SyncedUpdateCallIn(name);
 	}
+
+	#undef UPDATE_HAVE_CALLIN
 	return true;
 }
 
 
 bool CLuaRules::UnsyncedUpdateCallIn(const string& name)
 {
-	if (name == "DrawUnit") {
-		haveDrawUnit = HasCallIn("DrawUnit");
-	}
-	else if (name == "AICallIn") {
-		haveAICallIn = HasCallIn("AICallIn");
-	}
+	     if (name == "DrawUnit"   ) { haveDrawUnit    = HasCallIn("DrawUnit"   ); }
+	else if (name == "DrawFeature") { haveDrawFeature = HasCallIn("DrawFeature"); }
+	else if (name == "AICallIn"   ) { haveAICallIn    = HasCallIn("AICallIn"   ); }
+
 	return CLuaHandleSynced::UnsyncedUpdateCallIn(name);
 }
 
-
-bool CLuaRules::CommandFallback(const CUnit* unit, const Command& cmd)
+/// pushes 7 items on the stack
+static void PushUnitAndCommand(lua_State* L, const CUnit* unit, const Command& cmd)
 {
-	if (!haveCommandFallback) {
-		return true; // the call is not defined
-	}
-
-	LUA_CALL_IN_CHECK(L);
-	lua_checkstack(L, 9);
-	static const LuaHashString cmdStr("CommandFallback");
-	if (!cmdStr.GetGlobalFunc(L)) {
-		return true; // the call is not defined
-	}
-
 	// push the unit info
 	lua_pushnumber(L, unit->id);
 	lua_pushnumber(L, unit->unitDef->id);
@@ -300,6 +247,22 @@ bool CLuaRules::CommandFallback(const CUnit* unit, const Command& cmd)
 
 	// push the command tag
 	lua_pushnumber(L, cmd.tag);
+}
+
+bool CLuaRules::CommandFallback(const CUnit* unit, const Command& cmd)
+{
+	if (!haveCommandFallback) {
+		return true; // the call is not defined
+	}
+
+	LUA_CALL_IN_CHECK(L);
+	lua_checkstack(L, 9);
+	static const LuaHashString cmdStr("CommandFallback");
+	if (!cmdStr.GetGlobalFunc(L)) {
+		return true; // the call is not defined
+	}
+
+	PushUnitAndCommand(L, unit, cmd);
 
 	// call the function
 	if (!RunCallIn(cmdStr, 7, 1)) {
@@ -334,34 +297,7 @@ bool CLuaRules::AllowCommand(const CUnit* unit, const Command& cmd, bool fromSyn
 		return true; // the call is not defined
 	}
 
-	// push the unit info
-	lua_pushnumber(L, unit->id);
-	lua_pushnumber(L, unit->unitDef->id);
-	lua_pushnumber(L, unit->team);
-
-	// push the command id
-	lua_pushnumber(L, cmd.id);
-
-	// push the params list
-	lua_newtable(L);
-	for (int p = 0; p < (int)cmd.params.size(); p++) {
-		lua_pushnumber(L, p + 1);
-		lua_pushnumber(L, cmd.params[p]);
-		lua_rawset(L, -3);
-	}
-	HSTR_PUSH_NUMBER(L, "n", cmd.params.size());
-
-	// push the options table
-	lua_newtable(L);
-	HSTR_PUSH_NUMBER(L, "coded", cmd.options);
-	HSTR_PUSH_BOOL(L, "alt",   !!(cmd.options & ALT_KEY));
-	HSTR_PUSH_BOOL(L, "ctrl",  !!(cmd.options & CONTROL_KEY));
-	HSTR_PUSH_BOOL(L, "shift", !!(cmd.options & SHIFT_KEY));
-	HSTR_PUSH_BOOL(L, "right", !!(cmd.options & RIGHT_MOUSE_KEY));
-	HSTR_PUSH_BOOL(L, "meta",  !!(cmd.options & META_KEY));
-
-	// push the command tag
-	lua_pushnumber(L, cmd.tag);
+	PushUnitAndCommand(L, unit, cmd);
 
 	lua_pushboolean(L, fromSynced);
 
@@ -803,8 +739,9 @@ bool CLuaRules::TerraformComplete(const CUnit* unit, const CUnit* build)
  * called after every damage modification (even HitByWeaponId)
  * but before the damage is applied
  *
- * expects a number returned by lua code; it is stored under *newDamage if
- * newDamage != NULL.
+ * expects two numbers returned by lua code:
+ * 1st is stored under *newDamage if newDamage != NULL
+ * 2nd is stored under *impulseMult if impulseMult != NULL
  */
 bool CLuaRules::UnitPreDamaged(const CUnit* unit, const CUnit* attacker,
                              float damage, int weaponID, bool paralyzer,
@@ -818,11 +755,11 @@ bool CLuaRules::UnitPreDamaged(const CUnit* unit, const CUnit* attacker,
 	lua_checkstack(L, 11);
 
 	const int errfunc = SetupTraceback();
-
 	static const LuaHashString cmdStr("UnitPreDamaged");
+
 	if (!cmdStr.GetGlobalFunc(L)) {
 		// remove error handler
-		if (errfunc) lua_pop(L, 1);
+		if (errfunc) { lua_pop(L, 1); }
 		return false; // the call is not defined
 	}
 
@@ -850,22 +787,143 @@ bool CLuaRules::UnitPreDamaged(const CUnit* unit, const CUnit* attacker,
 		*newDamage = lua_tonumber(L, -2);
 	} else if (!lua_isnumber(L, -2) || lua_isnil(L, -2)) {
 		// first value is obligatory, so may not be nil
-		logOutput.Print("%s(): 1st value returned should be a number\n", cmdStr.GetString().c_str());
+		logOutput.Print("%s(): 1st value returned should be a number (newDamage)\n", cmdStr.GetString().c_str());
 	}
 
 	if (impulseMult && lua_isnumber(L, -1)) {
 		*impulseMult = lua_tonumber(L, -1);
 	} else if (!lua_isnumber(L, -1) && !lua_isnil(L, -1)) {
 		// second value is optional, so nils are OK
-		logOutput.Print("%s(): 2nd value returned should be a number\n", cmdStr.GetString().c_str());
+		logOutput.Print("%s(): 2nd value returned should be a number (impulseMult)\n", cmdStr.GetString().c_str());
 	}
 
 	lua_pop(L, 2);
 	return true;
 }
 
+bool CLuaRules::ShieldPreDamaged(
+	const CProjectile* projectile,
+	const CWeapon* shieldEmitter,
+	const CUnit* shieldCarrier,
+	bool bounceProjectile
+) {
+	if (!haveShieldPreDamaged) {
+		return false;
+	}
+
+	LUA_CALL_IN_CHECK(L);
+	lua_checkstack(L, 5 + 1);
+
+	const int errfunc(SetupTraceback());
+	static const LuaHashString cmdStr("ShieldPreDamaged");
+
+	bool ret = false;
+
+	if (!cmdStr.GetGlobalFunc(L)) {
+		if (errfunc) { lua_pop(L, 1); }
+
+		// undefined call-in
+		return ret;
+	}
+
+	const CUnit* projectileOwner = projectile->owner();
+
+	// push the call-in arguments
+	lua_pushnumber(L, projectile->id);
+	lua_pushnumber(L, ((projectileOwner != NULL)? projectileOwner->id: -1));
+	lua_pushnumber(L, shieldEmitter->weaponNum);
+	lua_pushnumber(L, shieldCarrier->id);
+	lua_pushboolean(L, bounceProjectile);
+
+	// call the routine
+	RunCallInTraceback(cmdStr, 5, 1, errfunc);
+
+	// pop the return-value; must be true or false
+	ret = (lua_isboolean(L, -1) && lua_toboolean(L, -1));
+	lua_pop(L, -1);
+
+	return ret;
+}
+
+
 
 /******************************************************************************/
+
+bool CLuaRules::AllowWeaponTargetCheck(unsigned int attackerID, unsigned int attackerWeaponNum, unsigned int attackerWeaponDefID)
+{
+	if (!haveAllowWeaponTargetCheck) {
+		return false;
+	}
+
+	LUA_CALL_IN_CHECK(L);
+	lua_checkstack(L, 3 + 1);
+
+	const int errfunc(SetupTraceback());
+	static const LuaHashString cmdStr("AllowWeaponTargetCheck");
+
+	bool ret = false;
+
+	if (!cmdStr.GetGlobalFunc(L)) {
+		if (errfunc) { lua_pop(L, 1); }
+		return ret;
+	}
+
+	lua_pushnumber(L, attackerID);
+	lua_pushnumber(L, attackerWeaponNum);
+	lua_pushnumber(L, attackerWeaponDefID);
+
+	RunCallInTraceback(cmdStr, 3, 1, errfunc);
+
+	ret = (lua_isboolean(L, -1) && lua_toboolean(L, -1));
+	lua_pop(L, -1);
+
+	return ret;
+}
+
+bool CLuaRules::AllowWeaponTarget(
+	unsigned int attackerID,
+	unsigned int targetID,
+	unsigned int attackerWeaponNum,
+	unsigned int attackerWeaponDefID,
+	float* targetPriority)
+{
+	if (!haveAllowWeaponTarget) {
+		return false;
+	}
+
+	LUA_CALL_IN_CHECK(L);
+	lua_checkstack(L, 4 + 2);
+
+	const int errfunc(SetupTraceback());
+	static const LuaHashString cmdStr("AllowWeaponTarget");
+
+	bool ret = false;
+
+	if (!cmdStr.GetGlobalFunc(L)) {
+		if (errfunc) { lua_pop(L, 1); }
+		return ret;
+	}
+
+	lua_pushnumber(L, attackerID);
+	lua_pushnumber(L, targetID);
+	lua_pushnumber(L, attackerWeaponNum);
+	lua_pushnumber(L, attackerWeaponDefID);
+
+	RunCallInTraceback(cmdStr, 4, 2, errfunc);
+
+	ret = (lua_isboolean(L, -2) && lua_toboolean(L, -2));
+
+	if (targetPriority && lua_isnumber(L, -1)) {
+		*targetPriority = lua_tonumber(L, -1);
+	}
+
+	lua_pop(L, 2);
+	return ret;
+}
+
+/******************************************************************************/
+
+
 
 bool CLuaRules::DrawUnit(int unitID)
 {
@@ -905,8 +963,47 @@ bool CLuaRules::DrawUnit(int unitID)
 	return retval;
 }
 
+bool CLuaRules::DrawFeature(int featureID)
+{
+	if (!haveDrawFeature) {
+		return false;
+	}
 
-const char* CLuaRules::AICallIn(const char* data, int inSize, int* outSize)
+	LUA_CALL_IN_CHECK(L);
+	lua_checkstack(L, 4);
+	static const LuaHashString cmdStr("DrawFeature");
+	if (!cmdStr.GetRegistryFunc(L)) {
+		return false;
+	}
+
+	const bool oldGLState = LuaOpenGL::IsDrawingEnabled();
+	LuaOpenGL::SetDrawingEnabled(true);
+
+	lua_pushnumber(L, featureID);
+	lua_pushnumber(L, game->GetDrawMode());
+
+	const bool success = RunCallIn(cmdStr, 2, 1);
+
+	LuaOpenGL::SetDrawingEnabled(oldGLState);
+
+	if (!success) {
+		return false;
+	}
+
+	if (!lua_isboolean(L, -1)) {
+		logOutput.Print("%s() bad return value\n", cmdStr.GetString().c_str());
+		lua_pop(L, 1);
+		return false;
+	}
+
+	const bool retval = !!lua_toboolean(L, -1);
+	lua_pop(L, 1);
+	return retval;
+}
+
+
+
+const char* CLuaRules::AICallIn(const char* data, int inSize)
 {
 	if (!haveAICallIn) {
 		return NULL;
@@ -937,11 +1034,7 @@ const char* CLuaRules::AICallIn(const char* data, int inSize, int* outSize)
 		return NULL;
 	}
 
-	size_t len;
-	const char* outData = lua_tolstring(L, -1, &len);
-	if (outSize != NULL) {
-		*outSize = len;
-	}
+	const char* outData = lua_tolstring(L, -1, NULL);
 
 	lua_pop(L, 1);
 
@@ -983,7 +1076,7 @@ void CLuaRules::Cob2Lua(const LuaHashString& name, const CUnit* unit,
 
 	const int top = lua_gettop(L);
 
-	if (!lua_checkstack(L, top + 1 + 3 + argsCount)) {
+	if (!lua_checkstack(L, 1 + 3 + argsCount)) {
 		logOutput.Print("CLuaRules::Cob2Lua() lua_checkstack() error: %s\n",
 		                name.GetString().c_str());
 		args[0] = 0; // failure
@@ -1062,15 +1155,6 @@ void CLuaRules::Cob2Lua(const LuaHashString& name, const CUnit* unit,
 // LuaRules Call-Outs
 //
 
-int CLuaRules::GetConfigString(lua_State* L)
-{
-	lua_pushlstring(L, configString.c_str(), configString.size());
-	return 1;
-}
-
-
-/******************************************************************************/
-
 int CLuaRules::PermitHelperAIs(lua_State* L)
 {
 	if (!lua_isboolean(L, 1)) {
@@ -1084,229 +1168,6 @@ int CLuaRules::PermitHelperAIs(lua_State* L)
 	}
 	return 0;
 }
-
-
-/******************************************************************************/
-
-int CLuaRules::SetRulesInfoMap(lua_State* L)
-{
-	assert(luaRules != NULL);
-	if (!lua_istable(L, 1)) {
-		luaL_error(L, "Incorrect arguments to SetRulesInfoMap(teamID)");
-	}
-	map<string, string>& infoMap = luaRules->infoMap;
-	infoMap.clear();
-	const int table = 1;
-	for (lua_pushnil(L); lua_next(L, table) != 0; lua_pop(L, 1)) {
-		if (lua_israwstring(L, -2) && lua_isstring(L, -1)) {
-			const string key = lua_tostring(L, -2);
-			const string value = lua_tostring(L, -1);
-			infoMap[key] = value;
-		}
-	}
-	lua_pushnumber(L, infoMap.size());
-	return 2;
-}
-
-
-/******************************************************************************/
-
-void CLuaRules::SetRulesParam(lua_State* L, const char* caller, int offset,
-                              vector<float>& params,
-		                          map<string, int>& paramsMap)
-{
-	const int index = offset + 1;
-	const int valIndex = offset + 2;
-	int pIndex = -1;
-
-	if (lua_israwnumber(L, index)) {
-		pIndex = lua_toint(L, index) - 1;
-	}
-	else if (lua_israwstring(L, index)) {
-		const string pName = lua_tostring(L, index);
-		map<string, int>::const_iterator it = paramsMap.find(pName);
-		if (it != paramsMap.end()) {
-			pIndex = it->second;
-		}
-		else {
-			// create a new parameter
-			pIndex = params.size();
-			paramsMap[pName] = params.size();
-			params.push_back(0.0f); // dummy value
-		}
-	}
-	else {
-		luaL_error(L, "Incorrect arguments to %s()", caller);
-	}
-
-	if ((pIndex < 0) || (pIndex >= (int)params.size())) {
-		return;
-	}
-
-	if (!lua_isnumber(L, valIndex)) {
-		luaL_error(L, "Incorrect arguments to %s()", caller);
-	}
-	params[pIndex] = lua_tofloat(L, valIndex);
-	return;
-}
-
-
-void CLuaRules::CreateRulesParams(lua_State* L, const char* caller, int offset,
-		                              vector<float>& params,
-		                              map<string, int>& paramsMap)
-{
-	const int table = offset + 1;
-	if (!lua_istable(L, table)) {
-		luaL_error(L, "Incorrect arguments to %s()", caller);
-	}
-
-	params.clear();
-	paramsMap.clear();
-
-	for (int i = 1; /* no test */; i++) {
-		lua_rawgeti(L, table, i);
-		if (lua_isnil(L, -1)) {
-			lua_pop(L, 1);
-			return;
-		}
-		else if (lua_israwnumber(L, -1)) {
-			const float value = lua_tofloat(L, -1);
-			params.push_back(value);
-		}
-		else if (lua_istable(L, -1)) {
-			lua_pushnil(L);
-			if (lua_next(L, -2)) {
-				if (lua_israwstring(L, -2) && lua_isnumber(L, -1)) {
-					const string name = lua_tostring(L, -2);
-					const float value = lua_tonumber(L, -1);
-					paramsMap[name] = params.size();
-					params.push_back(value);
-				}
-				lua_pop(L, 2);
-			}
-		}
-		lua_pop(L, 1);
-	}
-
-	return;
-}
-
-
-/******************************************************************************/
-
-int CLuaRules::SetGameRulesParam(lua_State* L)
-{
-	CLuaRules* lr = (CLuaRules*)activeHandle;
-	SetRulesParam(L, __FUNCTION__, 0, lr->gameParams, lr->gameParamsMap);
-	return 0;
-}
-
-
-int CLuaRules::CreateGameRulesParams(lua_State* L)
-{
-	CLuaRules* lr = (CLuaRules*)activeHandle;
-	CreateRulesParams(L, __FUNCTION__, 0, lr->gameParams, lr->gameParamsMap);
-	return 0;
-}
-
-
-/******************************************************************************/
-
-static CTeam* ParseTeam(lua_State* L, const char* caller, int index)
-{
-	if (!lua_isnumber(L, index)) {
-		luaL_error(L, "%s(): Bad teamID type\n", caller);
-	}
-	const int teamID = lua_toint(L, index);
-	if ((teamID < 0) || (teamID >= teamHandler->ActiveTeams())) {
-		luaL_error(L, "%s(): Bad teamID: %i\n", teamID);
-	}
-	CTeam* team = teamHandler->Team(teamID);
-	if (team == NULL) {
-		return NULL;
-	}
-	const CLuaHandle* lh = CLuaHandle::GetActiveHandle();
-	const int ctrlTeam = lh->GetCtrlTeam();
-	if (ctrlTeam < 0) {
-		return lh->GetFullCtrl() ? team : NULL;
-	}
-	if (ctrlTeam != teamID) {
-		luaL_error(L, "%s(): No permission to control team %i\n", caller, teamID);
-	}
-	return team;
-}
-
-
-int CLuaRules::SetTeamRulesParam(lua_State* L)
-{
-	CTeam* team = ParseTeam(L, __FUNCTION__, 1);
-	if (team == NULL) {
-		return 0;
-	}
-	SetRulesParam(L, __FUNCTION__, 1, team->modParams, team->modParamsMap);
-	return 0;
-}
-
-
-int CLuaRules::CreateTeamRulesParams(lua_State* L)
-{
-	CTeam* team = ParseTeam(L, __FUNCTION__, 1);
-	if (team == NULL) {
-		return 0;
-	}
-	CreateRulesParams(L, __FUNCTION__, 1, team->modParams, team->modParamsMap);
-	return 0;
-}
-
-
-/******************************************************************************/
-
-static CUnit* ParseUnit(lua_State* L, const char* caller, int luaIndex)
-{
-	if (!lua_isnumber(L, luaIndex)) {
-		luaL_error(L, "%s(): Bad unitID", caller);
-	}
-	const int unitID = lua_toint(L, luaIndex);
-	if ((unitID < 0) || (static_cast<size_t>(unitID) >= uh->MaxUnits())) {
-		luaL_error(L, "%s(): Bad unitID: %i\n", caller, unitID);
-	}
-	CUnit* unit = uh->units[unitID];
-	if (unit == NULL) {
-		return NULL;
-	}
-	const CLuaHandle* lh = CLuaHandle::GetActiveHandle();
-	const int ctrlTeam = lh->GetCtrlTeam();
-	if (ctrlTeam < 0) {
-		return lh->GetFullCtrl() ? unit : NULL;
-	}
-	if (ctrlTeam != unit->team) {
-		luaL_error(L, "%s(): No permission to control unit %i\n", caller, unitID);
-	}
-	return unit;
-}
-
-
-int CLuaRules::SetUnitRulesParam(lua_State* L)
-{
-	CUnit* unit = ParseUnit(L, __FUNCTION__, 1);
-	if (unit == NULL) {
-		return 0;
-	}
-	SetRulesParam(L, __FUNCTION__, 1, unit->modParams, unit->modParamsMap);
-	return 0;
-}
-
-
-int CLuaRules::CreateUnitRulesParams(lua_State* L)
-{
-	CUnit* unit = ParseUnit(L, __FUNCTION__, 1);
-	if (unit == NULL) {
-		return 0;
-	}
-	CreateRulesParams(L, __FUNCTION__, 1, unit->modParams, unit->modParamsMap);
-	return 0;
-}
-
 
 /******************************************************************************/
 /******************************************************************************/

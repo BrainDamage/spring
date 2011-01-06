@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifdef _MSC_VER
 #include "StdAfx.h"
 #endif
@@ -6,7 +8,7 @@
 #include <boost/bind.hpp>
 
 #include "ConfigHandler.h"
-#include "lib/liblobby/Connection.h"
+#include "lib/lobby/Connection.h"
 #include "aGui/LineEdit.h"
 #include "aGui/VerticalLayout.h"
 #include "aGui/HorizontalLayout.h"
@@ -34,9 +36,9 @@ UpdaterWindow::UpdaterWindow(Connection* _con) : agui::Window("Lobby connection"
 	passwd->SetCrypt(true);
 	passwd->SetFocus(true);
 	passwd->SetWeight(2);
-	
+
 	agui::HorizontalLayout* bttnLayout = new agui::HorizontalLayout(wndLayout);
-	
+
 	agui::Button* login = new agui::Button("Login", bttnLayout);
 	login->Clicked.connect(boost::bind(&UpdaterWindow::Login, this));
 	agui::Button* registerb = new agui::Button("Register", bttnLayout);
@@ -76,7 +78,7 @@ void UpdaterWindow::ShowAggreement(const std::string& text)
 	agreement->SetSize(0.6, 0.7);
 	agui::VerticalLayout* vLay = new agui::VerticalLayout(agreement);
 	agui::TextElement* textEl = new agui::TextElement(text, vLay);
-	
+
 	agui::HorizontalLayout* bttnLayout = new agui::HorizontalLayout(vLay);
 	bttnLayout->SetSize(0.0f, 0.04f, true);
 	agui::Button* accept = new agui::Button("I Accept", bttnLayout);

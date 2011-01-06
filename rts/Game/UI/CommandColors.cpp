@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// CommandColors.cpp: implementation of the CCommandColors class.
-//
-//////////////////////////////////////////////////////////////////////
 #include "CommandColors.h"
 #include <cstdio>
 #include <cstring>
@@ -39,7 +38,7 @@ CCommandColors::CCommandColors()
 	queuedBlendSrc = GL_SRC_ALPHA;
 	queuedBlendDst = GL_ONE_MINUS_SRC_ALPHA;
 	stipplePattern = 0xffffffff;
-  stippleFactor = 1;
+	stippleFactor = 1;
 	stippleSpeed = 1.0f;
 
 	selectedLineWidth = 1.49f;
@@ -211,7 +210,7 @@ bool CCommandColors::LoadConfig(const string& filename)
 			break;
 		}
 
-		vector<string> words = parser.Tokenize(line, 1);
+		const vector<string> &words = parser.Tokenize(line, 1);
 
 		const string command = StringToLower(words[0]);
 

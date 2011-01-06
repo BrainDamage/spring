@@ -1,6 +1,6 @@
 #include "UnitDefHandler.h"
-#include "Sim/Weapons/WeaponDefHandler.h"
-#include "Sim/MoveTypes/MoveInfo.h"
+#include "LegacyCpp/MoveData.h"
+#include "LegacyCpp/WeaponDef.h"
 
 // ------------------------------------------------------------------------------------------------
 
@@ -99,7 +99,6 @@ sRAIUnitDef::sRAIUnitDef(const UnitDef *unitdef, IAICallback* cb, GlobalResource
 //	*l<<" ud->buildTime="<<ud->buildTime;
 //	*l<<" ud->maxThisUnit="<<ud->maxThisUnit;
 	ListSize=0;
-	SetUnitLimit(ud->maxThisUnit);
 	CanBuild=false;
 	CanBeBuilt=false;
 	HasPrerequisite=false;
@@ -147,7 +146,7 @@ sRAIUnitDef::sRAIUnitDef(const UnitDef *unitdef, IAICallback* cb, GlobalResource
 	WeaponGuardRange = 0;
 	WeaponEnergyDifference = 0;
 	WeaponMaxEnergyCost = 0;
-	for(std::vector<UnitDef::UnitDefWeapon>::const_iterator iW=ud->weapons.begin(); iW!=ud->weapons.end(); iW++)
+	for(std::vector<UnitDef::UnitDefWeapon>::const_iterator iW=ud->weapons.begin(); iW!=ud->weapons.end(); ++iW)
 	{
 		if( iW->def->reload!=0 )
 		{
@@ -199,6 +198,8 @@ sRAIUnitDef::sRAIUnitDef(const UnitDef *unitdef, IAICallback* cb, GlobalResource
 //		if( iW->def->selfExplode )
 //			Destruct=iW->def;
 	}
+
+	SetUnitLimit(ud->maxThisUnit);
 
 	SetBestWeaponEff(&WeaponLandEff,1,MaxFiringRange);
 	SetBestWeaponEff(&WeaponAirEff,2,MaxFiringRange);
@@ -255,7 +256,7 @@ sRAIUnitDef::sRAIUnitDef(const UnitDef *unitdef, IAICallback* cb, GlobalResource
 			// If a unit can build mobile units then it will inherit mobileType from it's options
 			map<TerrainMapMobileType*,int> MTcount;
 			typedef pair<TerrainMapMobileType*,int> MTpair;
-			for( map<int,string>::const_iterator iB=ud->buildOptions.begin(); iB!=ud->buildOptions.end(); iB++ )
+			for( map<int,string>::const_iterator iB=ud->buildOptions.begin(); iB!=ud->buildOptions.end(); ++iB )
 			{
 				if( cb->GetUnitDef(iB->second.c_str()) == 0 ) // Work-Around(Mod: ? Don't Remember):  Spring-Version(?)
 				{
@@ -276,14 +277,16 @@ sRAIUnitDef::sRAIUnitDef(const UnitDef *unitdef, IAICallback* cb, GlobalResource
 				}
 			}
 			int iMost = 0;
-			for( map<TerrainMapMobileType*,int>::iterator iM=MTcount.begin(); iM!=MTcount.end(); iM++ )
+			for( map<TerrainMapMobileType*,int>::iterator iM=MTcount.begin(); iM!=MTcount.end(); ++iM )
+			{				
 				if( mobileType == 0 || iM->second > iMost )
 				{
 					mobileType = iM->first;
 					iMost = iM->second;
 				}
-			if( (mobileType!=0 && !mobileType->typeUsable) ||
-				(!immobileType->typeUsable && (mobileType==0 || immobileType->sector.size()<100)) )
+			}
+			if( (mobileType != 0 && !mobileType->typeUsable) ||
+				(!immobileType->typeUsable && (mobileType == 0 || float(immobileType->sector.size()) / (TM->sectorXSize * TM->sectorZSize) < 0.01f)) )
 			{
 				Disabled = true;
 				CheckBuildOptions();
@@ -306,7 +309,7 @@ int sRAIUnitDef::GetPrerequisite()
 	int iBest=-1;
 	vector<int> vTempIDList; // Unit ID
 	set<int> sTemp; // searchable record of vTempIDList contents
-	for( map<int,sRAIPrerequisite>::iterator iP=AllPrerequisiteOptions.begin(); iP!=AllPrerequisiteOptions.end(); iP++ )
+	for( map<int,sRAIPrerequisite>::iterator iP=AllPrerequisiteOptions.begin(); iP!=AllPrerequisiteOptions.end(); ++iP )
 		if( int(iP->second.udr->UnitsActive.size()) > 0 )
 		{
 			if( iBest == -1 || iBest > iP->second.buildLine ) // New or Better buildline was found
@@ -317,7 +320,7 @@ int sRAIUnitDef::GetPrerequisite()
 			}
 			if( iBest == iP->second.buildLine )
 			{
-				for( map<int,sRAIUnitDef*>::iterator iB=iP->second.udr->BuildOptions.begin(); iB!=iP->second.udr->BuildOptions.end(); iB++ )
+				for( map<int,sRAIUnitDef*>::iterator iB=iP->second.udr->BuildOptions.begin(); iB!=iP->second.udr->BuildOptions.end(); ++iB )
 					if( iB->second->CanBeBuilt && AllPrerequisiteOptions.find(iB->first) != AllPrerequisiteOptions.end() && AllPrerequisiteOptions.find(iB->first)->second.buildLine == iBest-1 && sTemp.find(iB->first)==sTemp.end() && iB->second->GetBuildList("Constructor") != 0 && iB->second->GetBuildList("Constructor")->udIndex < iB->second->GetBuildList("Constructor")->RBL->UDefActiveTemp )
 					{
 						vTempIDList.push_back(iB->first);
@@ -338,11 +341,11 @@ int sRAIUnitDef::GetPrerequisite()
 int sRAIUnitDef::GetPrerequisiteNewBuilder()
 {
 	vector<int> vTempIDList;
-	for( map<int,sRAIUnitDef*>::iterator iP=PrerequisiteOptions.begin(); iP!=PrerequisiteOptions.end(); iP++ )
+	for( map<int,sRAIUnitDef*>::iterator iP=PrerequisiteOptions.begin(); iP!=PrerequisiteOptions.end(); ++iP )
 	{
 		if( iP->second->CanBeBuilt && (iP->second->ListSize > 1 || iP->second->List[0]->efficiency >= 0.5 || PrerequisiteOptions.size() == 1 ) )
 		{
-			for( map<int,sRAIUnitDef*>::iterator iP2=iP->second->PrerequisiteOptions.begin(); iP2!=iP->second->PrerequisiteOptions.end(); iP2++ )
+			for( map<int,sRAIUnitDef*>::iterator iP2=iP->second->PrerequisiteOptions.begin(); iP2!=iP->second->PrerequisiteOptions.end(); ++iP2 )
 			{
 				if( int(iP2->second->UnitsActive.size()) > 0 )
 				{
@@ -412,16 +415,16 @@ void sRAIUnitDef::CheckBuildOptions()
 	{
 		if( CanBuild )
 		{
-			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); iB++ )
+			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); ++iB )
 				if( !iB->second->HasPrerequisite )
 					iB->second->HasPrerequisite = true;
 		}
 		else
 		{
-			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); iB++ )
+			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); ++iB )
 			{
 				bool StillHasPrereq = false;
-				for( map<int,sRAIUnitDef*>::iterator iP=iB->second->PrerequisiteOptions.begin(); iP!=iB->second->PrerequisiteOptions.end(); iP++ )
+				for( map<int,sRAIUnitDef*>::iterator iP=iB->second->PrerequisiteOptions.begin(); iP!=iB->second->PrerequisiteOptions.end(); ++iP )
 				{
 					if( iP->second->CanBuild )
 					{
@@ -461,7 +464,7 @@ void sRAIUnitDef::CheckBuildOptions()
 		if( CanBuild || CanBeBuilt )
 		{
 			// Enabling
-			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); iB++ )
+			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); ++iB )
 			{
 				if( iB->second->RBPrereq )
 				{
@@ -473,12 +476,12 @@ void sRAIUnitDef::CheckBuildOptions()
 		else
 		{
 			// Disabling
-			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); iB++ )
+			for( map<int,sRAIUnitDef*>::iterator iB=BuildOptions.begin(); iB!=BuildOptions.end(); ++iB )
 			{
 				if( !iB->second->RBPrereq )
 				{
 					bool prereq = false;
-					for( map<int,sRAIUnitDef*>::iterator iP=iB->second->PrerequisiteOptions.begin(); iP!=iB->second->PrerequisiteOptions.end(); iP++ )
+					for( map<int,sRAIUnitDef*>::iterator iP=iB->second->PrerequisiteOptions.begin(); iP!=iB->second->PrerequisiteOptions.end(); ++iP )
 					{
 						if( iP->second->CanBuild || iP->second->CanBeBuilt )
 						{
@@ -552,7 +555,7 @@ void sRAIUnitDef::SetBestWeaponEff(sWeaponEfficiency *we, int type, float MaxFir
 {
 	float fRange=-1;
 	float fVal=0;
-	for(vector<UnitDef::UnitDefWeapon>::const_iterator iW=ud->weapons.begin(); iW!=ud->weapons.end(); iW++)
+	for(vector<UnitDef::UnitDefWeapon>::const_iterator iW=ud->weapons.begin(); iW!=ud->weapons.end(); ++iW)
 	{
 		if( CheckWeaponType(iW,type) )
 		{
@@ -561,7 +564,7 @@ void sRAIUnitDef::SetBestWeaponEff(sWeaponEfficiency *we, int type, float MaxFir
 				fRangeTemp = MaxFiringRange;
 
 			float fValTemp=0;
-			for(std::vector<UnitDef::UnitDefWeapon>::const_iterator iW2=ud->weapons.begin(); iW2!=ud->weapons.end(); iW2++)
+			for(std::vector<UnitDef::UnitDefWeapon>::const_iterator iW2=ud->weapons.begin(); iW2!=ud->weapons.end(); ++iW2)
 			{
 				if( CheckWeaponType(iW,type) )
 				{
@@ -654,9 +657,9 @@ cRAIUnitDefHandler::cRAIUnitDefHandler(IAICallback* cb, GlobalResourceMap *RM, G
 	*l<<"\n Reading All Unit Definitions (Frame="<<cb->GetCurrentFrame()<<") ...";
 	for( int iud=cb->GetNumUnitDefs()-1; iud>=0; iud-- )
 	{
-		if( udList[iud] == 0 ) // Work-around: War Alien VS Human v1.0 (as well as other possible mods)
+		if( udList[iud] == NULL ) // Work-around: War Alien VS Human v1.0 (as well as other possible mods)
 		{
-			*l<<"\n  WARNING: (unitdef->id="<<iud+1<<") Mod UnitDefList["<<iud<<"] = 0";
+			*l<<"\n  WARNING: (unitdef->id="<<iud+1<<") Mod UnitDefList["<<iud<<"] = NULL";
 			udSize--;
 			udList[iud] = udList[udSize];
 		}
@@ -711,17 +714,17 @@ cRAIUnitDefHandler::cRAIUnitDefHandler(IAICallback* cb, GlobalResourceMap *RM, G
 	for( int iud=0; iud<udSize; iud++ )
 	{
 		const UnitDef* ud=udList[iud];
-		UDR.insert(iuPair(ud->id,*new sRAIUnitDef(ud,cb,RM,TM,EnergyToMetalRatio,l,MaxFiringRange)));
+		UDR.insert(iuPair(ud->id,sRAIUnitDef(ud,cb,RM,TM,EnergyToMetalRatio,l,MaxFiringRange)));
 	}
-	delete [] udList;
+	delete [] udList; udList = NULL;
 
 	*l<<"\n Reading UnitDef Build Options ...";
 	typedef pair<int,sRAIUnitDef*> iupPair; // used to access UDR->BuildOptions & UDR->PrerequisiteOptions
 	typedef pair<int,sRAIPrerequisite> ipPair; // used to access UDR->AllPrerequisiteOptions
-	for( map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); iU++ )
+	for( map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); ++iU )
 	{
 		const UnitDef* ud = iU->second.ud;
-		for(map<int,string>::const_iterator iBO=ud->buildOptions.begin(); iBO!=ud->buildOptions.end(); iBO++ )
+		for(map<int,string>::const_iterator iBO=ud->buildOptions.begin(); iBO!=ud->buildOptions.end(); ++iBO )
 		{
 			const UnitDef* bd = cb->GetUnitDef(iBO->second.c_str());
 			if( bd == 0 )
@@ -739,17 +742,17 @@ cRAIUnitDefHandler::cRAIUnitDefHandler(IAICallback* cb, GlobalResourceMap *RM, G
 	}
 
 	*l<<"\n Determining All Build Options and Prerequisites ...";
-	for( map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); iU++ )
+	for( map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); ++iU )
 	{
 		vector<sBuildLine> vTemp;
 		vTemp.clear();
-		for( map<int,sRAIUnitDef*>::iterator iB=iU->second.PrerequisiteOptions.begin(); iB!=iU->second.PrerequisiteOptions.end(); iB++ )
+		for( map<int,sRAIUnitDef*>::iterator iB=iU->second.PrerequisiteOptions.begin(); iB!=iU->second.PrerequisiteOptions.end(); ++iB )
 			vTemp.push_back(sBuildLine(iB->first,1));
 		for(int iT=0; iT<int(vTemp.size()); iT++ )
 		{
 			if( iU->second.AllPrerequisiteOptions.find(vTemp[iT].ID) == iU->second.AllPrerequisiteOptions.end() )
 			{
-				for( map<int,sRAIUnitDef*>::iterator iB=UDR.find(vTemp[iT].ID)->second.PrerequisiteOptions.begin(); iB!=UDR.find(vTemp[iT].ID)->second.PrerequisiteOptions.end(); iB++ )
+				for( map<int,sRAIUnitDef*>::iterator iB=UDR.find(vTemp[iT].ID)->second.PrerequisiteOptions.begin(); iB!=UDR.find(vTemp[iT].ID)->second.PrerequisiteOptions.end(); ++iB )
 					vTemp.push_back(sBuildLine(iB->first,vTemp[iT].BL+1));
 				iU->second.AllPrerequisiteOptions.insert(ipPair(vTemp[iT].ID,sRAIPrerequisite(&UDR.find(vTemp[iT].ID)->second)));
 				iU->second.AllPrerequisiteOptions.find(vTemp[iT].ID)->second.buildLine=vTemp[iT].BL;
@@ -761,10 +764,10 @@ cRAIUnitDefHandler::cRAIUnitDefHandler(IAICallback* cb, GlobalResourceMap *RM, G
 			*l<<"\n  WARNING: ("<<iU->first<<")"<<iU->second.ud->humanName<<" is a non-commander unit that can not be built.";
 	}
 
-	for( list<TerrainMapMobileType>::iterator i=TM->mobileType.begin(); i!=TM->mobileType.end(); i++)
+	for( list<TerrainMapMobileType>::iterator i=TM->mobileType.begin(); i!=TM->mobileType.end(); ++i)
 		if( i->typeUsable )
 			RBMobile.insert(&*i);
-	for( list<TerrainMapImmobileType>::iterator i=TM->immobileType.begin(); i!=TM->immobileType.end(); i++)
+	for( list<TerrainMapImmobileType>::iterator i=TM->immobileType.begin(); i!=TM->immobileType.end(); ++i)
 		if( i->typeUsable )
 			RBImmobile.insert(&*i);
 /*
@@ -809,7 +812,7 @@ for(map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); iU++ )
 
 //	double UE[cb->GetNumUnitDefs()][ESIZE]; // Unit Efficency
 	double UE[5000][ESIZE]; // required for Visual Studios
-	for( map<int,sRAIUnitDef>::iterator iUD=UDR.begin(); iUD!=UDR.end(); iUD++ )
+	for( map<int,sRAIUnitDef>::iterator iUD=UDR.begin(); iUD!=UDR.end(); ++iUD )
 	{
 		sRAIUnitDef *udr=&iUD->second;
 		const UnitDef* ud=iUD->second.ud;
@@ -823,7 +826,7 @@ for(map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); iU++ )
 
 		UE[i][BUILD]=(ud->buildSpeed*ud->buildDistance)/cost;
 		UE[i][BUILDOPT]=int(ud->buildOptions.size()) + 8.0*ud->canResurrect;
-		for( map<int,sRAIUnitDef*>::iterator iB=udr->BuildOptions.begin(); iB!=udr->BuildOptions.end(); iB++ )
+		for( map<int,sRAIUnitDef*>::iterator iB=udr->BuildOptions.begin(); iB!=udr->BuildOptions.end(); ++iB )
 			if( (iB->second->PrerequisiteOptions.size()) == 1 )
 			{
 				UE[i][BUILDOPT] += 2;
@@ -883,7 +886,7 @@ for(map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); iU++ )
 		UE[i][SHIELD]=0;
 		UE[i][WEAPON]=0;
 		UE[i][WEAPONSEA]=0;
-		for(std::vector<UnitDef::UnitDefWeapon>::const_iterator iW=ud->weapons.begin(); iW!=ud->weapons.end(); iW++)
+		for(std::vector<UnitDef::UnitDefWeapon>::const_iterator iW=ud->weapons.begin(); iW!=ud->weapons.end(); ++iW)
 		{
 			float reload=iW->def->reload;
 			if( reload == 0 )
@@ -1018,7 +1021,7 @@ for(map<int,sRAIUnitDef>::iterator iU=UDR.begin(); iU!=UDR.end(); iU++ )
 	{
 		BL[BLSize] = new sRAIBuildList(cb->GetNumUnitDefs(),this);
 		float fAverageTaskEfficiency=0;
-		for( map<int,sRAIUnitDef>::iterator iUD=UDR.begin(); iUD!=UDR.end(); iUD++ )
+		for( map<int,sRAIUnitDef>::iterator iUD=UDR.begin(); iUD!=UDR.end(); ++iUD )
 		{
 			int i=iUD->first-1;
 			sRAIUnitDef *udr=&iUD->second;
@@ -1454,7 +1457,7 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		else if( udr->ud->isCommander )
 		{
 			sRAIUnitDefBL* bestEP = 0;
-			for( map<int,sRAIUnitDef*>::iterator iB = udr->BuildOptions.begin(); iB != udr->BuildOptions.end(); iB++ )
+			for( map<int,sRAIUnitDef*>::iterator iB = udr->BuildOptions.begin(); iB != udr->BuildOptions.end(); ++iB )
 				for(int iL=0; iL<iB->second->ListSize; iL++)
 					if( iB->second->List[iL]->RBL == BLEnergy && (bestEP == 0 || bestEP->efficiency < iB->second->List[iL]->efficiency) )
 						bestEP = iB->second->List[iL];
@@ -1553,7 +1556,7 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		}
 	}
 
-	for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
+	for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); ++iud )
 		if( iud->second.ListSize > 1 )
 		{
 			int bestTIndex=0; // best task-index
@@ -1618,7 +1621,7 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 	{
 		bool UseHoverCraft=false;
 		set<int> HoverCraftFactory;
-		for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end() && !UseHoverCraft; iud++ )
+		for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end() && !UseHoverCraft; ++iud )
 		{
 			if( iud->second.immobileType != 0 && iud->second.mobileType != 0 && iud->second.mobileType->canHover )
 				HoverCraftFactory.insert(iud->first);
@@ -1645,15 +1648,15 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		}
 		if( !UseHoverCraft )
 		{
-			for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end() && !UseHoverCraft; iud++ )
+			for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end() && !UseHoverCraft; ++iud )
 				if( !iud->second.ud->canhover && !iud->second.Disabled && HoverCraftFactory.find(iud->first) == HoverCraftFactory.end() )
 					// known defect (unlikely, has yet to occur):
 					// for every iud, all prerequisites are capable of building other prerequisites but at the same time a buildline doesn't exist
-					for(map<int,sRAIPrerequisite>::iterator iP=iud->second.AllPrerequisiteOptions.begin(); iP!=iud->second.AllPrerequisiteOptions.end(); iP++)
+					for(map<int,sRAIPrerequisite>::iterator iP=iud->second.AllPrerequisiteOptions.begin(); iP!=iud->second.AllPrerequisiteOptions.end(); ++iP)
 						if( !iP->second.udr->ud->canhover && !iP->second.udr->Disabled && HoverCraftFactory.find(iP->first) == HoverCraftFactory.end() )
 						{
 							bool alternative=false;
-							for(map<int,sRAIUnitDef*>::iterator iB=iP->second.udr->BuildOptions.begin(); iB!=iP->second.udr->BuildOptions.end(); iB++)
+							for(map<int,sRAIUnitDef*>::iterator iB=iP->second.udr->BuildOptions.begin(); iB!=iP->second.udr->BuildOptions.end(); ++iB)
 								if( !iB->second->ud->canhover && !iB->second->Disabled && HoverCraftFactory.find(iB->first) == HoverCraftFactory.end() )
 									if( iB->first == iud->first || iud->second.AllPrerequisiteOptions.find(iB->first) != iud->second.AllPrerequisiteOptions.end() )
 									{
@@ -1672,7 +1675,7 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		if( !UseHoverCraft )
 		{
 			*l<<"\n Disabling all hovercraft & their factories ...";
-			for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end() && !UseHoverCraft; iud++ )
+			for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end() && !UseHoverCraft; ++iud )
 			{
 				if( iud->second.ud->canhover || HoverCraftFactory.find(iud->first) != HoverCraftFactory.end() )
 				{
@@ -1692,20 +1695,20 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		if( udr->ud->speed == 0 )
 		{
 			set<int> deletion;
-			for( map<int,sRAIUnitDef*>::iterator i=udr->BuildOptions.begin(); i!=udr->BuildOptions.end(); i++ )
+			for( map<int,sRAIUnitDef*>::iterator i=udr->BuildOptions.begin(); i!=udr->BuildOptions.end(); ++i )
 			{
 				if( i->second->ud->speed == 0 )
 					if( i->second->ud->needGeo || i->second->ud->extractsMetal > 0 || i->second->HighEnergyDemand )
 					{
 						bool alternative=false;
-						for( map<int,sRAIUnitDef*>::iterator iP=i->second->PrerequisiteOptions.begin(); iP!=i->second->PrerequisiteOptions.end(); iP++)
+						for( map<int,sRAIUnitDef*>::iterator iP=i->second->PrerequisiteOptions.begin(); iP!=i->second->PrerequisiteOptions.end(); ++iP)
 							if( iP->second->ud->speed > 0 && !iP->second->Disabled )
 								alternative = true;
 						if( alternative )
 							deletion.insert(i->first);
 					}
 			}
-			for( set<int>::iterator i=deletion.begin(); i!=deletion.end(); i++ )
+			for( set<int>::iterator i=deletion.begin(); i!=deletion.end(); ++i )
 			{
 				sRAIUnitDef *udr2 = udr->BuildOptions.find(*i)->second;
 //				*l<<"\n  (Special Rule) Resource Build Option Removed ... ("<<udr->ud->id<<")"<<udr->ud->humanName<<" -> ("<<udr2->ud->id<<")"<<udr2->ud->humanName;
@@ -1719,19 +1722,19 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		if( udr->ud->speed > 0 && udr->ud->minWaterDepth >= 0 )
 		{
 			set<int> deletion;
-			for( map<int,sRAIUnitDef*>::iterator i=udr->BuildOptions.begin(); i!=udr->BuildOptions.end(); i++ )
+			for( map<int,sRAIUnitDef*>::iterator i=udr->BuildOptions.begin(); i!=udr->BuildOptions.end(); ++i )
 			{
 				if( i->second->ud->speed == 0 && i->second->WeaponGuardRange > 0 && i->second->ud->minWaterDepth < 0 )
 				{
 					bool alternative=false;
-					for( map<int,sRAIUnitDef*>::iterator iP=i->second->PrerequisiteOptions.begin(); iP!=i->second->PrerequisiteOptions.end(); iP++)
+					for( map<int,sRAIUnitDef*>::iterator iP=i->second->PrerequisiteOptions.begin(); iP!=i->second->PrerequisiteOptions.end(); ++iP)
 						if( iP->second->ud->speed > 0 && !iP->second->Disabled && iP->second->ud->minWaterDepth < 0 )
 							alternative = true;
 					if( alternative )
 						deletion.insert(i->first);
 				}
 			}
-			for( set<int>::iterator i=deletion.begin(); i!=deletion.end(); i++ )
+			for( set<int>::iterator i=deletion.begin(); i!=deletion.end(); ++i )
 			{
 				sRAIUnitDef *udr2 = udr->BuildOptions.find(*i)->second;
 //				*l<<"\n  (Special Rule) Defence Build Option Removed ... ("<<udr->ud->id<<")"<<udr->ud->humanName<<" -> ("<<udr2->ud->id<<")"<<udr2->ud->humanName;
@@ -1745,10 +1748,10 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		if( udr->ud->movedata != 0 && !udr->ud->canfly && !udr->ud->canhover && udr->ud->minWaterDepth < 0 && -udr->ud->movedata->depth > TM->minElevation )
 		{
 			set<int> deletion;
-			for( map<int,sRAIUnitDef*>::iterator i=udr->BuildOptions.begin(); i!=udr->BuildOptions.end(); i++ )
+			for( map<int,sRAIUnitDef*>::iterator i=udr->BuildOptions.begin(); i!=udr->BuildOptions.end(); ++i )
 				if( -i->second->ud->minWaterDepth < 0 && i->second->ud->extractsMetal > 0 )
 					deletion.insert(i->first);
-			for( set<int>::iterator i=deletion.begin(); i!=deletion.end(); i++ )
+			for( set<int>::iterator i=deletion.begin(); i!=deletion.end(); ++i )
 			{
 				sRAIUnitDef *udr2 = udr->BuildOptions.find(*i)->second;
 //				*l<<"\n  (Special Rule) Extractor Build Option Removed ... ("<<udr->ud->id<<")"<<udr->ud->humanName<<" -> ("<<udr2->ud->id<<")"<<udr2->ud->humanName;
@@ -1793,7 +1796,7 @@ for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
 		}
 	}
 	*l<<"\n  List of Undefined Units:";
-	for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); iud++ )
+	for(map<int,sRAIUnitDef>::iterator iud=UDR.begin(); iud!=UDR.end(); ++iud )
 		if( iud->second.ListSize == 0 )
 			*l<<"  "+iud->second.ud->humanName;
 }

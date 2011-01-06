@@ -1,5 +1,5 @@
 // GML - OpenGL Multithreading Library
-// for Spring http://spring.clan-sy.com
+// for Spring http://springrts.com
 // Author: Mattias "zerver" Radeskog
 // (C) Ware Zerver Tech. http://zerver.net
 // Ware Zerver Tech. licenses this library
@@ -13,6 +13,7 @@
 #include <set>
 #include <map>
 #include "LogOutput.h"
+#include <SDL_timer.h>
 #include <string.h>
 
 #define GML_ENABLE_DEBUG 0
@@ -316,21 +317,40 @@ EXTERN inline int gmlSizeOf(int datatype) {
 
 #if GML_CALL_DEBUG
 #include "lib/lua/include/lauxlib.h"
+extern unsigned drawCallInTime;
 extern lua_State *gmlCurrentLuaState;
 class gmlCallDebugger {
 public:
 	bool set;
+	unsigned drawtime;
 	gmlCallDebugger(lua_State *L) { 
 		if(!gmlCurrentLuaState) {
 			gmlCurrentLuaState = L;
 			set=true;
+			if(gmlThreadNumber == 0)
+				drawtime = SDL_GetTicks();
+			else
+				drawtime = 0;
 		} 
 		else 
 			set = false;
 	}
 	~gmlCallDebugger() {
-		if(set)
+		if(set) {
 			gmlCurrentLuaState = NULL;
+			if(drawtime) {
+				drawCallInTime += (SDL_GetTicks() - drawtime);
+				drawtime = 0;
+			}
+		}
+	}
+	static unsigned getDrawCallInTime() {
+		extern volatile int gmlMultiThreadSim, gmlStartSim;
+		unsigned ret = 0;
+		if(gmlMultiThreadSim && gmlStartSim)
+			ret = drawCallInTime;
+		drawCallInTime = 0;
+		return ret;
 	}
 };
 #define GML_CURRENT_LUA() (gmlCurrentLuaState ? "LUA" : "Unknown")
@@ -345,11 +365,11 @@ public:
 	rettype rdummy = (rettype)0;\
 	return rdummy;
 #define GML_IF_SIM_THREAD_RET(thread,name)\
-	if(thread == gmlThreadCount) {\
+	if(!GML_SHARE_LISTS && thread == GML_SIM_THREAD_NUM) {\
 		GML_THREAD_ERROR(GML_QUOTE(gml##name), GML_DUMMYRET())\
 	}
 #define GML_IF_SIM_THREAD_RETVAL(thread,name,rettype)\
-	if(thread == gmlThreadCount) {\
+	if(!GML_SHARE_LISTS && thread == GML_SIM_THREAD_NUM) {\
 		GML_THREAD_ERROR(GML_QUOTE(gml##name), GML_DUMMYRETVAL(rettype))\
 	}
 #else
@@ -410,12 +430,12 @@ EXTERN inline void gmlSync(gmlQueue *qd) {
 
 #if GML_ENABLE_ITEMSERVER_CHECK
 #define GML_ITEMSERVER_CHECK(thread)\
-	if(thread == gmlThreadCount) {\
+	if(!GML_SHARE_LISTS && thread == GML_SIM_THREAD_NUM) {\
 		GML_ITEMLOG_PRINT()\
 		GML_DUMMYRET()\
 	}
 #define GML_ITEMSERVER_CHECK_RET(thread,rettype)\
-	if(thread == gmlThreadCount) {\
+	if(!GML_SHARE_LISTS && thread == GML_SIM_THREAD_NUM) {\
 		GML_ITEMLOG_PRINT()\
 		GML_DUMMYRETVAL(rettype)\
 	}
@@ -528,6 +548,18 @@ GML_FUN(void, name, tA A, tB B, tC C, tD D) {\
 	GML_MAKEASS_D()\
 	GML_UPD_POS()\
 	GML_SYNC_COND(__VA_ARGS__,)\
+}
+
+#define GML_MAKEFUN4R(name,tA,tB,tC,tD,tR)\
+	GML_MAKEDATA_D(name,tA,tB,tC,tD)\
+	GML_MAKEVAR_RET(tR)\
+GML_FUN(tR, name, tA A, tB B, tC C, tD D) {\
+	GML_COND_RET(name,tR,A,B,C,D)\
+	GML_PREP_FIXED(name)\
+	GML_MAKEASS_D()\
+	GML_UPD_POS()\
+	GML_SYNC();\
+	GML_RETVAL(tR)\
 }
 
 #define GML_MAKEFUN5(name,tA,tB,tC,tD,tE,...)\
@@ -1366,5 +1398,7 @@ GML_MAKEFUN3V(Uniform4iv,GLint,GLsizei,const GLint,GLint,4*B)
 GML_MAKEFUN3V(Uniform2fv,GLint,GLsizei,const GLfloat,GLfloat,2*B)
 GML_MAKEFUN3V(Uniform3fv,GLint,GLsizei,const GLfloat,GLfloat,3*B)
 GML_MAKEFUN3V(Uniform4fv,GLint,GLsizei,const GLfloat,GLfloat,4*B)
+GML_MAKEFUN4R(MapBufferRange,GLenum,GLintptr,GLsizeiptr,GLbitfield,GLvoid *)
+GML_MAKEFUN1(PrimitiveRestartIndexNV,GLuint)
 
 #endif

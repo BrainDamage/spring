@@ -1,5 +1,7 @@
-#ifndef TAAIRMOVETYPE_H
-#define TAAIRMOVETYPE_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef TA_AIR_MOVE_TYPE_H
+#define TA_AIR_MOVE_TYPE_H
 
 #include "AAirMoveType.h"
 
@@ -66,16 +68,16 @@ public:
 
 
 	CTAAirMoveType(CUnit* owner);
-	~CTAAirMoveType(void);
+	~CTAAirMoveType();
 
 	// MoveType interface
-	virtual void Update();
-	virtual void SlowUpdate();
-	virtual void StartMoving(float3 pos, float goalRadius);
-	virtual void StartMoving(float3 pos, float goalRadius, float speed);
-	virtual void KeepPointingTo(float3 pos, float distance, bool aggressive);
-	virtual void StopMoving();
-	virtual void Idle();
+	void Update();
+	void SlowUpdate();
+	void StartMoving(float3 pos, float goalRadius);
+	void StartMoving(float3 pos, float goalRadius, float speed);
+	void KeepPointingTo(float3 pos, float distance, bool aggressive);
+	void StopMoving();
+	void Idle();
 
 	// Main state handlers
 	void UpdateLanded();
@@ -94,16 +96,16 @@ public:
 	void SetGoal(float3 newPos, float distance);
 	void SetState(AircraftState newState);
 
-	bool CanLandAt(float3 pos);
+	bool CanLandAt(const float3& pos) const;
 	void ExecuteStop();
 	void ForceHeading(short h);
 	void SetWantedAltitude(float altitude);
 	void SetDefaultAltitude(float altitude);
-	void CheckForCollision(void);
+	void CheckForCollision();
 	void DependentDied(CObject* o);
 
 	void Takeoff();
-	bool IsFighter();
+	bool IsFighter() const;
 };
 
-#endif // TAAIRMOVETYPE_H
+#endif // TA_AIR_MOVE_TYPE_H

@@ -1,11 +1,14 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "WeaponDef.h"
 
 #include "Sim/Projectiles/ExplosionGenerator.h"
-#include "Rendering/UnitModels/IModelParser.h"
+#include "Rendering/Models/IModelParser.h"
 
 WeaponDef::~WeaponDef()
 {
-	delete explosionGenerator; explosionGenerator = 0;
+	delete explosionGenerator; explosionGenerator = NULL;
+	delete bounceExplosionGenerator; bounceExplosionGenerator = NULL;
 }
 
 

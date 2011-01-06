@@ -1,19 +1,4 @@
-/*
-	Copyright (c) 2008 Robin Vobruba <hoijui.quaero@gmail.com>
-
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef _OPTION_CPP
 #define _OPTION_CPP
@@ -22,6 +7,8 @@
 
 #include "System/Util.h"
 #include "System/Exceptions.h"
+#include "System/FileSystem/FileSystem.h"
+#include "System/FileSystem/ArchiveScanner.h"
 #include "Lua/LuaParser.h"
 #include "Map/MapParser.h"
 
@@ -200,7 +187,6 @@ void parseOptions(
 		const std::string& fileName,
 		const std::string& fileModes,
 		const std::string& accessModes,
-		const std::string& mapName,
 		std::set<std::string>* optionsSet,
 		CLogSubsystem* logSubsystem) {
 
@@ -209,16 +195,6 @@ void parseOptions(
 	}
 
 	LuaParser luaParser(fileName, fileModes, accessModes);
-
-	const string configName = MapParser::GetMapConfigName(mapName);
-
-	if (!mapName.empty() && !configName.empty()) {
-		luaParser.GetTable("Map");
-		luaParser.AddString("fileName", mapName);
-		luaParser.AddString("fullName", "maps/" + mapName);
-		luaParser.AddString("configFile", configName);
-		luaParser.EndTable();
-	}
 
 	if (!luaParser.Execute()) {
 		throw content_error("luaParser.Execute() failed: "
@@ -248,20 +224,64 @@ void parseOptions(
 	}
 }
 
-std::vector<Option> parseOptions(
+
+void parseMapOptions(
+		std::vector<Option>& options,
 		const std::string& fileName,
+		const std::string& mapName,
 		const std::string& fileModes,
 		const std::string& accessModes,
-		const std::string& mapName,
 		std::set<std::string>* optionsSet,
 		CLogSubsystem* logSubsystem) {
 
-	std::vector<Option> options;
+	if (!logSubsystem) {
+		assert(logSubsystem);
+	}
 
-	parseOptions(options, fileName, fileModes, accessModes, mapName, optionsSet,
-			logSubsystem);
+	LuaParser luaParser(fileName, fileModes, accessModes);
 
-	return options;
+	const string configName = MapParser::GetMapConfigName(mapName);
+	const string mapFile    = archiveScanner->MapNameToMapFile(mapName);
+
+	if (mapName.empty())
+		throw "Missing map name!";
+
+	if (configName.empty())
+		throw "Couldn't determine config filename from the map name '" + mapName + "'!";
+
+	luaParser.GetTable("Map");
+	luaParser.AddString("name",     mapName);	
+	luaParser.AddString("fileName", filesystem.GetFilename(mapFile));
+	luaParser.AddString("fullName", mapFile);
+	luaParser.AddString("configFile", configName);
+	luaParser.EndTable();
+
+	if (!luaParser.Execute()) {
+		throw content_error("luaParser.Execute() failed: "
+				+ luaParser.GetErrorLog());
+	}
+
+	const LuaTable root = luaParser.GetRoot();
+	if (!root.IsValid()) {
+		throw content_error("root table invalid");
+	}
+
+	std::set<std::string>* myOptionsSet = NULL;
+	if (optionsSet == NULL) {
+		myOptionsSet = new std::set<std::string>();
+	} else {
+		myOptionsSet = optionsSet;
+	}
+	for (int index = 1; root.KeyExists(index); index++) {
+		Option opt;
+		if (parseOption(root, index, opt, *myOptionsSet, *logSubsystem)) {
+			options.push_back(opt);
+		}
+	}
+	if (optionsSet == NULL) {
+		delete myOptionsSet;
+		myOptionsSet = NULL;
+	}
 }
 
 #endif // _OPTION_CPP

@@ -46,7 +46,7 @@ bool CVFSHandler::AddArchive(const std::string& arName, bool override, const std
 	std::string name;
 	int size;
 
-	for (cur = ar->FindFiles(0, &name, &size); cur != 0; cur = ar->FindFiles(cur, &name, &size)) {
+	for (cur = filesystem.FindFiles(0, &name, &size); cur != 0; cur = ar->FindFiles(cur, &name, &size)) {
 		StringToLowerInPlace(name);
 
 		if (!override) {
@@ -107,7 +107,7 @@ bool CVFSHandler::RemoveArchive(const std::string& arName)
 		// archive is not loaded
 		return true;
 	}
-	
+
 	// remove the files loaded from the archive to remove
 	for (std::map<std::string, FileData>::iterator f = files.begin(); f != files.end();) {
 		if (f->second.ar == ar) {
@@ -295,3 +295,4 @@ std::vector<std::string> CVFSHandler::GetDirsInDir(const std::string& rawDir)
 
 	return ret;
 }
+

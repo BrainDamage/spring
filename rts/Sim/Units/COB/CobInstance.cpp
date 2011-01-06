@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -11,8 +13,6 @@
 #include "Game/GameHelper.h"
 #include "LogOutput.h"
 #include "Map/Ground.h"
-#include "Rendering/UnitModels/3DOParser.h"
-#include "Rendering/UnitModels/s3oParser.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/RadarHandler.h"
@@ -40,7 +40,7 @@
 #include "Sim/Weapons/Weapon.h"
 #include "GlobalUnsynced.h"
 #include "Util.h"
-#include "Sound/AudioChannel.h"
+#include "Sound/IEffectChannel.h"
 #include "myMath.h"
 #include "Sync/SyncTracer.h"
 
@@ -113,7 +113,7 @@ void CCobInstance::MapScriptToModelPieces(LocalModel* lmodel)
 
 		// Map this piecename to an index in the script's pieceinfo
 		for (cur=0; cur<lp.size(); cur++) {
-			if (lp[cur]->name.compare(scriptname) == 0) {
+			if (lp[cur]->original->name.compare(scriptname) == 0) {
 				break;
 			}
 		}
@@ -121,7 +121,7 @@ void CCobInstance::MapScriptToModelPieces(LocalModel* lmodel)
 		// Not found? Try lowercase
 		if (cur == lp.size()) {
 			for (cur=0; cur<lp.size(); cur++) {
-				if (StringToLower(lp[cur]->name).compare(scriptname) == 0) {
+				if (StringToLower(lp[cur]->original->name).compare(scriptname) == 0) {
 					break;
 				}
 			}
@@ -229,8 +229,8 @@ void CCobInstance::RockUnit(const float3& rockDir)
 
 
 // ugly hack to get return value of HitByWeaponId script
-static float weaponHitMod; //fraction of weapondamage to use when hit by weapon
-static void hitByWeaponIdCallback(int retCode, void *p1, void *p2) { weaponHitMod = retCode*0.01f; }
+static float weaponHitMod; ///< fraction of weapondamage to use when hit by weapon
+static void hitByWeaponIdCallback(int retCode, void* p1, void* p2) { weaponHitMod = retCode * 0.01f; }
 
 
 void CCobInstance::HitByWeapon(const float3& hitDir, int weaponDefId, float& inout_damage)

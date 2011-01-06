@@ -22,7 +22,6 @@
 #define _AIEVENTS_H
 
 #include "../AIAI.h"
-#include "../AIGlobalAI.h"
 
 #include "ExternalAI/Interface/AISEvents.h"
 #include "ExternalAI/Interface/AISCommands.h"
@@ -46,6 +45,8 @@
 #include "AIUnitGivenEvent.h"
 #include "AIUnitCapturedEvent.h"
 
+#include "AIEnemyCreatedEvent.h"
+#include "AIEnemyFinishedEvent.h"
 #include "AIEnemyEnterLOSEvent.h"
 #include "AIEnemyLeaveLOSEvent.h"
 #include "AIEnemyEnterRadarEvent.h"

@@ -1,4 +1,4 @@
-/* Author: Teake Nutma */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include <algorithm>
@@ -14,6 +14,7 @@
 #include "Lua/LuaParser.h"
 #include "Textures/Bitmap.h"
 #include "Exceptions.h"
+#include "Rendering/GL/myGL.h"
 
 using std::string;
 
@@ -30,8 +31,6 @@ CIconData CIconHandler::safetyData;
 
 CIconHandler::CIconHandler()
 {
-	PrintLoadMsg("Parsing unit icons");
-
 	defTexID = 0;
 	defIconData = NULL;
 
@@ -176,7 +175,7 @@ unsigned int CIconHandler::GetDefaultTexture()
 			const int index = ((y * 128) + x) * 4;
 			const int dx = (x - 64);
 			const int dy = (y - 64);
-			const float r = streflop::sqrtf((dx * dx) + (dy * dy)) / 64.0f;
+			const float r = math::sqrt((dx * dx) + (dy * dy)) / 64.0f;
 			if (r > 1.0f) {
 				si[index + 0] = 0;
 				si[index + 1] = 0;

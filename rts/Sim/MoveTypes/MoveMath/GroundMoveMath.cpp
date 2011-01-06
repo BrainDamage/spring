@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "GroundMoveMath.h"
 #include "Map/ReadMap.h"
@@ -13,7 +15,7 @@ float CGroundMoveMath::waterCost=0;
 /*
 Calculate speed-multiplier for given height and slope data.
 */
-float CGroundMoveMath::SpeedMod(const MoveData& moveData, float height, float slope) 
+float CGroundMoveMath::SpeedMod(const MoveData& moveData, float height, float slope) const
 {
 	//Too slope?
 	if(slope > moveData.maxSlope)
@@ -31,7 +33,7 @@ float CGroundMoveMath::SpeedMod(const MoveData& moveData, float height, float sl
 	return mod;
 }
 
-float CGroundMoveMath::SpeedMod(const MoveData& moveData, float height, float slope,float moveSlope) 
+float CGroundMoveMath::SpeedMod(const MoveData& moveData, float height, float slope,float moveSlope) const
 {
 	//Too slope?
 /*	if(slope*moveSlope > moveData.maxSlope)
@@ -51,13 +53,15 @@ float CGroundMoveMath::SpeedMod(const MoveData& moveData, float height, float sl
 /*
 Gives the ground-level of given square.
 */
-float CGroundMoveMath::yLevel(int xSquare, int zSquare) {
+float CGroundMoveMath::yLevel(int xSquare, int zSquare) const
+{
 	return readmap->centerheightmap[xSquare + zSquare * gs->mapx];
 }
 
-float CGroundMoveMath::yLevel(const float3& pos)
+
+float CGroundMoveMath::yLevel(const float3& pos) const
 {
-	return ground->GetHeight2(pos.x, pos.z) + 10;
+	return ground->GetHeightReal(pos.x, pos.z) + 10;
 }
 
 

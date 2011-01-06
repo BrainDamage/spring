@@ -1,11 +1,10 @@
-// Building.h: interface for the CBuilding class.
-//
-//////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef __BUILDING_H__
 #define __BUILDING_H__
 
 #include "Sim/Units/Unit.h"
+#include "System/float3.h"
 
 struct BuildingGroundDecal;
 
@@ -15,11 +14,12 @@ public:
 	CR_DECLARE(CBuilding);
 
 	CBuilding();
-	virtual ~CBuilding();
-	void PostLoad();
+	virtual ~CBuilding() {}
+	void PostLoad() {}
 
-	void Init(const CUnit* builder);
-	void UnitInit(const UnitDef* def, int team, const float3& position);
+	void PreInit(const UnitDef* def, int team, int facing, const float3& position, bool build);
+	void PostInit(const CUnit* builder);
+	void ForcedMove(const float3& newPos, int facing);
 
 	BuildingGroundDecal* buildingDecal;
 };

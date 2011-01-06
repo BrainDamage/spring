@@ -1,4 +1,9 @@
-//Modified DDS class from NVIDIA SDK.
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+// This software contains source code provided by NVIDIA Corporation.
+// License: http://developer.download.nvidia.com/licenses/general_license.txt
+
+// Modified DDS class from NVIDIA SDK.
 
 #ifndef __NV_DDS_H__
 #define __NV_DDS_H__
@@ -12,7 +17,6 @@
 #include <deque>
 #include <assert.h>
 
-#include "Rendering/GL/myGL.h"
 #if defined(__APPLE__)
 //#include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
@@ -202,7 +206,7 @@ namespace nv_dds
             bool save(std::string filename, bool flipImage = true);
 
             bool upload_texture1D();
-            bool upload_texture2D(unsigned int imageIndex = 0, GLenum target = GL_TEXTURE_2D);
+            bool upload_texture2D(unsigned int imageIndex, int target);
             bool upload_texture3D();
             bool upload_textureRectangle();
             bool upload_textureCubemap();
@@ -275,23 +279,15 @@ namespace nv_dds
                 return m_images[face];
             }
 
-            inline unsigned int get_components() { return m_components; }
-            inline unsigned int get_format() { return m_format; }
-            inline TextureType get_type() { return m_type; }
+            inline unsigned int get_components() const { return m_components; }
+            inline unsigned int get_format() const { return m_format; }
+            inline TextureType get_type() const { return m_type; }
 
-            inline bool is_compressed()
-            {
-                if ((m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ||
-                    (m_format == GL_COMPRESSED_RGBA_S3TC_DXT3_EXT) ||
-                    (m_format == GL_COMPRESSED_RGBA_S3TC_DXT5_EXT))
-                    return true;
-                else
-                    return false;
-            }
+            bool is_compressed() const;
 
-            inline bool is_cubemap() { return (m_type == TextureCubemap); }
-            inline bool is_volume() { return (m_type == Texture3D); }
-            inline bool is_valid() { return m_valid; }
+            inline bool is_cubemap() const { return (m_type == TextureCubemap); }
+            inline bool is_volume() const { return (m_type == Texture3D); }
+            inline bool is_valid() const { return m_valid; }
 
             inline bool is_dword_aligned()
             {
@@ -310,7 +306,7 @@ namespace nv_dds
             inline void swap_endian(void *val);
 
             // calculates 4-byte aligned width of image
-            inline unsigned int get_dword_aligned_linesize(unsigned int width, unsigned int bpp)
+            inline unsigned int get_dword_aligned_linesize(unsigned int width, unsigned int bpp) const
             {
                 return ((width * bpp + 31) & -32) >> 3;
             }
@@ -332,13 +328,6 @@ namespace nv_dds
             bool m_valid;
 
             std::deque<CTexture> m_images;
-
-#ifndef __APPLE__
-            static PFNGLTEXIMAGE3DEXTPROC glTexImage3D;
-            static PFNGLCOMPRESSEDTEXIMAGE1DARBPROC glCompressedTexImage1DARB;
-            static PFNGLCOMPRESSEDTEXIMAGE2DARBPROC glCompressedTexImage2DARB;
-            static PFNGLCOMPRESSEDTEXIMAGE3DARBPROC glCompressedTexImage3DARB;
-#endif
     };
 }
 

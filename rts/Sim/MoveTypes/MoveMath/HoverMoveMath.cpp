@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "HoverMoveMath.h"
 #include "Map/ReadMap.h"
@@ -13,7 +15,7 @@ bool CHoverMoveMath::noWaterMove;
 /*
 Calculate speed-multiplier for given height and slope data.
 */
-float CHoverMoveMath::SpeedMod(const MoveData& moveData, float height, float slope)
+float CHoverMoveMath::SpeedMod(const MoveData& moveData, float height, float slope) const
 {
 	//On water?
 	if(height < 0){
@@ -28,7 +30,7 @@ float CHoverMoveMath::SpeedMod(const MoveData& moveData, float height, float slo
 	return 1 / (1 + slope * moveData.slopeMod);
 }
 
-float CHoverMoveMath::SpeedMod(const MoveData& moveData, float height, float slope,float moveSlope)
+float CHoverMoveMath::SpeedMod(const MoveData& moveData, float height, float slope,float moveSlope) const
 {
 	//On water?
 	if(height < 0)
@@ -43,14 +45,14 @@ float CHoverMoveMath::SpeedMod(const MoveData& moveData, float height, float slo
 /*
 Gives a position slightly over ground and water level.
 */
-float CHoverMoveMath::yLevel(int xSquare, int zSquare)
+float CHoverMoveMath::yLevel(int xSquare, int zSquare) const
 {
-	return ground->GetHeight(xSquare*SQUARE_SIZE, zSquare*SQUARE_SIZE) + 10;
+	return ground->GetHeightAboveWater(xSquare*SQUARE_SIZE, zSquare*SQUARE_SIZE) + 10;
 }
 
 
-float CHoverMoveMath::yLevel(const float3& pos)
+float CHoverMoveMath::yLevel(const float3& pos) const
 {
-	return ground->GetHeight(pos.x, pos.z) + 10;
+	return ground->GetHeightAboveWater(pos.x, pos.z) + 10;
 }
 

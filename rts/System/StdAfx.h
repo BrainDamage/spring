@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef __STD_AFX_H__
 #define __STD_AFX_H__
 
@@ -33,7 +35,6 @@
 // do not include <cmath> or <math.h> before this, it'll cause ambiguous call er
 #include "lib/streflop/streflop_cond.h"
 #endif // defined(_MSC_VER) || defined(USE_PRECOMPILED_HEADER) || defined(USE_MMGR)
-
 
 #if !defined(USE_GML) && (defined(_MSC_VER) || defined(USE_PRECOMPILED_HEADER))
 // top included files without lots of dependencies

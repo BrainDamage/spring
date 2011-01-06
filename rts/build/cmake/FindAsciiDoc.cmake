@@ -1,3 +1,5 @@
+# This file is part of the Spring engine (GPL v2 or later), see LICENSE.html
+
 # - Find AsciiDoc, XSLTProc and DocBook
 # These toolds are used to compile man pages
 #
@@ -7,6 +9,8 @@
 #  ASCIIDOC_FOUND - TRUE if AsciiDoc was found
 #  XSLTPROC_FOUND - TRUE if XSLTProc was found
 #  DOCBOOK_FOUND  - TRUE if DocBook was found
+
+INCLUDE(FindPackageHandleStandardArgs)
 
 # Already in cache, be silent
 IF    (ASCIIDOC_BIN)
@@ -39,8 +43,6 @@ find_file(DOCBOOK_XSL
 		sgml/docbook/xsl-stylesheets/manpages
 	DOC "DocBook XSL Style-Sheet"
 	)
-
-INCLUDE(FindPackageHandleStandardArgs)
 
 # handle the QUIETLY and REQUIRED arguments and set ASCIIDOC_FOUND to TRUE if
 # all listed variables are TRUE

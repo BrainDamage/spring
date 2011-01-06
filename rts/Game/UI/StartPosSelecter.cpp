@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
@@ -59,7 +61,7 @@ bool CStartPosSelecter::MousePress(int x, int y, int button)
 		return !Ready();
 	}
 
-	float dist=ground->LineGroundCol(camera->pos,camera->pos+mouse->dir*gu->viewRange*1.4f);
+	float dist=ground->LineGroundCol(camera->pos,camera->pos+mouse->dir*globalRendering->viewRange*1.4f);
 	if(dist<0)
 		return true;
 
@@ -108,9 +110,9 @@ void CStartPosSelecter::Draw()
 
 	for(int a=0;a<10;++a){	//draw start rect restrictions
 		float3 pos1(bx+a*dx,0,by);
-		pos1.y=ground->GetHeight(pos1.x,pos1.z);
+		pos1.y=ground->GetHeightAboveWater(pos1.x,pos1.z);
 		float3 pos2(bx+(a+1)*dx,0,by);
-		pos2.y=ground->GetHeight(pos2.x,pos2.z);
+		pos2.y=ground->GetHeightAboveWater(pos2.x,pos2.z);
 
 		glVertexf3(pos1);
 		glVertexf3(pos2);
@@ -118,9 +120,9 @@ void CStartPosSelecter::Draw()
 		glVertexf3(pos1+UpVector*100);
 
 		pos1=float3(bx+a*dx,0,by+dy*10);
-		pos1.y=ground->GetHeight(pos1.x,pos1.z);
+		pos1.y=ground->GetHeightAboveWater(pos1.x,pos1.z);
 		pos2=float3(bx+(a+1)*dx,0,by+dy*10);
-		pos2.y=ground->GetHeight(pos2.x,pos2.z);
+		pos2.y=ground->GetHeightAboveWater(pos2.x,pos2.z);
 
 		glVertexf3(pos1);
 		glVertexf3(pos2);
@@ -128,9 +130,9 @@ void CStartPosSelecter::Draw()
 		glVertexf3(pos1+UpVector*100);
 
 		pos1=float3(bx,0,by+dy*a);
-		pos1.y=ground->GetHeight(pos1.x,pos1.z);
+		pos1.y=ground->GetHeightAboveWater(pos1.x,pos1.z);
 		pos2=float3(bx,0,by+dy*(a+1));
-		pos2.y=ground->GetHeight(pos2.x,pos2.z);
+		pos2.y=ground->GetHeightAboveWater(pos2.x,pos2.z);
 
 		glVertexf3(pos1);
 		glVertexf3(pos2);
@@ -138,9 +140,9 @@ void CStartPosSelecter::Draw()
 		glVertexf3(pos1+UpVector*100);
 
 		pos1=float3(bx+dx*10,0,by+dy*a);
-		pos1.y=ground->GetHeight(pos1.x,pos1.z);
+		pos1.y=ground->GetHeightAboveWater(pos1.x,pos1.z);
 		pos2=float3(bx+dx*10,0,by+dy*(a+1));
-		pos2.y=ground->GetHeight(pos2.x,pos2.z);
+		pos2.y=ground->GetHeightAboveWater(pos2.x,pos2.z);
 
 		glVertexf3(pos1);
 		glVertexf3(pos2);
@@ -155,8 +157,8 @@ void CStartPosSelecter::Draw()
 	glPopMatrix();
 	glDisable(GL_DEPTH_TEST);
 
-	float mx=float(mouse->lastx)/gu->viewSizeX;
-	float my=(gu->viewSizeY-float(mouse->lasty))/gu->viewSizeY;
+	float mx=float(mouse->lastx)/globalRendering->viewSizeX;
+	float my=(globalRendering->viewSizeY-float(mouse->lasty))/globalRendering->viewSizeY;
 
 	glDisable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
@@ -185,8 +187,8 @@ void CStartPosSelecter::Draw()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	// fit text into box
-	const float unitWidth  = font->GetSize() * font->GetTextWidth("Ready") * gu->pixelX;
-	const float unitHeight = font->GetSize() * font->GetLineHeight() * gu->pixelY;
+	const float unitWidth  = font->GetSize() * font->GetTextWidth("Ready") * globalRendering->pixelX;
+	const float unitHeight = font->GetSize() * font->GetLineHeight() * globalRendering->pixelY;
 
 	const float ySize = (readyBox.y2 - readyBox.y1);
 	const float xSize = (readyBox.x2 - readyBox.x1);

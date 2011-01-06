@@ -1,7 +1,6 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
-// Player.cpp: implementation of the CPlayer class.
-//
-//////////////////////////////////////////////////////////////////////
 #include <assert.h>
 #include <SDL_mouse.h>
 
@@ -50,28 +49,27 @@ CR_REG_METADATA(CPlayer, (
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-CPlayer::CPlayer()
+DirectControlStruct::DirectControlStruct()
+	: forward(false)
+	, back(false)
+	, left(false)
+	, right(false)
+	, mouse1(false)
+	, mouse2(false)
+	, viewDir(float3(0.0f, 0.0f, 1.0f))
+	, targetPos(float3(0.0f, 0.0f, 1.0f))
+	, targetDist(1000)
+	, target(NULL)
+	, myController(NULL)
 {
-	memset(&currentStats, 0, sizeof(Statistics));
+}
 
-	active   = false;
-	cpuUsage = 0;
-	ping     = 0;
-
-
-	dccs.playerControlledUnit = 0;
-
-	myControl.forward = 0;
-	myControl.back    = 0;
-	myControl.left    = 0;
-	myControl.right   = 0;
-
-	myControl.mouse1       = 0;
-	myControl.mouse2       = 0;
-	myControl.viewDir      = float3(0, 0, 1);
-	myControl.targetPos    = float3(0, 0, 1);
-	myControl.targetDist   = 1000;
-	myControl.target       = 0;
+CPlayer::CPlayer()
+	: PlayerBase()
+	, active(false)
+	, playerNum(-1)
+	, ping(0)
+{
 	myControl.myController = this;
 }
 
@@ -121,9 +119,14 @@ void CPlayer::UpdateControlledTeams()
 
 void CPlayer::StartSpectating()
 {
+	if (spectator) {
+		return;
+	}
+
 	spectator = true;
-	if (dccs.playerControlledUnit)
+	if (dccs.playerControlledUnit != NULL) {
 		StopControllingUnit();
+	}
 
 	if (playerHandler->Player(gu->myPlayerNum) == this) { //TODO bad hack
 		gu->spectating           = true;
@@ -135,8 +138,9 @@ void CPlayer::StartSpectating()
 
 void CPlayer::GameFrame(int frameNum)
 {
-	if (!active || !dccs.playerControlledUnit)
+	if (!active || (dccs.playerControlledUnit == NULL)) {
 		return;
+	}
 
 	CUnit* unit = dccs.playerControlledUnit;
 	DirectControlStruct* dc = &myControl;
@@ -155,11 +159,6 @@ void CPlayer::GameFrame(int frameNum)
 	float dist = helper->TraceRayTeam(pos, dc->viewDir, unit->maxRange, hit, 1, unit, teamHandler->AllyTeam(team));
 	dc->target = hit;
 
-	// prevent dgunning using FPS view if outside dgun-limit
-	if (uh->limitDgun && unit->unitDef->isCommander && unit->pos.SqDistance(teamHandler->Team(unit->team)->startPos) > Square(uh->dgunRadius)) {
-		return;
-	}
-
 	if (hit) {
 		dc->targetDist = dist;
 		dc->targetPos = hit->pos;
@@ -167,8 +166,9 @@ void CPlayer::GameFrame(int frameNum)
 			unit->AttackUnit(hit, true);
 		}
 	} else {
-		if (dist > unit->maxRange * 0.95f)
+		if (dist > unit->maxRange * 0.95f) {
 			dist = unit->maxRange * 0.95f;
+		}
 
 		dc->targetDist = dist;
 		dc->targetPos = pos + dc->viewDir * dc->targetDist;
@@ -177,9 +177,10 @@ void CPlayer::GameFrame(int frameNum)
 			unit->AttackGround(dc->targetPos, true);
 			for (std::vector<CWeapon*>::iterator wi = unit->weapons.begin(); wi != unit->weapons.end(); ++wi) {
 				float d = dc->targetDist;
-				if (d > (*wi)->range * 0.95f)
+				if (d > (*wi)->range * 0.95f) {
 					d = (*wi)->range * 0.95f;
-				float3 p = pos + dc->viewDir * d;
+				}
+				const float3 p = pos + dc->viewDir * d;
 				(*wi)->AttackGround(p, true);
 			}
 		}
@@ -188,14 +189,18 @@ void CPlayer::GameFrame(int frameNum)
 
 void CPlayer::StopControllingUnit()
 {
+	if (!dccs.playerControlledUnit) {
+		return;
+	}
+
 	CUnit* unit = dccs.playerControlledUnit;
-	unit->directControl = 0;
-	unit->AttackUnit(0, true);
+	unit->directControl = NULL;
+	unit->AttackUnit(NULL, true);
 	if (gu->directControl == dccs.playerControlledUnit) {
 		assert(playerHandler->Player(gu->myPlayerNum) == this);
-		gu->directControl = 0;
+		gu->directControl = NULL;
 
-		/* Switch back to the camera we were using before. */
+		// Switch back to the camera we were using before.
 		camHandler->PopMode();
 
 		if (mouse->locked && !mouse->wasLocked) {
@@ -204,7 +209,7 @@ void CPlayer::StopControllingUnit()
 		}
 	}
 
-	dccs.playerControlledUnit = 0;
+	dccs.playerControlledUnit = NULL;
 }
 
 

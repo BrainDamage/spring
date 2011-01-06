@@ -1,29 +1,32 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
 #include "DynWater.h"
 #include "Game/Game.h"
 #include "Game/Camera.h"
-#include "Rendering/GL/VertexArray.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
-#include "LogOutput.h"
-#include "bitops.h"
-#include "Map/BaseGroundDrawer.h"
-#include "BaseSky.h"
-#include "Rendering/UnitModels/FeatureDrawer.h"
-#include "Rendering/UnitModels/UnitDrawer.h"
-#include "Sim/Projectiles/ProjectileHandler.h"
 #include "Game/UI/MouseHandler.h"
 #include "Game/GameHelper.h"
+#include "Map/BaseGroundDrawer.h"
+#include "Rendering/GlobalRendering.h"
+#include "Rendering/FeatureDrawer.h"
+#include "Rendering/ProjectileDrawer.hpp"
+#include "Rendering/UnitDrawer.h"
 #include "Rendering/ShadowHandler.h"
+#include "Rendering/Env/BaseSky.h"
+#include "Rendering/GL/VertexArray.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
-#include "GlobalUnsynced.h"
-#include "EventHandler.h"
-#include "Exceptions.h"
+#include "System/LogOutput.h"
+#include "System/bitops.h"
+#include "System/GlobalUnsynced.h"
+#include "System/EventHandler.h"
+#include "System/Exceptions.h"
 
 #define W_SIZE 5
 #define WF_SIZE 5120
@@ -43,7 +46,7 @@ CDynWater::CDynWater(void)
 	firstDraw=true;
 	drawSolid=true;
 	camPosBig=float3(2048,0,2048);
-	refractSize=gu->viewSizeY>=1024 ? 1024:512;
+	refractSize=globalRendering->viewSizeY>=1024 ? 1024:512;
 
 	glGenTextures(1, &reflectTexture);
 	glBindTexture(GL_TEXTURE_2D, reflectTexture);
@@ -101,24 +104,24 @@ CDynWater::CDynWater(void)
 
 	delete[] scrap;
 
-	if (ProgramStringIsNative(GL_VERTEX_PROGRAM_ARB, "waterDyn.vp"))
-		waterVP = LoadVertexProgram("waterDyn.vp");
+	if (ProgramStringIsNative(GL_VERTEX_PROGRAM_ARB, "ARB/waterDyn.vp"))
+		waterVP = LoadVertexProgram("ARB/waterDyn.vp");
 	else
-		waterVP = LoadVertexProgram("waterDynNT.vp");
+		waterVP = LoadVertexProgram("ARB/waterDynNT.vp");
 
-	waterFP          = LoadFragmentProgram("waterDyn.fp");
-	waveFP           = LoadFragmentProgram("waterDynWave.fp");
-	waveVP           = LoadVertexProgram("waterDynWave.vp");
-	waveFP2          = LoadFragmentProgram("waterDynWave2.fp");
-	waveVP2          = LoadVertexProgram("waterDynWave2.vp");
-	waveNormalFP     = LoadFragmentProgram("waterDynNormal.fp");
-	waveNormalVP     = LoadVertexProgram("waterDynNormal.vp");
-	waveCopyHeightFP = LoadFragmentProgram("waterDynWave3.fp");
-	waveCopyHeightVP = LoadVertexProgram("waterDynWave3.vp");
-	dwDetailNormalFP = LoadFragmentProgram("dwDetailNormal.fp");
-	dwDetailNormalVP = LoadVertexProgram("dwDetailNormal.vp");
-	dwAddSplashFP    = LoadFragmentProgram("dwAddSplash.fp");
-	dwAddSplashVP    = LoadVertexProgram("dwAddSplash.vp");
+	waterFP          = LoadFragmentProgram("ARB/waterDyn.fp");
+	waveFP           = LoadFragmentProgram("ARB/waterDynWave.fp");
+	waveVP           = LoadVertexProgram("ARB/waterDynWave.vp");
+	waveFP2          = LoadFragmentProgram("ARB/waterDynWave2.fp");
+	waveVP2          = LoadVertexProgram("ARB/waterDynWave2.vp");
+	waveNormalFP     = LoadFragmentProgram("ARB/waterDynNormal.fp");
+	waveNormalVP     = LoadVertexProgram("ARB/waterDynNormal.vp");
+	waveCopyHeightFP = LoadFragmentProgram("ARB/waterDynWave3.fp");
+	waveCopyHeightVP = LoadVertexProgram("ARB/waterDynWave3.vp");
+	dwDetailNormalFP = LoadFragmentProgram("ARB/dwDetailNormal.fp");
+	dwDetailNormalVP = LoadVertexProgram("ARB/dwDetailNormal.vp");
+	dwAddSplashFP    = LoadFragmentProgram("ARB/dwAddSplash.fp");
+	dwAddSplashVP    = LoadVertexProgram("ARB/dwAddSplash.vp");
 
 	waterSurfaceColor = mapInfo->water.surfaceColor;
 
@@ -312,8 +315,8 @@ void CDynWater::Draw()
 	glBindProgramARB( GL_VERTEX_PROGRAM_ARB, waterVP );
 	glEnable( GL_VERTEX_PROGRAM_ARB );
 
-	float dx=float(gu->viewSizeX)/gu->viewSizeY * camera->GetTanHalfFov();
-	float dy=float(gu->viewSizeY)/gu->viewSizeY * camera->GetTanHalfFov();
+	float dx=float(globalRendering->viewSizeX)/globalRendering->viewSizeY * camera->GetTanHalfFov();
+	float dy=float(globalRendering->viewSizeY)/globalRendering->viewSizeY * camera->GetTanHalfFov();
 
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 10, 1.0f/(W_SIZE*256),1.0f/(W_SIZE*256), 0, 0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, -camPosX/256.0f+0.5f,-camPosZ/256.0f+0.5f, 0, 0);
@@ -367,8 +370,6 @@ void CDynWater::Draw()
 
 void CDynWater::UpdateWater(CGame* game)
 {
-	DeleteOldWater(this);
-
 	if ((!mapInfo->water.forceRendering && readmap->currMinHeight > 1.0f) || mapInfo->map.voidWater)
 		return;
 
@@ -467,10 +468,10 @@ void CDynWater::DrawReflection(CGame* game)
 
 	unitDrawer->Draw(true);
 	featureDrawer->Draw();
-	unitDrawer->DrawCloakedUnits(false,true);
-	featureDrawer->DrawFadeFeatures(false,true);
+	unitDrawer->DrawCloakedUnits(true);
+	featureDrawer->DrawFadeFeatures(true);
 
-	ph->Draw(true);
+	projectileDrawer->Draw(true);
 	eventHandler.DrawWorldReflection();
 
 	sky->DrawSun();
@@ -480,7 +481,7 @@ void CDynWater::DrawReflection(CGame* game)
 	drawReflection=false;
 	glDisable(GL_CLIP_PLANE2);
 
-	glViewport(gu->viewPosX,0,gu->viewSizeX,gu->viewSizeY);
+	glViewport(globalRendering->viewPosX,0,globalRendering->viewSizeX,globalRendering->viewSizeY);
 	glClearColor(mapInfo->atmosphere.fogColor[0],mapInfo->atmosphere.fogColor[1],mapInfo->atmosphere.fogColor[2],1);
 
 //	delete camera;
@@ -525,10 +526,10 @@ void CDynWater::DrawRefraction(CGame* game)
 	drawReflection=true;
 	unitDrawer->Draw(false,true);
 	featureDrawer->Draw();
-	unitDrawer->DrawCloakedUnits(true,true);
-	featureDrawer->DrawFadeFeatures(true,true); // FIXME: Make it fade out correctly without "noAdvShading"
+	unitDrawer->DrawCloakedUnits(true);
+	featureDrawer->DrawFadeFeatures(true); // FIXME: Make it fade out correctly without "noAdvShading"
 	drawReflection=false;
-	ph->Draw(false,true);
+	projectileDrawer->Draw(false, true);
 	eventHandler.DrawWorldRefraction();
 	glDisable(GL_CLIP_PLANE2);
 
@@ -537,7 +538,7 @@ void CDynWater::DrawRefraction(CGame* game)
 	drawRefraction=false;
 
 
-	glViewport(gu->viewPosX,0,gu->viewSizeX,gu->viewSizeY);
+	glViewport(globalRendering->viewPosX,0,globalRendering->viewSizeX,globalRendering->viewSizeY);
 	glClearColor(mapInfo->atmosphere.fogColor[0],mapInfo->atmosphere.fogColor[1],mapInfo->atmosphere.fogColor[2],1);
 
 	unitDrawer->unitSunColor=oldsun;
@@ -789,13 +790,13 @@ void CDynWater::DrawHeightTex(void)
 
 void CDynWater::AddFrustumRestraint(float3 side)
 {
-	fline temp;
 	float3 up(0,1,0);
 
 	float3 b=up.cross(side);		//get vector for collision between frustum and horizontal plane
 	if(fabs(b.z)<0.0001f)
 		b.z=0.0001f;
 	{
+		fline temp;
 		temp.dir=b.x/b.z;				//set direction to that
 		float3 c=b.cross(side);			//get vector from camera to collision line
 		float3 colpoint;				//a point on the collision line
@@ -827,7 +828,6 @@ void CDynWater::UpdateCamRestraints(void)
 	AddFrustumRestraint(cam2->leftside);
 
 	//Add restraint for maximum view distance
-	fline temp;
 	float3 up(0,1,0);
 	float3 side=cam2->forward;
 	float3 camHorizontal=cam2->forward;
@@ -835,14 +835,15 @@ void CDynWater::UpdateCamRestraints(void)
 	camHorizontal.ANormalize();
 	float3 b=up.cross(camHorizontal);			//get vector for collision between frustum and horizontal plane
 	if(fabs(b.z)>0.0001f){
+		fline temp;
 		temp.dir=b.x/b.z;				//set direction to that
 		float3 c=b.cross(camHorizontal);			//get vector from camera to collision line
 		float3 colpoint;				//a point on the collision line
 
 		if(side.y>0)
-			colpoint=cam2->pos+camHorizontal*gu->viewRange*1.05f-c*(cam2->pos.y/c.y);
+			colpoint=cam2->pos+camHorizontal*globalRendering->viewRange*1.05f-c*(cam2->pos.y/c.y);
 		else
-			colpoint=cam2->pos+camHorizontal*gu->viewRange*1.05f-c*((cam2->pos.y-255/3.5f)/c.y);
+			colpoint=cam2->pos+camHorizontal*globalRendering->viewRange*1.05f-c*((cam2->pos.y-255/3.5f)/c.y);
 
 
 		temp.base=colpoint.x-colpoint.z*temp.dir;	//get intersection between colpoint and z axis
@@ -910,7 +911,7 @@ void CDynWater::DrawWaterSurface(void)
 			int xe=xend;
 			int xtest,xtest2;
 			std::vector<fline>::iterator fli;
-			for(fli=left.begin();fli!=left.end();fli++){
+			for(fli=left.begin();fli!=left.end();++fli){
 				float xtf = fli->base / WSQUARE_SIZE + fli->dir * y;
 				xtest = ((int)xtf) / lod * lod - lod;
 				xtest2 = ((int)(xtf + fli->dir * lod)) / lod * lod - lod;
@@ -919,7 +920,7 @@ void CDynWater::DrawWaterSurface(void)
 				if(xtest>xs)
 					xs=xtest;
 			}
-			for(fli=right.begin();fli!=right.end();fli++){
+			for(fli=right.begin();fli!=right.end();++fli){
 				float xtf = fli->base / WSQUARE_SIZE + fli->dir * y;
 				xtest = ((int)xtf) / lod * lod - lod;
 				xtest2 = ((int)(xtf + fli->dir * lod)) / lod * lod - lod;
@@ -1141,48 +1142,57 @@ void CDynWater::AddShipWakes()
 	{
 		GML_RECMUTEX_LOCK(unit); // AddShipWakes
 
-		int nadd=uh->renderUnits.size()*4;
-		va->EnlargeArrays(nadd,0,VA_SIZE_TN);
-		va2->EnlargeArrays(nadd,0,VA_SIZE_TN);
+		const std::set<CUnit*>& units = unitDrawer->GetUnsortedUnits();
+		const int nadd = units.size() * 4;
 
-		for(std::list<CUnit*>::iterator ui=uh->renderUnits.begin(); ui!=uh->renderUnits.end();++ui){
-			CUnit* unit=*ui;
-			if(unit->moveType && unit->mobility) {
-				if(unit->unitDef->canhover){	//hover
-					float3 pos=unit->pos;
-					if(fabs(pos.x-camPosBig.x)>WH_SIZE-50 || fabs(pos.z-camPosBig.z)>WH_SIZE-50)
-						continue;
-					if(!(unit->losStatus[gu->myAllyTeam] & LOS_INLOS) && !gu->spectatingFullView)
-						continue;
-					if(pos.y>-4 && pos.y<4){
-						float3 frontAdd=unit->frontdir*unit->radius*0.75f;
-						float3 sideAdd=unit->rightdir*unit->radius*0.75f;
-						float depth=sqrt(sqrt(unit->mass))*0.4f;
-						float3 n(depth, 0.05f*depth, depth);
+		va->EnlargeArrays(nadd, 0, VA_SIZE_TN);
+		va2->EnlargeArrays(nadd, 0, VA_SIZE_TN);
 
-						va2->AddVertexQTN(pos+frontAdd+sideAdd,0,0,n);
-						va2->AddVertexQTN(pos+frontAdd-sideAdd,1,0,n);
-						va2->AddVertexQTN(pos-frontAdd-sideAdd,1,1,n);
-						va2->AddVertexQTN(pos-frontAdd+sideAdd,0,1,n);
+		for (std::set<CUnit*>::const_iterator ui = units.begin(); ui != units.end(); ++ui) {
+			CUnit* unit = *ui;
+
+			if (unit->moveType && unit->mobility) {
+				if (unit->unitDef->canhover) {
+					// hovercraft
+					const float3& pos = unit->pos;
+
+					if ((fabs(pos.x - camPosBig.x) > WH_SIZE - 50) || (fabs(pos.z - camPosBig.z) > WH_SIZE - 50))
+						continue;
+					if (!(unit->losStatus[gu->myAllyTeam] & LOS_INLOS) && !gu->spectatingFullView)
+						continue;
+
+					if (pos.y > -4.0f && pos.y < 4.0f) {
+						const float3 frontAdd = unit->frontdir * unit->radius * 0.75f;
+						const float3 sideAdd = unit->rightdir * unit->radius * 0.75f;
+						const float depth = sqrt(sqrt(unit->mass)) * 0.4f;
+						const float3 n(depth, 0.05f * depth, depth);
+
+						va2->AddVertexQTN(pos + frontAdd + sideAdd, 0, 0, n);
+						va2->AddVertexQTN(pos + frontAdd - sideAdd, 1, 0, n);
+						va2->AddVertexQTN(pos - frontAdd - sideAdd, 1, 1, n);
+						va2->AddVertexQTN(pos - frontAdd + sideAdd, 0, 1, n);
 					}
 				}
-				else if(unit->floatOnWater){	//boat
-					float speedf=unit->speed.Length2D();
-					float3 pos=unit->pos;
-					if(fabs(pos.x-camPosBig.x)>WH_SIZE-50 || fabs(pos.z-camPosBig.z)>WH_SIZE-50)
-						continue;
-					if(!(unit->losStatus[gu->myAllyTeam] & LOS_INLOS) && !gu->spectatingFullView)
-						continue;
-					if(pos.y>-4 && pos.y<1){
-						float3 frontAdd=unit->frontdir*unit->radius*0.75f;
-						float3 sideAdd=unit->rightdir*unit->radius*0.18f;
-						float depth=sqrt(sqrt(unit->mass));
-						float3 n(depth, 0.04f*speedf*depth, depth);
+				else if (unit->floatOnWater) {
+					// surface ship
+					const float speedf = unit->speed.Length2D();
+					const float3& pos = unit->pos;
 
-						va->AddVertexQTN(pos+frontAdd+sideAdd,0,0,n);
-						va->AddVertexQTN(pos+frontAdd-sideAdd,1,0,n);
-						va->AddVertexQTN(pos-frontAdd-sideAdd,1,1,n);
-						va->AddVertexQTN(pos-frontAdd+sideAdd,0,1,n);
+					if ((fabs(pos.x - camPosBig.x) > WH_SIZE - 50) || (fabs(pos.z - camPosBig.z) > WH_SIZE - 50))
+						continue;
+					if (!(unit->losStatus[gu->myAllyTeam] & LOS_INLOS) && !gu->spectatingFullView)
+						continue;
+
+					if (pos.y > -4.0f && pos.y < 1.0f) {
+						const float3 frontAdd = unit->frontdir * unit->radius * 0.75f;
+						const float3 sideAdd = unit->rightdir * unit->radius * 0.18f;
+						const float depth = sqrt(sqrt(unit->mass));
+						const float3 n(depth, 0.04f * speedf * depth, depth);
+
+						va->AddVertexQTN(pos + frontAdd + sideAdd, 0, 0, n);
+						va->AddVertexQTN(pos + frontAdd - sideAdd, 1, 0, n);
+						va->AddVertexQTN(pos - frontAdd - sideAdd, 1, 1, n);
+						va->AddVertexQTN(pos - frontAdd + sideAdd, 0, 1, n);
 					}
 				}
 			}
@@ -1190,12 +1200,12 @@ void CDynWater::AddShipWakes()
 	}
 
 	glActiveTextureARB(GL_TEXTURE0_ARB);
-	glBindTexture(GL_TEXTURE_2D,boatShape);
+	glBindTexture(GL_TEXTURE_2D, boatShape);
 
 	va->DrawArrayTN(GL_QUADS);
 
 	glActiveTextureARB(GL_TEXTURE0_ARB);
-	glBindTexture(GL_TEXTURE_2D,hoverShape);
+	glBindTexture(GL_TEXTURE_2D, hoverShape);
 
 	va2->DrawArrayTN(GL_QUADS);
 

@@ -1,19 +1,26 @@
-// BFGroundTextures.h
-///////////////////////////////////////////////////////////////////////////
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef __BASE_GROUND_DRAWER_H__
 #define __BASE_GROUND_DRAWER_H__
 
 #include <vector>
-#include "Rendering/Env/BaseTreeDrawer.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/PBO.h"
 #include "float3.h"
 
+class CMetalMap;
 class CHeightLinePalette;
 
 class CBaseGroundDrawer
 {
 public:
+	enum {
+		COLOR_R = 2,
+		COLOR_G = 1,
+		COLOR_B = 0,
+		COLOR_A = 3,
+	};
+
 	CBaseGroundDrawer(void);
 	virtual ~CBaseGroundDrawer(void);
 
@@ -39,49 +46,50 @@ public:
 		drawLos,
 		drawMetal,
 		drawHeight,
-		drawPath
+		drawPathTraversability,
+		drawPathHeat,
+		drawPathCost,
 	};
 
 protected:
 	virtual void SetDrawMode(BaseGroundDrawMode dm) { drawMode = dm; }
 
 public:
-	void DrawTrees(bool drawReflection=false) const;
+	void DrawTrees(bool drawReflection = false) const;
 
 	// Everything that deals with drawing extra textures on top
 	void DisableExtraTexture();
 	void SetHeightTexture();
-	void SetMetalTexture(unsigned char* tex,float* extractMap,unsigned char* pal,bool highRes);
-	void SetPathMapTexture();
+	void SetMetalTexture(const CMetalMap*);
+	void TogglePathTraversabilityTexture();
+	void TogglePathHeatTexture();
+	void TogglePathCostTexture();
 	void ToggleLosTexture();
 	void ToggleRadarAndJammer();
 	bool UpdateExtraTexture();
-	bool DrawExtraTex() const { return drawMode!=drawNormal; };
+	bool DrawExtraTex() const { return drawMode != drawNormal; }
 
-	void SetTexGen(float scalex,float scaley, float offsetx, float offsety) const;
-
-	bool updateFov;
-	bool drawRadarAndJammer;
-	bool drawLineOfSight;
 	bool wireframe;
 
 	float LODScaleReflection;
 	float LODScaleRefraction;
 	float LODScaleUnitReflection;
 
-	GLuint infoTex;
+	BaseGroundDrawMode drawMode;
 
-	unsigned char* infoTexMem;
+	bool drawRadarAndJammer;
+	bool drawLineOfSight;
+
+	int updateTextureState;
+
+	GLuint infoTex;
+	PBO extraTexPBO;
 	bool highResInfoTex;
 	bool highResInfoTexWanted;
 
 	const unsigned char* extraTex;
 	const unsigned char* extraTexPal;
-	float* extractDepthMap;
-
-	int updateTextureState;
-
-	BaseGroundDrawMode drawMode;
+	const float* extractDepthMap;
 
 	float infoTexAlpha;
 
@@ -92,7 +100,7 @@ public:
 	static const int losColorScale = 10000;
 
 	bool highResLosTex;
-// 	bool smoothLosTex;
+	int extraTextureUpdateRate;
 
 	CHeightLinePalette* heightLinePal;
 };

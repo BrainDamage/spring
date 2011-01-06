@@ -1,8 +1,11 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 #include "mmgr.h"
 
 #include "BitmapMuzzleFlame.h"
 #include "Sim/Misc/GlobalSynced.h"
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/VertexArray.h"
 #include "Rendering/Textures/ColorMap.h"
 #include "Rendering/Textures/TextureAtlas.h"
@@ -27,22 +30,35 @@ CR_REG_METADATA(CBitmapMuzzleFlame,
 	CR_RESERVED(8)
 ));
 
-CBitmapMuzzleFlame::CBitmapMuzzleFlame(void) :
-	CProjectile()
+CBitmapMuzzleFlame::CBitmapMuzzleFlame()
+	: CProjectile()
+	, sideTexture(NULL)
+	, frontTexture(NULL)
+	, dir(ZeroVector)
+	, colorMap(NULL)
+	, size(0.0f)
+	, length(0.0f)
+	, sizeGrowth(0.0f)
+	, frontOffset(0.0f)
+	, ttl(0)
+	, invttl(0.0f)
+	, life(0.0f)
+	, createTime(0)
 {
-	deleteMe  = false;
-	checkCol  = false;
+	// set fields from super-classes
 	useAirLos = true;
+	checkCol  = false;
+	deleteMe  = false;
 }
 
-CBitmapMuzzleFlame::~CBitmapMuzzleFlame(void)
+CBitmapMuzzleFlame::~CBitmapMuzzleFlame()
 {
 }
 
-void CBitmapMuzzleFlame::Draw(void)
+void CBitmapMuzzleFlame::Draw()
 {
 	inArray = true;
-	life = (gs->frameNum - createTime + gu->timeOffset) * invttl;
+	life = (gs->frameNum - createTime + globalRendering->timeOffset) * invttl;
 
 	unsigned char col[4];
 	colorMap->GetColor(col, life);
@@ -74,17 +90,18 @@ void CBitmapMuzzleFlame::Draw(void)
 
 }
 
-void CBitmapMuzzleFlame::Update(void)
+void CBitmapMuzzleFlame::Update()
 {
 	ttl--;
-	if(!ttl)
+	if (ttl == 0) {
 		deleteMe = true;
+	}
 }
 
-void CBitmapMuzzleFlame::Init(const float3 &pos, CUnit *owner GML_PARG_C)
+void CBitmapMuzzleFlame::Init(const float3& pos, CUnit* owner)
 {
-	CProjectile::Init(pos, owner GML_PARG_P);
-	life = 0;
+	CProjectile::Init(pos, owner);
+	life = 0.0f;
 	createTime = gs->frameNum;
-	invttl = 1.0f/(float)ttl;
+	invttl = 1.0f / (float) ttl;
 }

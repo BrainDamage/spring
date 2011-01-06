@@ -1,33 +1,56 @@
-#ifndef AICHEATS_H
-#define AICHEATS_H
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "IAICheats.h"
+#ifndef AI_CHEATS_H
+#define AI_CHEATS_H
+
+#include "ExternalAI/AILegacySupport.h"
+#include "float3.h"
+
+#include <string>
+#include <vector>
+#include <map>
+
+struct Command;
+struct UnitDef;
+struct FeatureDef;
+struct WeaponDef;
+struct CommandDescription;
+class CCommandQueue;
+class CGroupHandler;
+class CGroup;
+class CUnit;
 class CSkirmishAIWrapper;
 
-class CAICheats: public IAICheats
+class CAICheats
 {
 	CSkirmishAIWrapper* ai;
+
+	// utility methods
+
+	/// Returns the unit if the ID is valid
+	CUnit* GetUnit(int unitId) const;
+
 public:
 	CAICheats(CSkirmishAIWrapper* ai);
-	~CAICheats(void);
+	~CAICheats();
 
-	void SetMyHandicap(float handicap);
+	void SetMyIncomeMultiplier(float incomeMultiplier);
 
 	void GiveMeMetal(float amount);
 	void GiveMeEnergy(float amount);
 
-	int CreateUnit(const char* name, float3 pos);
+	int CreateUnit(const char* name, const float3& pos);
 
 	const UnitDef* GetUnitDef(int unitId);
 	float3 GetUnitPos(int unitId);
-	int GetEnemyUnits(int* unitIds, int unitIds_max);
-	int GetEnemyUnits(int* unitIds, const float3& pos, float radius, int unitIds_max);
-	int GetNeutralUnits(int* unitIds, int unitIds_max);
-	int GetNeutralUnits(int* unitIds, const float3& pos, float radius, int unitIds_max);
+	float3 GetUnitVelocity(int unitId);
+	int GetEnemyUnits(int* unitIds, int unitIds_max = -1);
+	int GetEnemyUnits(int* unitIds, const float3& pos, float radius, int unitIds_max = -1);
+	int GetNeutralUnits(int* unitIds, int unitIds_max = -1);
+	int GetNeutralUnits(int* unitIds, const float3& pos, float radius, int unitIds_max = -1);
 
-	int GetFeatures(int *features, int max);
-	int GetFeatures(int *features, int max, const float3& pos,
-			float radius);
+	int GetFeatures(int* features, int max) const;
+	int GetFeatures(int* features, int max, const float3& pos, float radius) const;
 
 	int GetUnitTeam(int unitId);
 	int GetUnitAllyTeam(int unitId);
@@ -45,13 +68,12 @@ public:
 	bool IsUnitCloaked(int unitId);
 	bool IsUnitParalyzed(int unitId);
 
-	bool OnlyPassiveCheats();
-	static bool IsPassive();
+	static bool OnlyPassiveCheats();
 	void EnableCheatEvents(bool enable);
 
 	bool GetProperty(int unit, int property, void* dst);
-	bool GetValue(int id, void* dst);
+	bool GetValue(int id, void* dst) const;
 	int HandleCommand(int commandId, void* data);
 };
 
-#endif
+#endif // AI_CHEATS_H

@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "StdAfx.h"
 
 #include <algorithm>
@@ -23,10 +25,22 @@ using namespace std;
 
 const CGameSetup* gameSetup = NULL;
 
-CGameSetup::CGameSetup():
-	startPosType(StartPos_Fixed),
-	hostDemo(false),
-	numDemoPlayers(0)
+CGameSetup::CGameSetup()
+	: fixedAllies(true)
+	, mapHash(0)
+	, modHash(0)
+	, useLuaGaia(true)
+	, startPosType(StartPos_Fixed)
+	, maxUnits(1500)
+	, ghostedBuildings(true)
+	, disableMapDamage(false)
+	, maxSpeed(0.0f)
+	, minSpeed(0.0f)
+	, onlyLocal(false)
+	, hostDemo(false)
+	, numDemoPlayers(0)
+	, gameStartDelay(0)
+	, noHelperAIs(0)
 {}
 
 CGameSetup::~CGameSetup()
@@ -140,7 +154,7 @@ void CGameSetup::LoadPlayers(const TdfParser& file, std::set<std::string>& nameL
 
 	unsigned playerCount = 0;
 	if (file.GetValue(playerCount, "GAME\\NumPlayers") && playerStartingData.size() != playerCount)
-		logOutput.Print("Warning: %i players in GameSetup script (NumPlayers says %i)", playerStartingData.size(), playerCount);
+		logOutput.Print("Warning: "_STPF_" players in GameSetup script (NumPlayers says %i)", playerStartingData.size(), playerCount);
 }
 
 void CGameSetup::LoadSkirmishAIs(const TdfParser& file, std::set<std::string>& nameList)
@@ -253,7 +267,7 @@ void CGameSetup::LoadTeams(const TdfParser& file)
 
 	unsigned teamCount = 0;
 	if (file.GetValue(teamCount, "Game\\NumTeams") && teamStartingData.size() != teamCount)
-		logOutput.Print("Warning: %i teams in GameSetup script (NumTeams: %i)", teamStartingData.size(), teamCount);
+		logOutput.Print("Warning: "_STPF_" teams in GameSetup script (NumTeams: %i)", teamStartingData.size(), teamCount);
 }
 
 void CGameSetup::LoadAllyTeams(const TdfParser& file)
@@ -367,7 +381,7 @@ bool CGameSetup::Init(const std::string& buf)
 	// Parse
 	TdfParser file(buf.c_str(),buf.size());
 
-	if(!file.SectionExist("GAME"))
+	if (!file.SectionExist("GAME"))
 		return false;
 
 	// Game parameters
@@ -378,24 +392,18 @@ bool CGameSetup::Init(const std::string& buf)
 
 	modName     = file.SGetValueDef("",  "GAME\\Gametype");
 	mapName     = file.SGetValueDef("",  "GAME\\MapName");
-	
-	luaGaiaStr  = file.SGetValueDef("1", "GAME\\ModOptions\\LuaGaia");
-	if (luaGaiaStr == "0")
-		useLuaGaia = false;
-	else
-		useLuaGaia = true;
-	luaRulesStr = file.SGetValueDef("1", "GAME\\ModOptions\\LuaRules");
 	saveName    = file.SGetValueDef("",  "GAME\\Savefile");
 	demoName    = file.SGetValueDef("",  "GAME\\Demofile");
 	hostDemo    = !demoName.empty();
 
 	file.GetDef(mapgenSeed, "0", "GAME\\MapgenSeed");
 
-	file.GetDef(gameMode,         "0", "GAME\\ModOptions\\GameMode");
+	file.GetTDef(gameStartDelay, (unsigned int) 4, "GAME\\GameStartDelay");
+
+	file.GetDef(onlyLocal,        "0", "GAME\\OnlyLocal");
+	file.GetDef(useLuaGaia,       "1", "GAME\\ModOptions\\LuaGaia");
 	file.GetDef(noHelperAIs,      "0", "GAME\\ModOptions\\NoHelperAIs");
 	file.GetDef(maxUnits,       "1500", "GAME\\ModOptions\\MaxUnits");
-	file.GetDef(limitDgun,        "0", "GAME\\ModOptions\\LimitDgun");
-	file.GetDef(diminishingMMs,   "0", "GAME\\ModOptions\\DiminishingMMs");
 	file.GetDef(disableMapDamage, "0", "GAME\\ModOptions\\DisableMapDamage");
 	file.GetDef(ghostedBuildings, "1", "GAME\\ModOptions\\GhostedBuildings");
 

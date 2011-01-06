@@ -1,8 +1,11 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef MAPINFO_H
 #define MAPINFO_H
 
 #include <string>
 #include <vector>
+
 #include "float3.h"
 #include "float4.h"
 
@@ -12,9 +15,11 @@ class MapParser;
 class CMapInfo
 {
 public:
-
-	CMapInfo(const std::string& mapName);
-	void Load(); // fill in infos
+	/**
+	@param mapInfoFile mapinfo file, aka sm3 / smf (full path)
+	@param mapName human readable mapname e.g. DeltaSiegeDry
+	*/
+	CMapInfo(const std::string& mapInfoFile, const std::string& mapName);
 	~CMapInfo();
 
 	/* The settings are just public members because:
@@ -48,17 +53,16 @@ public:
 
 	/** Global settings, ie. from "MAP" section. */
 	struct map_t {
-		std::string name;      ///< The filename as passed to the constructor.
-		std::string humanName; ///< "MAP\\Description"
+		std::string name;        ///< The filename as passed to the constructor.
+		std::string description; ///< "MAP\\Description"
 		std::string author;
-		float hardness;        ///< "MAP\\MapHardness"
+		float hardness;          ///< "MAP\\MapHardness"
 		bool  notDeformable;
 		/** Stores the gravity as a negative number in units/frame^2
 		    (NOT positive units/second^2 as in the mapfile) */
 		float gravity;
 		float tidalStrength;
-		/// what metal value 255 in the metal map is worth
-		float maxMetal;
+		float maxMetal;        ///< what metal value 255 in the metal map is worth
 		float extractorRadius; ///< extraction radius for mines
 		bool  voidWater;
 	} map;
@@ -80,6 +84,20 @@ public:
 		float  maxWind;
 		std::string skyBox;
 	} atmosphere;
+
+	/** settings read from "MAP\SPLATS" section */
+	struct splats_t {
+		float4 texScales;
+		float4 texMults;
+	} splats;
+
+	/** settings read from "MAP\GRASS" section */
+	struct grass_t {
+		float bladeWaveScale; //! how strongly wind affects grass-blade waving (if 0, disables vertex animation)
+		float bladeWidth;
+		float bladeHeight;    //! actual blades will be (bladeHeight + randf(0, bladeHeight)) tall
+		float bladeAngle;
+	} grass;
 
 	/** settings read from "MAP\LIGHT" section */
 	struct light_t {
@@ -134,8 +152,13 @@ public:
 
 	/** SMF specific settings */
 	struct smf_t {
-		std::string detailTexName; ///< "MAP\DetailTex"
-		std::string specularTexName; ///< "MAP\SpecularTex"
+		std::string detailTexName;        ///< "MAP\DetailTex"
+		std::string specularTexName;      ///< "MAP\SpecularTex"
+		std::string splatDistrTexName;
+		std::string splatDetailTexName;
+		std::string grassBladeTexName;    // defaults to internally-generated texture
+		std::string grassShadingTexName;  // defaults to minimap texture
+		std::string skyReflectModTexName;
 
 		float minHeight;
 		bool  minHeightOverride;
@@ -170,12 +193,15 @@ private:
 	void ReadGlobal();
 	void ReadGui();
 	void ReadAtmosphere();
+	void ReadSplats();
+	void ReadGrass();
 	void ReadLight();
 	void ReadWater();
 	void ReadSmf();
 	void ReadSm3();
 	void ReadTerrainTypes();
 
+	std::string mapInfoFile;
 	MapParser* parser; // map       parser root table
 	LuaTable* resRoot; // resources parser root table
 };

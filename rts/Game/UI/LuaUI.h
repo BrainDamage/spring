@@ -1,15 +1,14 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #ifndef LUA_UI_H
 #define LUA_UI_H
-// LuaUI.h: interface for the CLuaUI class.
-//
-//////////////////////////////////////////////////////////////////////
 
 #include <string>
 #include <vector>
 #include <map>
 
 #include "Lua/LuaHandle.h"
-#include "Sim/Units/CommandAI/Command.h"
+//#include "Sim/Units/CommandAI/Command.h"
 
 
 class CUnit;
@@ -17,9 +16,13 @@ class CFeature;
 struct Command;
 struct lua_State;
 struct CommandDescription;
+class LuaLobby;
 
 
-class CLuaUI : public CLuaHandle {
+class CLuaUI : public CLuaHandle
+{
+	friend class LuaLobby;
+
 	public:
 		static void LoadHandler();
 		static void FreeHandler();
@@ -42,8 +45,6 @@ class CLuaUI : public CLuaHandle {
 	public: // call-ins
 		bool HasCallIn(const string& name);
 		bool UnsyncedUpdateCallIn(const string& name);
-
-		void GameFrame(int frameNum);
 
 		void Shutdown();
 

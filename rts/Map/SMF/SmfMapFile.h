@@ -1,4 +1,4 @@
-/* Author: Tobi Vollebregt */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef SMFMAPFILE_H
 #define SMFMAPFILE_H
@@ -14,7 +14,7 @@ class CSmfMapFile
 {
 public:
 
-	CSmfMapFile(const std::string& mapname);
+	CSmfMapFile(const std::string& mapFileName);
 
 	void ReadMinimap(void* data);
 	/// @return mipsize

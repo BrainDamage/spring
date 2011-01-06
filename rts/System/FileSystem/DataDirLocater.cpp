@@ -1,10 +1,4 @@
-/**
- * @file DataDirLocater.cpp
- * @author Tobi Vollebregt
- *
- * Copyright (C) 2006-2008 Tobi Vollebregt
- * Licensed under the terms of the GNU GPL, v2 or later
- */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
 #include "DataDirLocater.h"
@@ -27,6 +21,7 @@
 #include "ConfigHandler.h"
 #include "FileSystemHandler.h"
 #include "FileSystem.h"
+#include "CacheDir.h"
 #include "mmgr.h"
 #include "Exceptions.h"
 #include "maindefines.h" // for sPS, cPS, cPD
@@ -34,14 +29,7 @@
 
 DataDir::DataDir(const std::string& p) : path(p), writable(false)
 {
-	// sPS/cPS (depending on OS): "\\" & '\\' or "/" & '/'
-
-	// make sure the path ends with a (back-)slash
-	if (path.empty()) {
-		path = "."sPS;
-	} else if (path[path.size() - 1] != cPS) {
-		path += cPS;
-	}
+	FileSystemHandler::EnsurePathSepAtEnd(path);
 }
 
 DataDirLocater::DataDirLocater() : writedir(NULL)
@@ -220,8 +208,8 @@ void DataDirLocater::LocateDataDirs()
 	// e.g. F:\Dokumente und Einstellungen\All Users\Anwendungsdaten\Spring
 	dd_appData += "\\Spring";
 #elif     defined(MACOSX_BUNDLE)
-	const std::string dd_curWorkDirData = dd_curWorkDir + "/" + SubstEnvVars(DATADIR));
-	const std::string dd_curWorkDirLib  = dd_curWorkDir + "/" + SubstEnvVars(LIBDIR));
+	const std::string dd_curWorkDirData = dd_curWorkDir + "/" + SubstEnvVars(DATADIR);
+	const std::string dd_curWorkDirLib  = dd_curWorkDir + "/" + SubstEnvVars(LIBDIR);
 #else // *nix (-OSX)
 	// settings in /etc
 	std::string dd_etc = "";
@@ -233,12 +221,13 @@ void DataDirLocater::LocateDataDirs()
 			while (fgets(lineBuf, sizeof(lineBuf), fileH)) {
 				char* newLineCharPos = strchr(lineBuf, '\n');
 				if (newLineCharPos) {
-					// end the string at the  it an empty string
+					// remove the new line char
 					*newLineCharPos = '\0';
 				}
 				// ignore lines consisting of only whitespaces
 				if ((strlen(lineBuf) > 0) && strspn(lineBuf, whiteSpaces) != strlen(lineBuf)) {
-					dd_etc = dd_etc + " " + SubstEnvVars(lineBuf);
+					// append, separated by sPD (depending on OS): ';' or ':'
+					dd_etc = dd_etc + (dd_etc.empty() ? "" : sPD) + SubstEnvVars(lineBuf);
 				}
 			}
 			fclose(fileH);
@@ -328,6 +317,12 @@ void DataDirLocater::LocateDataDirs()
 	for (std::vector<DataDir>::const_iterator d = datadirs.begin(); d != datadirs.end(); ++d) {
 		if (d->writable) {
 			logOutput.Print("Using read-write data directory: %s", d->path.c_str());
+
+			// tag the cache dir
+			const std::string cacheDir = d->path + "cache";
+			if (filesystem.CreateDirectory(cacheDir)) {
+				CacheDir::SetCacheDir(cacheDir, true);
+			}
 		} else {
 			logOutput.Print("Using read-only data directory: %s",  d->path.c_str());
 		}
