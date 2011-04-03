@@ -1031,8 +1031,15 @@ void CGame::ClientReadNet()
 					player.playerNum = playerNum;
 					// add the new player
 					playerHandler->AddPlayer(player);
+					if (spectator) logOutput.Print("Added new spectator: %s", name.c_str());
+					else {
+						if (teamHandler->Team(team)->leader == -1) {
+							teamHandler->Team(team)->leader = playerNum;
+						}
+						CPlayer::UpdateControlledTeams();
+						logOutput.Print("Added new player: %s to team: %d", name.c_str(), team);
+					}
 					eventHandler.PlayerAdded(player.playerNum);
-					logOutput.Print("Added new player: %s", name.c_str());
 					//TODO: perhaps add a lua hook, hook should be able to reassign the player to a team and/or create a new team/allyteam
 					AddTraffic(-1, packetCode, dataLength);
 				} catch (netcode::UnpackPacketException &e) {

@@ -209,7 +209,7 @@ private:
 	void InternalSpeedChange(float newSpeed);
 	void UserSpeedChange(float newSpeed, int player);
 
-	void AddAdditionalUser( const std::string& name, const std::string& passwd, bool fromDemo = false );
+	void AddAdditionalUser( const std::string& name, const std::string& passwd, bool fromDemo = false, bool spectator = true, int team = 0 );
 
 	bool hasLocalClient;
 	unsigned localClientNumber;

@@ -1904,9 +1904,25 @@ void CGameServer::PushAction(const Action& action)
 			if (tokens.size() > 1) {
 				const std::string& name = tokens[0];
 				const std::string& password = tokens[1];
-
 				GameParticipant gp;
-					gp.name = name;
+				gp.name = name;
+				if (tokens.size() > 2) {
+					gp.spectator = atoi(tokens[2].c_str());
+				} else {
+					gp.spectator = true;
+				}
+				if (tokens.size() > 3 ) {
+					gp.team = atoi(tokens[3].c_str());
+					if (gp.team >= teams.size() ){
+						logOutput.Print("Failed to add player. Invalid team.");
+						return;
+					}
+				} else {
+					gp.team = 0;
+				}
+				std::string type;
+				if (gp.spectator) type = "spectator";
+				else type = "player";
 				// note: this must only compare by name
 				std::vector<GameParticipant>::iterator participantIter = std::find(players.begin(), players.end(), gp);
 
@@ -1914,11 +1930,11 @@ void CGameServer::PushAction(const Action& action)
 					participantIter->SetValue("password", password);
 					logOutput.Print("Changed player/spectator password: \"%s\" \"%s\"", name.c_str(), password.c_str());
 				} else {
-					AddAdditionalUser(name, password);
-					logOutput.Print("Added player/spectator password: \"%s\" \"%s\"", name.c_str(), password.c_str());
+					AddAdditionalUser(gp.name, password,false,gp.spectator,gp.team);
+					logOutput.Print("Added %s password: \"%s\" \"%s\" (%d)", type.c_str(), name.c_str(), password.c_str(),gp.team);
 				}
 			} else {
-				logOutput.Print("Failed to add player/spectator password. usage: /adduser <player-name> <password>");
+				logOutput.Print("Failed to add player/spectator password. usage: /adduser <player-name> <password> [spectator=1] [team=0]");
 			}
 		}
 	}
@@ -2080,13 +2096,13 @@ void CGameServer::KickPlayer(const int playerNum)
 }
 
 
-void CGameServer::AddAdditionalUser(const std::string& name, const std::string& passwd, bool fromDemo)
+void CGameServer::AddAdditionalUser(const std::string& name, const std::string& passwd, bool fromDemo, bool spectator, int team )
 {
 	GameParticipant buf;
 	buf.isFromDemo = fromDemo;
 	buf.name = name;
-	buf.spectator = true;
-	buf.team = 0;
+	buf.spectator = spectator;
+	buf.team = team;
 	buf.isMidgameJoin = true;
 	if (passwd.size() > 0)
 		buf.SetValue("password",passwd);
